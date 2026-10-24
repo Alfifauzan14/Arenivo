@@ -18,7 +18,8 @@
     "dev:backend": "npm run dev --workspace=@futsal/backend",
     "build": "npm run build --workspace=@futsal/shared && npm run build --workspace=@futsal/backend && npm run build --workspace=@futsal/frontend",
     "lint": "eslint .",
-    "typecheck": "npm run typecheck --workspace=@futsal/shared && npm run typecheck --workspace=@futsal/backend && npm run typecheck --workspace=@futsal/frontend"
+    "typecheck": "npm run typecheck --workspace=@futsal/shared && npm run typecheck --workspace=@futsal/backend && npm run typecheck --workspace=@futsal/frontend",
+    "test": "npm run test --workspace=@futsal/backend"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

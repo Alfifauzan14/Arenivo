@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Smartphone,
   LogOut,
+  Loader2,
 } from "lucide-react";
 import {
   Button,
@@ -20,6 +21,12 @@ import {
 } from "@/components/ui";
 import { useSession } from "@/features/auth/context/SessionContext";
 import { cn } from "@/lib/utils";
+import {
+  isPushNotificationSupported,
+  subscribeToPushNotifications,
+  unsubscribeFromPushNotifications,
+  getCurrentPushSubscription,
+} from "@/lib/pushNotifications";
 
 export function ProfilePage() {
   const { user, logout, isLoggedIn } = useSession();
@@ -40,12 +47,24 @@ export function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = React.useState("");
 
   // Firebase Web Push Notification state
+  const [isPushLoading, setIsPushLoading] = React.useState(false);
+  const [hasActiveSub, setHasActiveSub] = React.useState(false);
   const [pushStatus, setPushStatus] = React.useState<"default" | "granted" | "denied">(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
       return Notification.permission as "default" | "granted" | "denied";
     }
     return "default";
   });
+
+  // Check active subscription on load
+  React.useEffect(() => {
+    getCurrentPushSubscription().then((sub) => {
+      if (sub) {
+        setHasActiveSub(true);
+        setPushStatus("granted");
+      }
+    });
+  }, []);
 
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,32 +92,38 @@ export function ProfilePage() {
     addToast("success", "Password Anda berhasil diganti.", "Password Diperbarui");
   };
 
-  // Request Firebase Web Push Notification Permission
+  // Toggle Firebase Web Push Notification
   const handleTogglePushNotifications = async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
+    if (!isPushNotificationSupported()) {
       addToast("error", "Browser Anda tidak mendukung Web Push Notification.", "Tidak Didukung");
       return;
     }
 
+    setIsPushLoading(true);
     try {
-      const permission = await Notification.requestPermission();
-      setPushStatus(permission as "default" | "granted" | "denied");
-
-      if (permission === "granted") {
-        addToast(
-          "success",
-          "Web Push Notification Firebase aktif! Anda akan menerima notifikasi pengingat jadwal langsung di layar.",
-          "Notifikasi Aktif"
-        );
-      } else if (permission === "denied") {
-        addToast(
-          "error",
-          "Izin notifikasi ditolak oleh browser. Anda dapat mengaktifkannya lewat pengaturan situs browser.",
-          "Izin Ditolak"
-        );
+      if (hasActiveSub) {
+        await unsubscribeFromPushNotifications();
+        setHasActiveSub(false);
+        setPushStatus("default");
+        addToast("info", "Web Push Notification telah dinonaktifkan.", "Notifikasi Dimatikan");
+      } else {
+        const res = await subscribeToPushNotifications();
+        setPushStatus(res.permission);
+        if (res.success) {
+          setHasActiveSub(true);
+          addToast(
+            "success",
+            "Web Push Notification Firebase aktif! Anda akan menerima notifikasi pengingat jadwal langsung di layar.",
+            "Notifikasi Aktif"
+          );
+        } else {
+          addToast("error", res.error || "Gagal mengaktifkan notifikasi.", "Izin Ditolak");
+        }
       }
-    } catch (err) {
-      addToast("error", "Gagal meminta izin notifikasi browser.", "Kesalahan");
+    } catch {
+      addToast("error", "Terjadi kesalahan saat mengatur notifikasi.", "Kesalahan");
+    } finally {
+      setIsPushLoading(false);
     }
   };
 
@@ -207,15 +232,15 @@ export function ProfilePage() {
                 <span
                   className={cn(
                     "font-bold font-mono text-[11px] px-2.5 py-0.5 rounded-full",
-                    pushStatus === "granted"
+                    hasActiveSub
                       ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                       : pushStatus === "denied"
                       ? "bg-red-50 text-red-700 border border-red-200"
                       : "bg-slate-100 text-slate-700"
                   )}
                 >
-                  {pushStatus === "granted"
-                    ? "Aktif (Diizinkan)"
+                  {hasActiveSub
+                    ? "Aktif & Terhubung"
                     : pushStatus === "denied"
                     ? "Diblokir Browser"
                     : "Belum Diaktifkan"}
@@ -224,12 +249,24 @@ export function ProfilePage() {
 
               <Button
                 type="button"
-                variant={pushStatus === "granted" ? "outline" : "primary"}
+                variant={hasActiveSub ? "outline" : "primary"}
                 size="sm"
                 onClick={handleTogglePushNotifications}
-                className="w-full text-xs font-bold rounded-lg shadow-xs"
+                disabled={isPushLoading}
+                className="w-full text-xs font-bold rounded-lg shadow-xs gap-2"
               >
-                {pushStatus === "granted" ? "Perbarui Izin Notifikasi" : "Aktifkan Web Push"}
+                {isPushLoading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Memproses...</span>
+                  </>
+                ) : hasActiveSub ? (
+                  "Nonaktifkan Web Push"
+                ) : pushStatus === "granted" ? (
+                  "Hubungkan Ulang Web Push"
+                ) : (
+                  "Aktifkan Web Push"
+                )}
               </Button>
             </div>
           </div>
