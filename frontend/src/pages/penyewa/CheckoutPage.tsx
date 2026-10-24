@@ -1,3 +1,18 @@
+declare global {
+  interface Window {
+    snap?: {
+      pay: (
+        token: string,
+        options?: {
+          onSuccess?: (result: any) => void;
+          onPending?: (result: any) => void;
+          onError?: (result: any) => void;
+          onClose?: () => void;
+        }
+      ) => void;
+    };
+  }
+}
 import * as React from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
@@ -181,15 +196,68 @@ export function CheckoutPage() {
     addToast("info", "Kode promo telah dihapus.", "Promo Dihapus");
   };
 
-  // 5. Midtrans Modal Simulator
+  // 5. Midtrans Snap Handler & Modal Simulator
   const [isMidtransOpen, setIsMidtransOpen] = React.useState<boolean>(false);
+  const [isSnapLoading, setIsSnapLoading] = React.useState<boolean>(false);
 
-  const handleOpenPayment = () => {
+  const handleOpenPayment = async () => {
     if (isExpired) {
       addToast("error", "Sesi pembayaran sudah habis. Silakan pilih slot jadwal kembali.", "Kedaluwarsa");
       navigate(`/venues/${venue.slug}`);
       return;
     }
+
+    // Jika Midtrans Snap SDK terpasang di browser
+    if (typeof window !== "undefined" && window.snap?.pay) {
+      setIsSnapLoading(true);
+      try {
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
+        const res = await fetch(`${apiBaseUrl}/payments/snap-token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId: `${existingBooking.bookingCode || "ARN"}-${Date.now().toString(36).toUpperCase()}`,
+            grossAmount: finalTotalPrice,
+            customerName,
+            customerPhone,
+            customerEmail,
+            itemDetails: [
+              {
+                id: field.id || "field-rent",
+                name: `Sewa ${field.name} (${venue.name})`,
+                price: finalTotalPrice,
+                quantity: 1,
+              },
+            ],
+          }),
+        });
+
+        const json = await res.json();
+        setIsSnapLoading(false);
+
+        if (json?.data?.token) {
+          window.snap.pay(json.data.token, {
+            onSuccess: (_result: any) => {
+              handlePaymentSuccess();
+            },
+            onPending: (_result: any) => {
+              handlePaymentPending();
+            },
+            onError: (_result: any) => {
+              addToast("error", "Pembayaran gagal diproses oleh gateway Midtrans.", "Transaksi Gagal");
+            },
+            onClose: () => {
+              addToast("info", "Jendela pembayaran Midtrans ditutup.", "Pembayaran Ditunda");
+            },
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn("Gagal memanggil Midtrans Snap Token, membuka fallback simulator:", err);
+        setIsSnapLoading(false);
+      }
+    }
+
     setIsMidtransOpen(true);
   };
 
@@ -525,12 +593,12 @@ export function CheckoutPage() {
                 type="button"
                 variant="primary"
                 size="lg"
-                disabled={isExpired}
+                disabled={isExpired || isSnapLoading}
                 onClick={handleOpenPayment}
                 className="w-full font-bold shadow-xs flex items-center justify-center gap-2"
               >
                 <Lock className="w-4 h-4" />
-                <span>Bayar Sekarang</span>
+                <span>{isSnapLoading ? "Menyiapkan Midtrans Snap..." : "Bayar Sekarang"}</span>
                 <ArrowRight className="w-4 h-4" />
               </Button>
 
