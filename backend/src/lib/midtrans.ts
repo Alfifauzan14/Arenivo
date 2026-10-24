@@ -46,6 +46,16 @@ export class MidtransClient {
   async createTransaction(params: CreateSnapTransactionParams): Promise<SnapTransactionResult> {
     const authHeader = `Basic ${Buffer.from(`${this.serverKey}:`).toString("base64")}`;
 
+    // Midtrans: nama item maks. 50 karakter, nominal harus bilangan bulat,
+    // dan gross_amount wajib sama dengan total item_details.
+    const items = params.itemDetails.map((it) => ({
+      id: String(it.id).slice(0, 50),
+      name: it.name.length > 50 ? `${it.name.slice(0, 47)}...` : it.name,
+      price: Math.round(it.price),
+      quantity: Math.max(1, Math.round(it.quantity)),
+    }));
+    const grossAmount = items.reduce((sum, it) => sum + it.price * it.quantity, 0);
+
     const res = await fetch(`${this.getSnapBaseUrl()}/transactions`, {
       method: "POST",
       headers: {
@@ -56,14 +66,14 @@ export class MidtransClient {
       body: JSON.stringify({
         transaction_details: {
           order_id: params.orderId,
-          gross_amount: params.grossAmount,
+          gross_amount: grossAmount,
         },
         customer_details: {
           first_name: params.customerDetails.firstName,
           phone: params.customerDetails.phone,
           email: params.customerDetails.email,
         },
-        item_details: params.itemDetails,
+        item_details: items,
         credit_card: {
           secure: true,
         },
