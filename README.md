@@ -59,19 +59,34 @@ npm run dev
 * **Portal Super Admin:** `http://localhost:5173/admin`
 * **Backend API Route Handlers:** `http://localhost:3000/api/v1`
 
+### 5. Menjalankan Pengujian Otomatis (Integration & Stress Test)
+```bash
+npm run test
+```
+* **Test 1:** High Concurrency Slot Reservation (Pencegahan Double-Booking)
+* **Test 2:** Midtrans Webhook Edge Cases (Settlement, Idempotency, Tampered Signature, Expire)
+* **Test 3:** Gate Scanner Validation (Sah, Sudah Dipakai, Salah Waktu, Fiktif, Dibatalkan, & Audit Log)
+
+### 6. Pengecekan Type & Production Build
+```bash
+npm run typecheck
+npm run build
+```
+
 ---
 
 ## 📂 Struktur Monorepo
 
 ```
 Arenivo/
-├── frontend/          # React 18 + Vite + Tailwind CSS + Lucide Icons
-│   ├── public/        # Aset terkompresi logo Arenivo, favicon, banner
+├── frontend/          # React 18 + Vite + Tailwind CSS + Lucide Icons + PWA
+│   ├── public/        # Aset logo Arenivo, favicon, manifest PWA, service worker FCM
 │   └── src/           # Pages, Layouts, Features, dan Components UI
 ├── backend/           # Next.js 15 App Router (API Route Handlers)
 │   ├── src/app/api/   # 66 Route Handlers REST API
 │   ├── src/modules/   # Logika bisnis, Repositori, dan Layanan integrasi
-│   └── supabase/      # Migrasi SQL, RLS, dan 8 fungsi transaksi atomik ACID
+│   ├── supabase/      # Migrasi SQL, RLS, dan 8 fungsi transaksi atomik ACID
+│   └── tests/         # Suite pengujian otomatis konkurensi, webhook, dan scanner
 ├── shared/            # Kontrak bersama TypeScript, Skema Zod, Enums, dan Utils
 └── docs/              # PRD, Desain Sistem, dan Dokumen Arsitektur
 ```
