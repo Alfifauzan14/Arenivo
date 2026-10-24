@@ -12,7 +12,7 @@ import { MitraLandingPage } from "@/pages/public/MitraLandingPage";
 import { AuthPage } from "@/pages/public/AuthPage";
 import { ForgotPasswordPage } from "@/pages/public/ForgotPasswordPage";
 import { ResetPasswordPage } from "@/pages/public/ResetPasswordPage";
-import { TikTokCallbackPage } from "@/pages/public/TikTokCallbackPage";
+
 
 // 2. Penyewa Portal Pages
 import { CheckoutPage } from "@/pages/penyewa/CheckoutPage";
@@ -78,7 +78,7 @@ export const router = createBrowserRouter([
   { path: "/register", element: <AuthPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
   { path: "/reset-password", element: <ResetPasswordPage /> },
-  { path: "/auth/tiktok/callback", element: <TikTokCallbackPage /> },
+
 
   // 2. Mitra Lapangan Auth Routes (Standalone without sidebar)
   { path: "/mitra/login", element: <MitraAuthPage /> },

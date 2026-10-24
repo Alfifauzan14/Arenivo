@@ -71,14 +71,14 @@
 | Super Admin | Web (/admin) | Memverifikasi mitra serta mengawasi pengguna, venue, transaksi, refund, pencairan, dan sistem. |
 
 ### 3.1 Fitur Role Penyewa (Web Publik & Member)
-- **P1. Akun & Profil:** Registrasi email/password, login/logout, login Google, Facebook, dan TikTok, verifikasi email, lupa & reset password, edit profil (nama, no. HP, foto), dan ganti password.
+- **P1. Akun & Profil:** Registrasi email/password, login/logout, login Google, verifikasi email, lupa & reset password, edit profil (nama, no. HP, foto), dan ganti password.
 - **P2. Landing Page & Pencarian:** Hero banner, pencarian cepat, venue populer, banner promo, daftar venue dengan pagination, pencarian nama venue, filter (jenis futsal/sepak bola, kota, rentang harga, fasilitas, rating), pengurutan (terdekat, termurah, rating), peta lokasi & venue terdekat (Google Maps), serta favorit venue.
 - **P3. Detail Venue:** Galeri foto, video profil YouTube, alamat, jam operasional, fasilitas, daftar lapangan (jenis, ukuran, permukaan, harga), ulasan & rating, serta aturan venue & kebijakan pembatalan.
 - **P4. Pemilihan Slot:** Pilih lapangan dan tanggal, tampilan jadwal per jam (tersedia, terisi, dikunci, diblokir, lewat), pilih satu atau beberapa jam berurutan, pembaruan status slot real-time (Pusher), dan penguncian slot sementara selama menunggu pembayaran.
 - **P5. Checkout & Pembayaran:** Ringkasan harga (per jam, total, biaya layanan), validasi kode promo/voucher, catatan untuk mitra, pembayaran Midtrans (VA, e-wallet, QRIS, kartu), hitung mundur batas waktu bayar 15 menit, pembaruan status pembayaran otomatis via webhook, lanjutkan pembayaran yang belum selesai, dan invoice/bukti pembayaran.
 - **P6. E-Tiket & Pesanan:** E-tiket dengan kode booking dan QR Code, unduh tiket PDF, riwayat pesanan dengan filter status, detail pesanan, pembatalan sesuai aturan beserta estimasi refund, reschedule jadwal, tambah ke Google Calendar, dan bagikan tiket.
 - **P7. Setelah Bermain:** Memberikan ulasan dan rating bintang (1–5) setelah status pesanan selesai.
-- **P8. Bantuan & Fitur Tambahan:** Chatbot AI (Gemini & Groq) untuk bantuan dan rekomendasi lapangan berdasarkan data nyata di database. (Catatan: Fitur P8.2 Membership, P8.3 Split bill, P8.4 Cari lawan tanding, dan P8.5 Booking berulang dicatat sebagai pengembangan tahap lanjut di luar skema inti saat ini).
+- **P8. Bantuan & Fitur Tambahan:** Chatbot AI (Google Gemini Flash) untuk bantuan dan rekomendasi lapangan berdasarkan data nyata di database. (Catatan: Fitur P8.2 Membership, P8.3 Split bill, P8.4 Cari lawan tanding, dan P8.5 Booking berulang dicatat sebagai pengembangan tahap lanjut di luar skema inti saat ini).
 - **P9. Notifikasi:** Email (verifikasi, konfirmasi booking, pembatalan, pengingat sebelum main) dan notifikasi di dalam aplikasi via Pusher.
 
 ### 3.2 Fitur Role Mitra / Pemilik Lapangan (Web /mitra)
@@ -99,7 +99,7 @@
 - **A4. Manajemen Transaksi, Refund & Pencairan:** Daftar seluruh pesanan dan pembayaran Midtrans, penanganan refund (proses via API Midtrans atau tandai selesai manual dengan referensi transfer, atau tolak dengan alasan), persetujuan & penyelesaian pencairan dana ke mitra (payouts), serta pengaturan komisi platform.
 - **A5. Konten & Moderasi:** Kelola banner landing page, moderasi ulasan, dan kelola promo/voucher global.
 - **A6. Laporan & Analitik:** Dashboard analitik (total pengguna, mitra, pesanan, pendapatan), grafik tren pesanan dan pendapatan, daftar venue terpopuler, dan ekspor laporan ke PDF / Excel.
-- **A7. Pengaturan Sistem:** Ubah parameter system_settings secara dinamis tanpa mengubah kode (batas waktu bayar, aturan pembatalan default, komisi, pencairan minimum, dan pilihan provider utama Chatbot AI gemini atau groq).
+- **A7. Pengaturan Sistem:** Ubah parameter system_settings secara dinamis tanpa mengubah kode (batas waktu bayar, aturan pembatalan default, komisi, pencairan minimum, dan konfigurasi Chatbot AI Google Gemini Flash).
 
 ---
 
@@ -143,7 +143,7 @@
 - **Backend:** Next.js (App Router Route Handlers saja, tanpa halaman UI Next.js), TypeScript.
 - **Kode Bersama (shared):** TypeScript interfaces, skema validasi Zod, konstanta status & kode error.
 - **Database, Auth, Storage:** Supabase (PostgreSQL, Supabase Auth, Supabase Storage, pg_cron).
-- **Layanan Pihak Ketiga:** Midtrans (Snap & Refund API), Pusher (Real-time), Firebase Cloud Messaging (Web Push), Brevo (SMTP Email), Google Maps (Iframe Embed), Google Calendar (Template Link), YouTube (youtube-nocookie.com Embed), Gemini & Groq (Chatbot AI), TikTok Login Kit.
+- **Layanan Pihak Ketiga:** Midtrans (Snap & Refund API), Pusher (Real-time), Firebase Cloud Messaging (Web Push), Brevo (SMTP Email), Google Maps (Iframe Embed), Google Calendar (Template Link), YouTube (youtube-nocookie.com Embed), Google Gemini Flash (Chatbot AI).
 
 ### 5.2 Struktur Direktori Monorepo
 ```plaintext
@@ -163,7 +163,7 @@ futsal-booking/
 │  │  ├─ app/api/v1/            # route handler tipis: auth, venues, fields, bookings, mitra, admin, webhooks, health
 │  │  ├─ modules/               # logika bisnis per modul (service, repository, schema)
 │  │  ├─ middleware/            # autentikasi withAuth, role check, rate limiting, error handler
-│  │  ├─ lib/                   # klien Supabase, Midtrans, Pusher, Brevo, Firebase, Gemini, Groq, TikTok
+│  │  ├─ lib/                   # klien Supabase, Midtrans, Pusher, Brevo, Firebase, Gemini
 │  │  └─ config/                # validasi environment variable (Zod)
 │  ├─ supabase/migrations/      # migrasi SQL, RLS, trigger, dan 8 fungsi transaksi
 │  └─ tests/                    # pengujian high concurrency, webhook, dan gate scanner
@@ -179,7 +179,7 @@ futsal-booking/
 ### 5.3 Standar Kode & Lapisan Backend
 - **Lapisan Backend Wajib:** Route handler (hanya membaca request, memanggil service, mengembalikan response) -> Service (seluruh logika bisnis) -> Repository (satu-satunya tempat yang mengakses Supabase) -> Database (aturan unik & fungsi transaksi).
 - **Konvensi Penamaan:** File kebab-case, komponen React PascalCase, variabel & fungsi camelCase, konstanta UPPER_SNAKE_CASE, tabel & kolom database snake_case, field JSON camelCase, dan nilai enum tetap snake_case (contoh: menunggu_bayar).
-- **Keamanan Kunci:** Semua rahasia (service role Supabase, server key Midtrans, secret Pusher, client secret TikTok, API key Gemini/Groq/Brevo) hanya ada di backend dan dilarang menggunakan awalan NEXT_PUBLIC_.
+- **Keamanan Kunci:** Semua rahasia (service role Supabase, server key Midtrans, secret Pusher, API key Gemini/Brevo) hanya ada di backend dan dilarang menggunakan awalan NEXT_PUBLIC_.
 
 ---
 
@@ -190,7 +190,7 @@ Nilai uang disimpan sebagai bilangan bulat (integer/bigint) dalam Rupiah, waktu 
 ### 6.1 Daftar Tabel Inti
 
 #### Identitas:
-- **profiles:** id (sama dengan Supabase Auth), full_name, email, phone, avatar_url, role (penyewa, mitra, admin), status (aktif, diblokir), tiktok_open_id (unik, boleh kosong).
+- **profiles:** id (sama dengan Supabase Auth), full_name, email, phone, avatar_url, role (penyewa, mitra, admin), status (aktif, diblokir).
 - **mitra_profiles:** id, user_id (unik), business_name, business_address, document_url, verification_status (menunggu, disetujui, ditolak), rejection_reason, verified_by, verified_at, bank_name, bank_account_number, bank_account_holder.
 
 #### Master Data:
@@ -270,7 +270,7 @@ Nilai uang disimpan sebagai bilangan bulat (integer/bigint) dalam Rupiah, waktu 
 ### 7.2 Daftar Endpoint Utama
 
 #### Publik & Penyewa:
-- **Auth & Profil:** `POST /auth/sync-profile`, `POST /auth/tiktok/callback`, `GET /me`, `PATCH /me`, `POST /uploads/sign`.
+- **Auth & Profil:** `POST /auth/sync-profile`, `GET /me`, `PATCH /me`, `POST /uploads/sign`.
 - **Katalog & Jadwal:** `GET /venues`, `GET /venues/{slug}`, `GET /venues/{slug}/reviews`, `GET /fields/{id}/availability?date=`, `GET /master/cities`, `GET /master/facilities`, `GET /master/field-types`, `GET /banners`.
 - **Booking & Pembayaran:** `POST /promos/validate`, `POST /bookings` (wajib header Idempotency-Key), `GET /bookings`, `GET /bookings/{id}`, `POST /bookings/{id}/payments`, `GET /bookings/{id}/refund-preview`, `POST /bookings/{id}/cancel`, `POST /bookings/{id}/reschedule`, `GET /bookings/{id}/ticket`, `GET /bookings/{id}/invoice`, `GET /bookings/{id}/calendar`, `POST /bookings/{id}/review`.
 - **Lainnya:** `GET/PUT/DELETE /me/favorites`, `GET/PATCH /me/notifications`, `POST/DELETE /me/push-subscriptions`, `POST /chat/messages`, `GET /chat/sessions`, `POST /pusher/auth`.
@@ -290,7 +290,6 @@ Nilai uang disimpan sebagai bilangan bulat (integer/bigint) dalam Rupiah, waktu 
 
 - **Satu Akun Satu Role:** Role ditentukan saat panggilan pertama POST /auth/sync-profile (penyewa atau mitra) dan tidak pernah bisa diubah lewat API; akun admin hanya dibuat melalui seed database.
 - **Urutan Pemeriksaan Middleware withAuth di Backend:** Verifikasi tanda tangan JWT Supabase secara lokal -> Muat role dan status dari tabel profiles (tidak pernah mempercayai user_metadata dari token) -> Cek status === 'aktif' (jika diblokir, tolak dengan 403 ACCOUNT_BLOCKED) -> Cek kecocokan role (403 FORBIDDEN) -> Khusus /mitra/* (kecuali /mitra/application, /mitra/profile, /me), pastikan verification_status === 'disetujui' (403 MITRA_NOT_VERIFIED) -> Cek kepemilikan data (jika bukan miliknya, kembalikan 404 NOT_FOUND).
-- **Alur Khusus Login TikTok:** Karena TikTok tidak membagikan email, akun dibuat menggunakan alamat email pengganti berdomain .invalid yang dilewati oleh pengirim email Brevo.
 - **Keamanan Storage & Rate Limiting:**
   - Dua bucket Supabase Storage: venue-photos (baca publik) dan mitra-documents (privat, hanya diakses Admin lewat signed URL).
   - Rate limiting (Upstash Redis): POST /bookings 10/menit/user, /chat/messages 20/menit/user, /mitra/tickets/validate 60/menit/mitra, dan endpoint publik 120/menit/IP.
@@ -303,7 +302,7 @@ Nilai uang disimpan sebagai bilangan bulat (integer/bigint) dalam Rupiah, waktu 
 - **Pusher:** Channel publik field-{fieldId} (event slot.updated) hanya dilanggan saat halaman jadwal/checkout dibuka (ditambah polling setiap 45 detik sebagai cadangan), serta channel privat private-user-{userId} dan private-mitra-{mitraId}.
 - **Google Maps, YouTube & Google Calendar:** Peta menggunakan komponen VenueMap berbasis iframe embed tanpa billing + tombol tautan "Buka di Google Maps"; video profil memakai iframe youtube-nocookie.com; kalender memakai tautan template Google Calendar.
 - **Brevo Email & Firebase Web Push (FCM):** Kegagalan pengiriman email atau push notification dibungkus try/catch dan dicatat di log sehingga tidak pernah menggagalkan transaksi utama.
-- **Chatbot AI (Gemini & Groq):** Membaca provider utama dari system_settings, mengambil konteks venue & jadwal nyata dari database (hanya baca), tidak mengirimkan data pribadi penyewa, dan otomatis berpindah ke provider cadangan atau pesan bawaan jika mengalami kegagalan/timeout.
+- **Chatbot AI (Google Gemini Flash):** Mengambil konteks venue & jadwal nyata dari database (hanya baca), tidak mengirimkan data pribadi penyewa, dan otomatis memberikan rekomendasi venue serta promo aktif berbasis data nyata.
 
 ---
 
@@ -315,4 +314,4 @@ Nilai uang disimpan sebagai bilangan bulat (integer/bigint) dalam Rupiah, waktu 
 - **Tahap 4 — UI/UX Mitra (/mitra):** MitraLayout (Sidebar desktop + Bottom Bar HP), Verifikasi Usaha, Dashboard Mitra, Kelola Venue & Lapangan (harga dinamis), Kalender Slot (blokir & walk-in), Gate Scanner Check-in, serta Keuangan & Payout.
 - **Tahap 5 — UI/UX Super Admin (/admin):** AdminLayout, Dashboard Analitik, Verifikasi Mitra, Manajemen Pengguna/Venue/Master Data, Proses Refund & Payout, Konten/Moderasi, system_settings, dan audit_logs.
 - **Tahap 6 — Database Supabase & Implementasi REST API (/api/v1):** Migrasi SQL lengkap, RLS, 8 fungsi transaksi PostgreSQL, pg_cron, middleware withAuth, seluruh endpoint /api/v1/..., dan penyambungan penuh ke frontend.
-- **Tahap 7 — Integrasi Third-Party:** Penyambungan Midtrans Snap & Webhook, Pusher, Supabase Storage signed URL, Brevo SMTP, Firebase FCM, Chatbot AI (Gemini/Groq), dan TikTok OAuth.
+- **Tahap 7 — Integrasi Third-Party:** Penyambungan Midtrans Snap & Webhook, Pusher, Supabase Storage signed URL, Brevo SMTP, Firebase FCM, dan Chatbot AI (Google Gemini Flash).

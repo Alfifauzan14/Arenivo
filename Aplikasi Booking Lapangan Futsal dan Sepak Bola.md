@@ -56,7 +56,6 @@ Membangun sistem ticketing booking lapangan futsal dan sepak bola yang terintegr
 - P1.2 Login dan logout
 - P1.3 Login Google
 - P1.4 Login Facebook
-- P1.5 Login TikTok
 - P1.6 Verifikasi email
 - P1.7 Lupa dan reset password
 - P1.8 Edit profil (nama, no. HP, foto)
@@ -118,7 +117,7 @@ Membangun sistem ticketing booking lapangan futsal dan sepak bola yang terintegr
 
 ### P8. Fitur Sosial dan Bantuan
 
-- P8.1 Chatbot AI (Gemini dan Groq): bantuan dan rekomendasi lapangan
+- P8.1 Chatbot AI (Google Gemini Flash): bantuan dan rekomendasi lapangan
 - P8.2 Membership
 - P8.3 Split bill
 - P8.4 Cari lawan tanding
@@ -244,7 +243,7 @@ Membangun sistem ticketing booking lapangan futsal dan sepak bola yang terintegr
 ### A7. Pengaturan Sistem
 
 - A7.1 Batas waktu bayar dan aturan pembatalan default
-- A7.2 Konfigurasi chatbot AI (pilihan Gemini / Groq)
+- A7.2 Konfigurasi chatbot AI (Google Gemini Flash)
 
 ## 4. Fitur Sistem (Otomatis / Lintas Role)
 
@@ -355,7 +354,7 @@ Angka di bawah adalah usulan dan akan disimpan sebagai pengaturan sistem agar mu
 1. Frontend login lewat Supabase Auth (Google, Facebook), lalu mengirim token JWT ke backend pada setiap request.
 2. Backend memverifikasi token dan mengecek role (Penyewa, Mitra, Super Admin) sebelum memproses permintaan.
 3. Frontend tidak mengakses database langsung. Semua aturan bisnis (booking, refund, komisi) hanya ada di backend.
-4. Rahasia (server key Midtrans, service role key Supabase, API key Gemini dan Groq) hanya disimpan di backend.
+4. Rahasia (server key Midtrans, service role key Supabase, API key Gemini) hanya disimpan di backend.
 5. Pembuatan booking dijalankan sebagai fungsi PostgreSQL dalam satu transaksi, dipanggil dari backend.
 6. Midtrans memanggil webhook di backend, backend mengubah status pesanan, lalu Pusher menyiarkan perubahan ke layar.
 7. Kedaluwarsa pesanan 15 menit dijalankan oleh tugas terjadwal Supabase pg\_cron.
@@ -380,7 +379,7 @@ futsal-booking/
 │  │  ├─ app/api/               route handler tipis: auth, venues, fields, slots, bookings, payments, tickets, mitra, admin, chatbot, cron
 │  │  ├─ modules/               logika bisnis per modul (service, repository, schema)
 │  │  ├─ middleware/            autentikasi, role, rate limiting
-│  │  ├─ lib/                   klien Supabase, Midtrans, Pusher, email, Gemini, Groq
+│  │  ├─ lib/                   klien Supabase, Midtrans, Pusher, email, Gemini
 │  │  └─ config/                validasi environment variable
 │  ├─ supabase/migrations/      migrasi SQL dan fungsi transaksi
 │  └─ tests/
@@ -449,7 +448,7 @@ Catatan pendapatan dibuat saat booking berstatus Selesai, dan catatan pencairan 
 
 | Tabel | Kolom utama | Catatan |
 | --- | --- | --- |
-| profiles | id (sama dengan id Supabase Auth), full\_name, email, phone, avatar\_url, role (penyewa, mitra, admin), status (aktif, diblokir), tiktok\_open\_id (unik, boleh kosong) | Kredensial dan login sosial disimpan oleh Supabase Auth |
+| profiles | id (sama dengan id Supabase Auth), full\_name, email, phone, avatar\_url, role (penyewa, mitra, admin), status (aktif, diblokir) | Kredensial dan login sosial disimpan oleh Supabase Auth |
 | mitra\_profiles | id, user\_id (unik), business\_name, business\_address, document\_url, verification\_status (menunggu, disetujui, ditolak), rejection\_reason, verified\_by, verified\_at, bank\_name, bank\_account\_number, bank\_account\_holder | Satu mitra, satu data usaha |
 
 **B. Master data (dikelola Super Admin)**
@@ -508,7 +507,7 @@ Catatan pendapatan dibuat saat booking berstatus Selesai, dan catatan pencairan 
 | notifications | id, user\_id, type, title, body, data, is\_read |
 | push\_subscriptions | id, user\_id, fcm\_token (unik) |
 | chat\_sessions | id, user\_id |
-| chat\_messages | id, session\_id, role (user, assistant), content, provider (gemini, groq) |
+| chat\_messages | id, session\_id, role (user, assistant), content, provider (gemini) |
 | system\_settings | key (kunci utama), value, description, updated\_by |
 | audit\_logs | id, actor\_id, action, entity\_type, entity\_id, metadata, created\_at |
 
@@ -613,7 +612,6 @@ IDEMPOTENCY\_CONFLICT berarti Idempotency-Key yang sama dikirim dengan isi permi
 | Method | Endpoint | Fungsi | Akses |
 | --- | --- | --- | --- |
 | POST | /auth/sync-profile | Membuat profil setelah login pertama. Menerima intendedRole: penyewa atau mitra. Role admin tidak pernah diterima dari klien | Login |
-| POST | /auth/tiktok/callback | Alur login TikTok khusus (di luar Supabase) | Pub |
 | GET | /me | Profil sendiri | Login |
 | PATCH | /me | Ubah nama, no. HP, foto | Login |
 | POST | /uploads/sign | Meminta URL unggah bertanda tangan ke Supabase Storage (foto dan dokumen diunggah langsung dari frontend) | Login |
@@ -654,7 +652,7 @@ IDEMPOTENCY\_CONFLICT berarti Idempotency-Key yang sama dikirim dengan isi permi
 | GET | /me/notifications | Daftar notifikasi | Login |
 | PATCH | /me/notifications/{id}/read, /me/notifications/read-all | Tandai dibaca | Login |
 | POST, DELETE | /me/push-subscriptions | Daftarkan atau hapus token Firebase | Login |
-| POST | /chat/messages | Kirim pesan ke chatbot (Gemini atau Groq sesuai pengaturan) | P |
+| POST | /chat/messages | Kirim pesan ke chatbot (Google Gemini Flash) | P |
 | GET | /chat/sessions, /chat/sessions/{id}/messages | Riwayat chat | P |
 | POST | /pusher/auth | Otorisasi channel privat Pusher (private-user-{id}, private-mitra-{id}). Hanya channel milik pemanggil yang diizinkan | Login |
 
@@ -815,7 +813,7 @@ Bagian ini menutup hal yang bisa ditafsirkan ganda saat implementasi.
 - Aksi Super Admin (verifikasi, blokir, refund, pencairan, ubah pengaturan) selalu dicatat di audit\_logs.
 - CORS hanya mengizinkan domain frontend.
 - Batas permintaan (usulan): POST /bookings 10 per menit per pengguna, /chat/messages 20 per menit, /mitra/tickets/validate 60 per menit, endpoint publik 120 per menit per IP.
-- Rahasia (server key Midtrans, service role Supabase, API key Gemini dan Groq) hanya ada di backend.
+- Rahasia (server key Midtrans, service role Supabase, API key Gemini) hanya ada di backend.
 - Perubahan status hanya lewat jalur pada diagram status (bagian 5.2). Percobaan lain menghasilkan 409 INVALID\_STATUS\_TRANSITION.
 
 ### 8.11 Keputusan yang perlu dikonfirmasi
@@ -824,7 +822,6 @@ Bagian ini menutup hal yang bisa ditafsirkan ganda saat implementasi.
 2. Booking manual tidak dikenai komisi dan tidak masuk saldo Mitra.
 3. Pembagian diskon: promo venue ditanggung Mitra, promo global ditanggung platform.
 4. Google Calendar cukup memakai tautan, bukan integrasi OAuth penuh.
-5. Login TikTok lewat alur khusus di backend, dengan kemungkinan perlu uji coba lebih awal.
 6. Pencairan dana dan refund boleh disimulasikan (admin menandai selesai manual).
 
 ## 9. Autentikasi dan Otorisasi
@@ -844,13 +841,12 @@ Bagian ini menutup hal yang bisa ditafsirkan ganda saat implementasi.
 | Email dan kata sandi | Supabase Auth, email wajib diverifikasi, kata sandi minimal 8 karakter | Penyewa, Mitra, Admin | Pasang SMTP sendiri karena batas kirim email bawaan Supabase sangat kecil. Ini juga menjadi integrasi Email |
 | Google | Provider bawaan Supabase | Penyewa, Mitra | Perlu OAuth client di Google Cloud |
 | Facebook | Provider bawaan Supabase | Penyewa | Perlu mode live agar publik bisa masuk. Jika akun Facebook tidak membagikan email, login gagal dan pengguna diminta memakai metode lain |
-| TikTok | Alur khusus di backend (bagian 9.5) | Penyewa | Sejauh yang saya tahu tidak ada provider bawaan, dan TikTok tidak memberikan email |
 | Lupa kata sandi | resetPasswordForEmail, tautan mengarah ke halaman /reset-password | Pengguna email | Pesan selalu sama baik email terdaftar maupun tidak, agar akun tidak bisa ditebak |
 
 Aturan tambahan:
 
 - Pembatasan metode per role hanya di tampilan: halaman daftar Mitra hanya menampilkan email dan Google, halaman admin hanya email. Ini bukan pengamanan, pengamanan ada di backend (bagian 9.7).
-- Akun dari provider Supabase dengan email terverifikasi yang sama digabung menjadi satu (sejauh yang saya tahu ini perilaku bawaan Supabase). Akun TikTok tidak digabung dengan akun lain karena tidak punya email.
+- Akun dari provider Supabase dengan email terverifikasi yang sama digabung menjadi satu (sejauh yang saya tahu ini perilaku bawaan Supabase). 
 - Percobaan login berulang dibatasi oleh rate limit bawaan Supabase Auth.
 
 ### 9.3 Pembuatan profil dan penentuan role
@@ -861,33 +857,13 @@ Aturan tambahan:
 4. Menerima intendedRole mitra dari klien aman karena role itu tidak memberi akses apa pun sampai admin menyetujui (MITRA\_NOT\_VERIFIED).
 5. Role dan status selalu dibaca dari tabel profiles, tidak pernah dari isi token. user\_metadata di token bisa diubah oleh penggunanya sendiri, jadi tidak boleh dipercaya untuk hak akses.
 6. GET /me mengembalikan role, status akun, dan status verifikasi mitra, dipakai frontend untuk mengarahkan pengguna.
-7. Endpoint yang dikecualikan dari pemeriksaan profil (karena dipanggil sebelum profil ada atau tanpa login): /auth/sync-profile, /auth/tiktok/callback, /health, /webhooks/midtrans, dan semua GET publik.
+7. Endpoint yang dikecualikan dari pemeriksaan profil (karena dipanggil sebelum profil ada atau tanpa login): /auth/sync-profile, /health, /webhooks/midtrans, dan semua GET publik.
 
 ### 9.4 Diagram urutan: login dan request biasa
 
 &#91;embedded content: diagram urutan · login email atau sosial, sinkron profil, lalu request biasa\]
 
 Panah putus-putus adalah balasan. Tiga panah terakhir berlaku untuk setiap request setelah login. Login Google dan Facebook memakai alihan ke penyedia, lalu kembali ke Supabase Auth dengan hasil yang sama: sesi berisi JWT.
-
-### 9.5 Alur login TikTok
-
-&#91;embedded content: diagram urutan · login TikTok lewat backend\]
-
-Langkah dan aturannya:
-
-1. Frontend membuat URL otorisasi TikTok dengan state acak (disimpan di sessionStorage) (PKCE tidak diwajibkan TikTok untuk aplikasi web), lalu mengarahkan pengguna ke TikTok.
-2. TikTok mengembalikan pengguna ke halaman /auth/tiktok/callback di frontend dengan code dan state. Frontend mencocokkan state sebagai perlindungan CSRF.
-3. Frontend mengirim code, redirectUri, intendedRole, dan codeVerifier (jika dipakai) ke POST /auth/tiktok/callback.
-4. Backend memastikan redirectUri ada di daftar yang diizinkan, lalu menukar code dengan token TikTok memakai client secret yang hanya ada di backend, dan mengambil data pengguna (open\_id, nama, foto).
-5. Backend mencari profil lewat profiles.tiktok\_open\_id. Jika belum ada, backend membuat akun lewat Admin API Supabase (email sudah dikonfirmasi) dan profilnya.
-6. Backend membuat tautan sesi lewat Admin API dan mengembalikan tokenHash.
-7. Frontend memanggil supabase.auth.verifyOtp dengan tokenHash dan mendapat sesi Supabase biasa. Setelah itu semua request memakai JWT seperti login lain.
-
-Catatan penting:
-
-- TikTok tidak memberi email. Akun dibuat dengan alamat pengganti berdomain yang dicadangkan (.invalid). Backend tidak mengirim email ke alamat pengganti, notifikasi hanya di dalam aplikasi, dan pengguna dapat menambahkan email asli di profil. Perilaku ini perlu diuji karena validasi email Supabase belum saya pastikan.
-- Akun TikTok tidak digabung otomatis dengan akun lain.
-- Persetujuan TikTok for Developers bisa memakan waktu. Selama belum disetujui, hanya akun tester yang bisa masuk, jadi urus ini paling awal.
 
 ### 9.6 Sesi dan token
 
@@ -933,11 +909,11 @@ Setiap endpoint melewati urutan ini. Penerapannya berupa pembungkus route handle
 ### 9.10 Pengamanan tambahan
 
 1. **Row Level Security** diaktifkan di semua tabel tanpa kebijakan untuk anon dan authenticated, sehingga akses langsung dari browser selalu ditolak. Backend memakai service role yang tidak terkena RLS.
-2. **Kunci rahasia** (service role Supabase, server key Midtrans, client secret TikTok, API key Gemini dan Groq) hanya ada di backend dan tidak boleh berawalan NEXT\_PUBLIC\_. Frontend hanya memegang URL Supabase dan anon key lewat variabel berawalan VITE\_.
+2. **Kunci rahasia** (service role Supabase, server key Midtrans, API key Gemini) hanya ada di backend dan tidak boleh berawalan NEXT\_PUBLIC\_. Frontend hanya memegang URL Supabase dan anon key lewat variabel berawalan VITE\_.
 3. **Storage** memakai dua bucket: venue-photos (baca publik) dan mitra-documents (privat, dibaca admin lewat URL bertanda tangan). Unggahan memakai URL bertanda tangan dari /uploads/sign.
 4. **Pusher**: status slot memakai channel publik per lapangan karena tidak memuat data pribadi. Notifikasi pengguna dan pesanan masuk Mitra memakai channel privat (private-user-{id}, private-mitra-{id}) yang diotorisasi lewat POST /pusher/auth, dan backend hanya mengizinkan channel milik pemanggil.
 5. **Batas permintaan** pada fungsi serverless tidak bisa memakai penghitung di memori karena tiap instance terpisah. Diperlukan penyimpanan bersama, misalnya Upstash Redis dengan pustaka @upstash/ratelimit.
-6. **CORS** hanya mengizinkan domain frontend, dan redirectUri login TikTok divalidasi terhadap daftar yang diizinkan.
+6. **CORS** hanya mengizinkan domain frontend.
 
 ### 9.11 Frontend
 
@@ -950,12 +926,10 @@ Setiap endpoint melewati urutan ini. Penerapannya berupa pembungkus route handle
 - Supabase: Site URL dan daftar Redirect URLs (domain produksi dan localhost), aktifkan konfirmasi email, kata sandi minimal 8 karakter, provider Google dan Facebook, serta SMTP sendiri.
 - Google Cloud: OAuth client dengan redirect URI milik Supabase.
 - Facebook Developers: aplikasi dengan izin email, dan mode live sebelum demo publik.
-- TikTok for Developers: aplikasi Login Kit dengan redirect URI frontend, diurus paling awal.
 - Environment variable backend dan frontend terpisah, masing-masing dengan berkas .env.example.
 
 ### 9.13 Keputusan yang perlu dikonfirmasi
 
-1. Email pengganti untuk akun TikTok (usulan: ya, dengan domain .invalid dan tanpa email notifikasi) atau pengguna wajib mengisi email asli.
 2. Mitra boleh melihat nama dan no. HP penyewa pada booking di venue sendiri (usulan: ya).
 3. Autentikasi dua langkah untuk admin: bonus atau dilewati.
 4. Penyimpanan batas permintaan: Upstash Redis (usulan) atau tabel di database.
@@ -968,29 +942,28 @@ Setiap endpoint melewati urutan ini. Penerapannya berupa pembungkus route handle
 | --- | --- | --- | --- | --- |
 | Midtrans | Pembayaran booking, refund | Snap.js membuka popup pembayaran | Membuat transaksi, menerima webhook, mengecek status, memproses refund | Client key di frontend. Server key hanya di backend. Notification URL di dashboard Midtrans |
 | Supabase Auth, Google, Facebook | Login dan daftar | supabase-js | Verifikasi token | OAuth client Google dan aplikasi Facebook di dashboard Supabase |
-| TikTok | Login | Tombol dan halaman callback | Menukar code, membuat sesi | Client key di frontend. Client secret hanya di backend |
 | Email | Verifikasi, reset kata sandi, konfirmasi booking, pembatalan, refund | Tidak ada | Mengirim email transaksional | SMTP untuk Supabase Auth dan API key layanan email di backend |
 | Google Maps | Peta venue, pilih lokasi, venue terdekat | Maps JavaScript API | Menyimpan koordinat, menghitung jarak di SQL | API key dibatasi HTTP referrer dan daftar API |
 | Google Calendar | Simpan jadwal ke kalender | Membuka tautan | Membuat tautan template | Tanpa kunci |
 | YouTube | Video profil venue | Iframe embed | Memvalidasi URL | Tanpa kunci |
 | Pusher | Status slot dan pesanan secara real-time | pusher-js | Mengirim event, mengotorisasi channel privat | App key di frontend. Secret hanya di backend |
 | Firebase (FCM) | Web push notification | Service worker dan token | Mengirim lewat Firebase Admin SDK | Konfigurasi web dan kunci VAPID di frontend. Service account hanya di backend |
-| Gemini dan Groq | Chatbot AI | Tidak ada, hanya memanggil API backend | Memanggil provider, mengelola cadangan | API key hanya di backend. Nama model di environment variable |
+| Google Gemini Flash | Chatbot AI | Tidak ada, hanya memanggil API backend | Memanggil Google Gemini Flash | API key hanya di backend |
 | Supabase (database, storage) | Data dan berkas | Unggah ke Storage lewat URL bertanda tangan | Semua akses data | Service role hanya di backend |
 
 ### 10.2 Prinsip umum
 
 1. Semua rahasia hanya ada di backend. Frontend hanya memegang kunci publik yang memang dirancang untuk browser.
-2. Satu modul per layanan di backend/src/lib (midtrans, pusher, firebase, email, gemini, groq, tiktok). Route handler dan service tidak memanggil layanan luar secara langsung.
+2. Satu modul per layanan di backend/src/lib (midtrans, pusher, firebase, email, gemini). Route handler dan service tidak memanggil layanan luar secara langsung.
 3. Setiap panggilan keluar memakai batas waktu (timeout), dan kegagalannya diubah menjadi kode error yang seragam (misalnya 502 PROVIDER\_ERROR) lengkap dengan requestId di log.
 4. Kegagalan layanan non-kritis (email, push notification, Pusher) tidak boleh menggagalkan transaksi. Panggilannya dibungkus try/catch dan hanya dicatat di log.
 5. Mode sandbox dan produksi memakai kunci yang terpisah, dipilih lewat environment variable.
 6. Nama model AI dan pilihan provider tidak ditulis di kode, melainkan di environment variable dan system\_settings, karena nama model sering berubah.
-7. Pengurusan akun yang butuh persetujuan atau penagihan (TikTok for Developers, mode live Facebook, billing Google Maps) dilakukan di minggu pertama.
+7. Pengurusan akun yang butuh persetujuan atau penagihan (mode live Facebook, billing Google Maps) dilakukan di minggu pertama.
 
 ### 10.3 Midtrans
 
-- **Membuat transaksi.** order\_id unik per percobaan bayar (kode booking ditambah nomor percobaan) dan disimpan di payments.midtrans\_order\_id. gross\_amount sama dengan total\_price. Email di customer\_details hanya diisi jika email asli (bukan alamat pengganti TikTok). Objek expiry pada permintaan Snap diisi sisa waktu sampai expires\_at booking, sehingga halaman Snap dan metode bayar kedaluwarsa bersamaan dengan booking (custom\_expiry hanya untuk Core API, bukan Snap).
+- **Membuat transaksi.** order\_id unik per percobaan bayar (kode booking ditambah nomor percobaan) dan disimpan di payments.midtrans\_order\_id. gross\_amount sama dengan total\_price. Email di customer\_details hanya diisi jika email asli. Objek expiry pada permintaan Snap diisi sisa waktu sampai expires\_at booking, sehingga halaman Snap dan metode bayar kedaluwarsa bersamaan dengan booking (custom\_expiry hanya untuk Core API, bukan Snap).
 - **Frontend.** snap.js membuka popup dengan snapToken dan client key. Sandbox dan produksi memakai alamat skrip serta kunci yang berbeda.
 - **Webhook.** URL notifikasi diatur di dashboard Midtrans. Saat pengembangan di komputer lokal, backend perlu diekspos lewat tunnel (misalnya ngrok atau cloudflared). Backend menghitung signature (SHA512 dari order\_id, status\_code, gross\_amount, dan server key), mencocokkannya dengan signature\_key kiriman Midtrans, lalu mengecek ulang status ke API Midtrans. Pemrosesan idempotent lewat webhook\_events. Webhook yang valid selalu dibalas 200, termasuk jika sudah pernah diproses.
 - **Kedaluwarsa halaman Snap tidak mengirim webhook** (menurut dokumentasi Midtrans). Karena itu status kedaluwarsa booking tidak boleh menunggu webhook, melainkan dijalankan oleh pg\_cron seperti yang sudah dirancang.
@@ -1042,19 +1015,19 @@ Mitra menempelkan tautan video. Backend memvalidasi bahwa host-nya youtube.com a
 - **Isi.** Template sederhana berbahasa Indonesia dengan kode booking, jadwal, dan tautan ke halaman pesanan. Tidak memuat data sensitif.
 - **Kegagalan.** Pengiriman dibungkus try/catch dan dicatat di log. Email ke alamat pengganti (.invalid) dilewati.
 
-### 10.10 Chatbot AI (Gemini dan Groq)
+### 10.10 Chatbot AI (Google Gemini Flash)
 
 &#91;embedded content: alur chatbot AI · provider utama, cadangan, dan jawaban bawaan\]
 
 Aturannya:
 
-- Provider utama dipilih lewat system\_settings (nilai gemini atau groq). Jika provider utama gagal, terkena batas permintaan, atau melebihi batas waktu, backend mencoba provider cadangan. Jika keduanya gagal, balasan bawaan dikirim.
+- Sistem menggunakan Google Gemini Flash untuk menghasilkan rekomendasi dan bantuan cerdas berbasis data katalog venue dan promo nyata dari database.
 - Jawaban didasarkan pada data nyata: backend mengambil venue dan jadwal yang relevan dari database (hanya baca) dan menyertakannya dalam prompt, sehingga model tidak mengarang lapangan atau harga.
 - Prompt sistem berbahasa Indonesia dan membatasi topik pada booking lapangan. Chatbot tidak dapat membuat, mengubah, atau membatalkan pesanan.
 - Riwayat yang dikirim ke model dibatasi pada beberapa pesan terakhir. Data pribadi (email, no. HP) tidak dikirim. Menurut halaman harga Google, permintaan pada tier gratis Gemini dapat dipakai untuk meningkatkan produk Google, jadi hal ini penting.
 - Input pengguna dianggap tidak tepercaya (risiko prompt injection), sehingga model tidak diberi alat yang bisa mengubah data.
 - Batas permintaan 20 per menit per pengguna, panjang pesan dibatasi, dan jawaban tidak di-streaming pada versi pertama.
-- Gemini memiliki tier gratis dengan batas yang hanya terlihat di konsol AI Studio per proyek, sedangkan Groq, sejauh yang saya ketahui, menyediakan tier gratis dengan batas permintaan dan memakai format API yang kompatibel dengan OpenAI. Keduanya cukup untuk demo, tetapi batasnya bisa berubah.
+- Model yang digunakan adalah gemini-flash-latest yang cepat dan responsif dengan integrasi langsung ke data database.
 
 ### 10.11 Penanganan kegagalan layanan luar
 
@@ -1066,15 +1039,14 @@ Aturannya:
 | Pusher | Layar tidak terbarui langsung | Transaksi tetap berhasil. Polling berkala menjadi cadangan |
 | Firebase | Push tidak terkirim | Dicatat di log. Notifikasi di dalam aplikasi tetap ada |
 | Email | Email tidak terkirim | Dicatat di log. Pesanan tidak terpengaruh |
-| Gemini atau Groq | Chatbot tidak menjawab | Pindah ke provider cadangan, lalu balasan bawaan |
+| Google Gemini | Chatbot tidak menjawab | Balasan bawaan ramah dan rekomendasi venue langsung |
 | Google Maps | Peta tidak termuat | Menampilkan alamat dan tautan Buka di Google Maps |
-| TikTok | Login gagal | Pesan jelas dan pengguna diarahkan ke metode login lain |
 
 ### 10.12 Keputusan
 
 1. Google Maps: tanpa akun penagihan. Peta ditampilkan lewat iframe embed dan tombol Buka di Google Maps, Mitra mengisi koordinat dengan pratinjau peta, dan komponen peta dibuat terpisah agar bisa diganti ke Maps JavaScript API jika akun penagihan tersedia nanti.
 2. Email: Brevo (SMTP relay, paket gratis 300 email per hari) untuk email autentikasi Supabase dan email transaksional dari backend, dengan satu akun SMTP. Tidak membutuhkan domain sendiri.
 3. Sinkronisasi status pembayaran saat booking dibuka: ya.
-4. Chatbot: Gemini sebagai provider utama dan Groq sebagai cadangan, dipilih lewat system\_settings sehingga bisa ditukar tanpa mengubah kode.
+4. Chatbot: Google Gemini Flash sebagai asisten resmi dengan rekomendasi venue real-time.
 5. Web push: Android dan desktop diprioritaskan, iOS sebagai bonus.
 

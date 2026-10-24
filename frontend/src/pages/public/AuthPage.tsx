@@ -118,11 +118,7 @@ export function AuthPage() {
     }, 600);
   };
 
-  const handleSocialLogin = async (provider: "google" | "tiktok") => {
-    if (provider === "tiktok") {
-      navigate("/auth/tiktok/callback");
-      return;
-    }
+  const handleSocialLogin = async (provider: "google") => {
 
     if (provider === "google") {
       try {
@@ -290,11 +286,11 @@ export function AuthPage() {
               <form onSubmit={handleSubmit} className="min-h-[360px] flex flex-col justify-between">
                 <div className="space-y-3.5">
                   {/* Social Logins */}
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div>
                     <button
                       type="button"
                       onClick={() => handleSocialLogin("google")}
-                      className="py-2.5 px-4 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2 text-xs font-semibold text-slate-700 shadow-xs cursor-pointer"
+                      className="w-full py-2.5 px-4 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2 text-xs font-semibold text-slate-700 shadow-xs cursor-pointer"
                     >
                       <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                         <path
@@ -314,18 +310,7 @@ export function AuthPage() {
                           d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                         />
                       </svg>
-                      <span>Google</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleSocialLogin("tiktok")}
-                      className="py-2.5 px-4 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2 text-xs font-semibold text-slate-700 shadow-xs cursor-pointer"
-                    >
-                      <svg className="w-4 h-4 fill-slate-900 shrink-0" viewBox="0 0 24 24">
-                        <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.24 1.07-.14 1.61.24 1.25 1.23 2.29 2.47 2.58 1.07.24 2.22.02 3.09-.64.71-.53 1.15-1.34 1.24-2.22.07-2.36.03-4.73.04-7.1v-11.2z" />
-                      </svg>
-                      <span>TikTok</span>
+                      <span>Lanjutkan dengan Google</span>
                     </button>
                   </div>
 
@@ -425,11 +410,11 @@ export function AuthPage() {
               <div className="min-h-[360px] flex flex-col justify-between">
                 <div className="space-y-3.5">
                   {/* Social Logins */}
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div>
                     <button
                       type="button"
                       onClick={() => handleSocialLogin("google")}
-                      className="py-2.5 px-4 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2 text-xs font-semibold text-slate-700 shadow-xs cursor-pointer"
+                      className="w-full py-2.5 px-4 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2 text-xs font-semibold text-slate-700 shadow-xs cursor-pointer"
                     >
                       <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                         <path
@@ -449,18 +434,7 @@ export function AuthPage() {
                           d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                         />
                       </svg>
-                      <span>Google</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleSocialLogin("tiktok")}
-                      className="py-2.5 px-4 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2 text-xs font-semibold text-slate-700 shadow-xs cursor-pointer"
-                    >
-                      <svg className="w-4 h-4 fill-slate-900 shrink-0" viewBox="0 0 24 24">
-                        <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.24 1.07-.14 1.61.24 1.25 1.23 2.29 2.47 2.58 1.07.24 2.22.02 3.09-.64.71-.53 1.15-1.34 1.24-2.22.07-2.36.03-4.73.04-7.1v-11.2z" />
-                      </svg>
-                      <span>TikTok</span>
+                      <span>Daftar dengan Google</span>
                     </button>
                   </div>
 

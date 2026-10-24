@@ -132,7 +132,7 @@ Seluruh antarmuka wajib responsif untuk layar HP (`<640px`), tablet (`640px–10
   - **HIJAU (`bg-emerald-600 text-white`):** `SAH — Check-in Berhasil` (menampilkan nama penyewa, lapangan, dan jam main).
   - **MERAH TUA (`bg-rose-700 text-white`):** Menampilkan alasan penolakan secara spesifik (`SUDAH DIPAKAI`, `BELUM DIBAYAR`, `SALAH WAKTU (Buka 30 menit sebelum main)`, `SALAH VENUE`, atau `DIBATALKAN / TIDAK DITEMUKAN`).
 
-### 5.7 Widget Chatbot AI (Gemini & Groq)
+### 5.7 Widget Chatbot AI (Google Gemini Flash)
 - Tombol melayang di kanan bawah (`fixed bottom-6 right-6 z-40 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-lg p-3 sm:px-4 sm:py-3 shadow-sm hover:shadow-md border border-red-700/20 flex items-center gap-2 font-semibold text-xs sm:text-sm`).
 - Membuka panel chat ringkas (`w-full sm:w-96 max-h-[85vh] bg-white rounded-2xl shadow-md border border-slate-200 flex flex-col`) dengan *quick replies* berformat `rounded-lg border border-red-200/70 bg-red-50 text-red-700 text-[11px] font-medium` seperti *"Rekomendasi lapangan futsal malam ini"* atau *"Cara reschedule booking"*.
 
