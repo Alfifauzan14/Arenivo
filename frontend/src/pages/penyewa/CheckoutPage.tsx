@@ -309,13 +309,21 @@ export function CheckoutPage() {
           return;
         }
       }
-    } catch (err) {
-      console.warn("Gagal menghubungi gateway Midtrans:", err);
+      console.error("[Midtrans] Respons backend tidak berisi token:", json);
+      addToast(
+        "error",
+        json?.error?.message || "Backend tidak mengembalikan Snap Token Midtrans. Periksa console browser (F12).",
+        "Gagal Membuka Midtrans"
+      );
+    } catch (err: any) {
+      console.error("[Midtrans] Gagal menghubungi backend/gateway:", err);
       setIsSnapLoading(false);
+      addToast(
+        "error",
+        "Tidak dapat menghubungi server pembayaran: " + (err?.message || String(err)) + ". Pastikan backend berjalan di port 3000.",
+        "Gagal Membuka Midtrans"
+      );
     }
-
-    // Jika internet gagal total atau snap offline, buka simulator sebagai cadangan
-    setIsMidtransOpen(true);
   };
 
   const handlePaymentSuccess = () => {
