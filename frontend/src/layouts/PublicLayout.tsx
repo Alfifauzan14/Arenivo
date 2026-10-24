@@ -36,7 +36,8 @@ import { BrandLogo, BrandLogoIcon } from "@/components/common/BrandLogo";
 import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
 import { useSession } from "@/features/auth/context/SessionContext";
 import { ChatbotWidget } from "@/features/chatbot/components/ChatbotWidget";
-import { MOCK_NOTIFICATIONS, type InAppNotification } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
+import { type InAppNotification } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 export function PublicLayout() {
@@ -44,7 +45,23 @@ export function PublicLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = React.useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = React.useState(false);
-  const [notifications, setNotifications] = React.useState<InAppNotification[]>(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = React.useState<InAppNotification[]>([]);
+
+  React.useEffect(() => {
+    if (!isLoggedIn) {
+      setNotifications([]);
+      return;
+    }
+    let isMounted = true;
+    apiClient.get<any[]>("/me/notifications").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data)) {
+        setNotifications(res.data);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [isLoggedIn]);
 
   const location = useLocation();
   const navigate = useNavigate();

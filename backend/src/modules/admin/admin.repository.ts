@@ -10,7 +10,7 @@ export const adminRepository = {
 
   async mitraList(p: { verification?: string; q?: string; from: number; to: number }) {
     let q = supabaseAdmin
-      .from("mitra_profiles").select("*, profile:profiles(email, phone, status, full_name)", { count: "exact" })
+      .from("mitra_profiles").select("*, profile:profiles!user_id(email, phone, status, full_name)", { count: "exact" })
       .order("created_at", { ascending: false }).range(p.from, p.to);
     if (p.verification) q = q.eq("verification_status", p.verification);
     if (p.q) q = q.ilike("business_name", `%${p.q}%`);

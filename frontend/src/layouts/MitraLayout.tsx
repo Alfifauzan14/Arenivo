@@ -20,12 +20,27 @@ import {
 import { BrandLogoIcon } from "@/components/common/BrandLogo";
 import { Select } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { MOCK_VENUES } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
+import { supabase } from "@/lib/supabase";
 import { MitraVerificationStatus } from "@futsal/shared";
 
 export function MitraLayout() {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const [selectedVenueId, setSelectedVenueId] = React.useState(MOCK_VENUES[0].id);
+  const [venues, setVenues] = React.useState<any[]>([]);
+  const [selectedVenueId, setSelectedVenueId] = React.useState("");
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any[]>("/mitra/venues").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setVenues(res.data);
+        setSelectedVenueId(res.data[0].id);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -38,8 +53,7 @@ export function MitraLayout() {
     MitraVerificationStatus.MENUNGGU
   );
 
-  const selectedVenue =
-    MOCK_VENUES.find((v) => v.id === selectedVenueId) || MOCK_VENUES[0];
+  const selectedVenue: any = venues.find((v: any) => v.id === selectedVenueId) || venues[0] || { name: "Champion Futsal Arena Cilandak", id: "" };
 
   const menuSections = [
     {
@@ -153,10 +167,7 @@ export function MitraLayout() {
           <Select
             value={selectedVenueId}
             onChange={(e) => setSelectedVenueId(e.target.value)}
-            options={MOCK_VENUES.map((v) => ({
-              value: v.id,
-              label: v.name,
-            }))}
+            options={venues.length > 0 ? venues.map((v: any) => ({ value: v.id, label: v.name })) : [{ value: selectedVenueId || "", label: "Champion Futsal Arena Cilandak" }]}
           />
         </div>
 

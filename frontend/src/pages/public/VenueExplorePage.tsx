@@ -45,9 +45,9 @@ export function VenueExplorePage() {
   const [mobileFilterOpen, setMobileFilterOpen] = React.useState(false);
 
   // Live Backend Data States with graceful Mock fallbacks
-  const [venues, setVenues] = React.useState<any[]>(MOCK_VENUES);
-  const [cities, setCities] = React.useState<any[]>(MOCK_CITIES);
-  const [facilities, setFacilities] = React.useState<any[]>(MOCK_FACILITIES);
+  const [venues, setVenues] = React.useState<any[]>([]);
+  const [cities, setCities] = React.useState<any[]>([]);
+  const [facilities, setFacilities] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     let isMounted = true;

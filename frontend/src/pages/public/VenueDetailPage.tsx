@@ -98,7 +98,26 @@ export function VenueDetailPage() {
 
   // 1. Temukan venue berdasarkan slug
   const initialVenue = React.useMemo(() => {
-    return MOCK_VENUES.find((v) => v.slug === slug) || MOCK_VENUES[0];
+    const found = MOCK_VENUES.find((v) => v.slug === slug);
+    if (found) return found;
+    return {
+      id: "17ab8073-3d37-4c3d-b635-be37aabd35b2",
+      name: "Champion Futsal Arena Cilandak",
+      slug: slug || "champion-futsal-arena-cilandak",
+      description: "Arena futsal modern berstandar internasional dengan lantai vinyl Taraflex dan rumput sintetis lembut.",
+      address: "Jl. TB Simatupang No. 18, Cilandak, Jakarta Selatan",
+      city: { id: "cd5f4a02-d0fc-4e18-8571-7624a0029492", name: "Jakarta Selatan" },
+      status: "aktif",
+      ratingAvg: 4.8,
+      reviewCount: 24,
+      startingPrice: 150000,
+      facilities: [],
+      fields: [],
+      photos: [
+        { id: "p1", url: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80", isCover: true },
+        { id: "p2", url: "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?auto=format&fit=crop&w=1200&q=80", isCover: false }
+      ],
+    } as any;
   }, [slug]);
 
   const [venue, setVenue] = React.useState<Venue>(initialVenue);

@@ -28,13 +28,13 @@ export function AdminDashboardPage() {
 
   // Live Compute metrics with Supabase API integration
   const [metrics, setMetrics] = React.useState({
-    totalUsers: MOCK_USERS.length,
-    totalMitra: MOCK_MITRA_PROFILES.length,
-    pendingMitraCount: MOCK_MITRA_PROFILES.filter((m) => m.verificationStatus === "menunggu").length,
-    totalVenues: MOCK_VENUES.length,
-    totalBookings: MOCK_BOOKINGS.length,
-    gmv: MOCK_BOOKINGS.reduce((acc, curr) => acc + (curr.totalPrice || 0), 0),
-    platformCommission: MOCK_BOOKINGS.reduce((acc, curr) => acc + (curr.platformCommission || 0), 0),
+    totalUsers: 0,
+    totalMitra: 0,
+    pendingMitraCount: 0,
+    totalVenues: 0,
+    totalBookings: 0,
+    gmv: 0,
+    platformCommission: 0,
   });
 
   React.useEffect(() => {

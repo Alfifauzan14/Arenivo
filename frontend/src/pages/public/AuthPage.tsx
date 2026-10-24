@@ -51,14 +51,14 @@ export function AuthPage() {
 
   // Form states
   const [registerStep, setRegisterStep] = React.useState<1 | 2>(1);
-  const [email, setEmail] = React.useState("rizky.ramadhan@gmail.com");
-  const [password, setPassword] = React.useState("rahasia123");
-  const [confirmPassword, setConfirmPassword] = React.useState("rahasia123");
-  const [fullName, setFullName] = React.useState("Rizky Ramadhan");
-  const [phone, setPhone] = React.useState("081234567890");
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [fullName, setFullName] = React.useState("");
+  const [phone, setPhone] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
-  const [agreeTerms, setAgreeTerms] = React.useState(true);
+  const [agreeTerms, setAgreeTerms] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
 
   const handleNextRegisterStep = (e: React.MouseEvent) => {

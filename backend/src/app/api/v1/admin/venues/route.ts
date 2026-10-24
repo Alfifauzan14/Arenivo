@@ -13,7 +13,7 @@ export const GET = withAuth(
     let q = supabaseAdmin
       .from("venues")
       .select(
-        "*, cities(*), mitra_profiles(*, profiles(id, full_name, email)), fields(id, name, base_price, status)"
+        "*, cities(*), mitra_profiles(*, profiles!user_id(id, full_name, email)), fields(id, name, base_price, status)"
       )
       .order("created_at", { ascending: false });
 

@@ -73,9 +73,9 @@ export function LandingPage() {
 
   // Search Widget State & Defaults for Reset
   // Live Backend Data States with graceful Mock fallbacks
-  const [venues, setVenues] = React.useState<any[]>(MOCK_VENUES);
-  const [cities, setCities] = React.useState<any[]>(MOCK_CITIES);
-  const [banners, setBanners] = React.useState<any[]>(MOCK_BANNERS);
+  const [venues, setVenues] = React.useState<any[]>([]);
+  const [cities, setCities] = React.useState<any[]>([]);
+  const [banners, setBanners] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     let isMounted = true;

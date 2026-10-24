@@ -36,6 +36,14 @@ import { apiClient } from "@/lib/api-client";
 import { formatRupiah, formatDateIndo } from "@futsal/shared";
 import { cn } from "@/lib/utils";
 
+interface MitraBalance {
+  mitraId: string;
+  saldoTotal: number;
+  saldoTertahan: number;
+  saldoBisaDicairkan: number;
+  entries: any[];
+}
+
 interface BalanceEntry {
   id: string;
   type: "in" | "out" | "hold";
@@ -48,7 +56,13 @@ interface BalanceEntry {
 export function MitraFinancePage() {
   const { addToast } = useToast();
 
-  const [balance, setBalance] = React.useState(MOCK_MITRA_BALANCE);
+  const [balance, setBalance] = React.useState<MitraBalance>({
+    mitraId: "",
+    saldoTotal: 0,
+    saldoTertahan: 0,
+    saldoBisaDicairkan: 0,
+    entries: [],
+  });
   const [payouts, setPayouts] = React.useState<any[]>([]);
 
   // Live Backend Loading for Balance & Payouts
@@ -87,39 +101,18 @@ export function MitraFinancePage() {
   const [bankAccount, setBankAccount] = React.useState("8830128491");
   const [accountHolder, setAccountHolder] = React.useState("PT Spartan Olahraga Sejahtera");
 
-  // Ledger Mutasi Saldo
-  const [ledgerEntries] = React.useState<BalanceEntry[]>([
-    {
-      id: "ent-1",
-      type: "in",
-      description: "Pendapatan Booking Online (Net 90%)",
-      orderCode: "FB-8K2M4Q",
-      amount: 378000,
-      date: "15 Okt 2026, 08:35",
-    },
-    {
-      id: "ent-2",
-      type: "out",
-      description: "Pencairan Dana (Payout) ke BCA 8830128491",
-      amount: 1500000,
-      date: "14 Okt 2026, 14:30",
-    },
-    {
-      id: "ent-3",
-      type: "in",
-      description: "Pendapatan Booking Online (Net 90%)",
-      orderCode: "FB-4L1B8C",
-      amount: 288000,
-      date: "13 Okt 2026, 10:05",
-    },
-    {
-      id: "ent-4",
-      type: "out",
-      description: "Pencairan Dana (Payout) ke BCA 8830128491",
-      amount: 2500000,
-      date: "10 Okt 2026, 09:00",
-    },
-  ]);
+  // Ledger Mutasi Saldo (Realtime dari Database Supabase)
+  const ledgerEntries: BalanceEntry[] = React.useMemo(() => {
+    if (!balance.entries || !Array.isArray(balance.entries)) return [];
+    return balance.entries.map((e: any) => ({
+      id: e.id,
+      type: (e.amount < 0 ? "out" : "in") as "in" | "out",
+      description: e.description || "Pendapatan Booking Online",
+      orderCode: e.bookingId ? e.bookingId.slice(0, 8) : undefined,
+      amount: Math.abs(e.amount),
+      date: formatDateIndo(e.createdAt || new Date()),
+    }));
+  }, [balance.entries]);
 
   const filteredLedger = React.useMemo(() => {
     return ledgerEntries.filter((e) => {
