@@ -14,6 +14,7 @@ import { BrandLogoIcon } from "@/components/common/BrandLogo";
 import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
 import { useSession } from "@/features/auth/context/SessionContext";
 import { supabase } from "@/lib/supabase";
+import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +23,7 @@ export function AuthPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const { isLoggedIn, login } = useSession();
+  const { isLoggedIn, refreshProfile } = useSession();
 
   // Mode: "login" | "register"
   const isRegisterParam = location.pathname === "/register" || searchParams.get("mode") === "register";
@@ -73,7 +74,7 @@ export function AuthPage() {
     setRegisterStep(2);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email.trim() || !password.trim()) {
@@ -98,49 +99,89 @@ export function AuthPage() {
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-      login({
-        fullName: mode === "register" ? fullName : "Rizky Ramadhan",
-        email: email,
-        phone: mode === "register" ? phone : "081234567890",
-      });
+    if (mode === "login") {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password,
+        });
 
-      addToast(
-        "success",
-        mode === "login"
-          ? `Selamat datang kembali, ${fullName}!`
-          : `Pendaftaran berhasil! Akun Anda telah aktif dan siap booking.`,
-        "Autentikasi Berhasil"
-      );
+        if (error) {
+          setIsLoading(false);
+          addToast("error", error.message || "Email atau kata sandi tidak sesuai.", "Gagal Masuk");
+          return;
+        }
 
-      navigate("/bookings");
-    }, 600);
+        if (data.session) {
+          localStorage.setItem("sb_access_token", data.session.access_token);
+          localStorage.setItem("futsal_logged_in", "true");
+          await refreshProfile();
+          setIsLoading(false);
+          addToast("success", "Selamat datang kembali!", "Autentikasi Berhasil");
+          navigate("/bookings");
+        }
+      } catch (err: any) {
+        setIsLoading(false);
+        addToast("error", err.message || "Terjadi kesalahan saat masuk.", "Error");
+      }
+    } else {
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password,
+          options: {
+            data: {
+              full_name: fullName.trim(),
+              phone: phone.trim(),
+            },
+          },
+        });
+
+        if (error) {
+          setIsLoading(false);
+          addToast("error", error.message || "Pendaftaran gagal.", "Gagal Daftar");
+          return;
+        }
+
+        if (data.user) {
+          try {
+            await apiClient.post("/auth/sync-profile", {
+              id: data.user.id,
+              fullName: fullName.trim(),
+              email: email.trim(),
+              phone: phone.trim(),
+            });
+          } catch {}
+
+          if (data.session) {
+            localStorage.setItem("sb_access_token", data.session.access_token);
+            localStorage.setItem("futsal_logged_in", "true");
+            await refreshProfile();
+          }
+
+          setIsLoading(false);
+          addToast("success", "Pendaftaran berhasil! Akun Anda aktif.", "Daftar Berhasil");
+          navigate("/bookings");
+        }
+      } catch (err: any) {
+        setIsLoading(false);
+        addToast("error", err.message || "Terjadi kesalahan saat mendaftar.", "Error");
+      }
+    }
   };
 
   const handleSocialLogin = async (provider: "google") => {
-
     if (provider === "google") {
       try {
         const { error } = await supabase.auth.signInWithOAuth({
           provider: "google",
           options: {
-            redirectTo: `${window.location.origin}/`,
+            redirectTo: `${window.location.origin}/bookings`,
           },
         });
         if (error) throw error;
       } catch (err: any) {
-        console.warn("Google OAuth Supabase belum aktif:", err);
-        login({
-          fullName: "Rizky Ramadhan (Google)",
-          email: "rizky.ramadhan@gmail.com",
-        });
-        addToast(
-          "info",
-          "Provider Google belum aktif di dashboard Supabase, beralih ke simulasi.",
-          "Mode Simulasi"
-        );
-        navigate("/bookings");
+        addToast("error", err.message || "Login Google gagal.", "Google Auth");
       }
     }
   };

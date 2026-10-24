@@ -4,17 +4,18 @@ import { ShieldCheck, Lock, Mail, KeyRound, ArrowRight, Shield } from "lucide-re
 import { BrandLogoIcon } from "@/components/common/BrandLogo";
 import { useToast } from "@/components/ui";
 import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
+import { supabase } from "@/lib/supabase";
 
 export function AdminLoginPage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
 
-  const [email, setEmail] = React.useState("superadmin@futsal.id");
-  const [password, setPassword] = React.useState("AdminMaster2026!");
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
   const [totpCode, setTotpCode] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       addToast("warning", "Masukkan email dan kata sandi.", "Validasi");
@@ -22,16 +23,46 @@ export function AdminLoginPage() {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (error) {
+        setIsLoading(false);
+        addToast("error", error.message || "Kredensial Super Admin tidak sesuai.", "Akses Ditolak");
+        return;
+      }
+
+      if (data.session) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.session.user.id)
+          .single();
+
+        if (profile?.role !== "admin") {
+          await supabase.auth.signOut();
+          setIsLoading(false);
+          addToast("error", "Akun ini tidak memiliki hak akses administrator platform.", "Akses Ditolak");
+          return;
+        }
+
+        localStorage.setItem("sb_access_token", data.session.access_token);
+        localStorage.setItem("futsal_admin_authenticated", "true");
+        setIsLoading(false);
+        addToast(
+          "success",
+          "Autentikasi Super Admin berhasil. Selamat datang kembali!",
+          "Sesi Aktif"
+        );
+        navigate("/admin");
+      }
+    } catch (err: any) {
       setIsLoading(false);
-      localStorage.setItem("futsal_admin_authenticated", "true");
-      addToast(
-        "success",
-        "Autentikasi Super Admin berhasil. Selamat datang kembali!",
-        "Sesi Aktif"
-      );
-      navigate("/admin");
-    }, 400);
+      addToast("error", err.message || "Gagal menghubungi server autentikasi.", "Error");
+    }
   };
 
   return (
@@ -65,7 +96,7 @@ export function AdminLoginPage() {
                 <input
                   type="email"
                   required
-                  placeholder="admin@platform.id"
+                  placeholder="admin@arenivo.id"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="bg-transparent border-none text-xs text-slate-900 placeholder-slate-400 focus:outline-none w-full font-medium"
@@ -81,7 +112,7 @@ export function AdminLoginPage() {
                 <input
                   type="password"
                   required
-                  placeholder="••••••••••••"
+                  placeholder="Masukkan kata sandi admin"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="bg-transparent border-none text-xs text-slate-900 placeholder-slate-400 focus:outline-none w-full font-mono"
@@ -105,46 +136,39 @@ export function AdminLoginPage() {
               </div>
             </div>
 
-            {/* Submit */}
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full mt-2 py-3 px-6 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider shadow-xs active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+              className="w-full mt-2 py-2.5 px-4 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-lg font-bold text-xs shadow-xs hover:shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 min-touch-target cursor-pointer"
             >
               {isLoading ? (
-                <span>Memverifikasi...</span>
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Memverifikasi...</span>
+                </>
               ) : (
                 <>
-                  <span>Masuk ke Sistem Admin</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>Masuk ke Dashboard</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </>
               )}
             </button>
           </form>
-
-          {/* Quick Demo Credential Hint */}
-          <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-200/60 flex items-start gap-2">
-            <Shield className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold text-slate-800 block">Kredensial Demo Terisi:</span>
-              <span className="font-mono text-[10px] text-slate-600">superadmin@futsal.id / AdminMaster2026!</span>
-            </div>
-          </div>
         </div>
 
-        {/* Back link */}
-        <div className="text-center">
-          <Link
-            to="/"
-            className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
-          >
-            ← Kembali ke Beranda Publik
-          </Link>
+        {/* Security Notice Footer */}
+        <div className="text-center space-y-1">
+          <p className="text-[11px] text-slate-600 flex items-center justify-center gap-1 font-medium">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 inline" />
+            Koneksi terenkripsi SSL 256-bit & JWT Guard
+          </p>
+          <p className="text-[10px] text-slate-600">
+            Seluruh aktivitas staf terekam otomatis di immutable audit logs.
+          </p>
         </div>
 
       </div>
     </div>
   );
 }
-
-export default AdminLoginPage;

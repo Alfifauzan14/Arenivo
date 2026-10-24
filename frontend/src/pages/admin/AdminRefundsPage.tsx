@@ -38,7 +38,7 @@ import { formatRupiah, formatDateIndo, RefundStatus } from "@futsal/shared";
 type RefundItem = (typeof MOCK_REFUNDS)[number];
 
 export function AdminRefundsPage() {
-  const [refunds, setRefunds] = React.useState<RefundItem[]>(MOCK_REFUNDS);
+  const [refunds, setRefunds] = React.useState<RefundItem[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -47,7 +47,7 @@ export function AdminRefundsPage() {
   React.useEffect(() => {
     let isMounted = true;
     apiClient.get<any[]>("/admin/refunds").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (isMounted && res.data && Array.isArray(res.data)) {
         setRefunds(res.data);
       }
     }).catch(() => {});

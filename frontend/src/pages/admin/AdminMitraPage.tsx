@@ -45,12 +45,7 @@ type MitraItem = (typeof MOCK_MITRA_PROFILES)[number] & {
 };
 
 export function AdminMitraPage() {
-  const [mitraList, setMitraList] = React.useState<MitraItem[]>(
-    MOCK_MITRA_PROFILES.map((m) => ({
-      ...m,
-      accountStatus: m.id === "mp-4" ? AccountStatus.DIBLOKIR : AccountStatus.AKTIF,
-    }))
-  );
+  const [mitraList, setMitraList] = React.useState<MitraItem[]>([]);
 
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterVerification, setFilterVerification] = React.useState<string>("all");
@@ -61,7 +56,7 @@ export function AdminMitraPage() {
   React.useEffect(() => {
     let isMounted = true;
     apiClient.get<any[]>("/admin/mitra").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (isMounted && res.data && Array.isArray(res.data)) {
         setMitraList(res.data);
       }
     }).catch(() => {});

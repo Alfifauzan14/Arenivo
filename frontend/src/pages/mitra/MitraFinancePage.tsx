@@ -49,7 +49,7 @@ export function MitraFinancePage() {
   const { addToast } = useToast();
 
   const [balance, setBalance] = React.useState(MOCK_MITRA_BALANCE);
-  const [payouts, setPayouts] = React.useState(MOCK_PAYOUTS);
+  const [payouts, setPayouts] = React.useState<any[]>([]);
 
   // Live Backend Loading for Balance & Payouts
   React.useEffect(() => {
@@ -59,7 +59,7 @@ export function MitraFinancePage() {
     }).catch(() => {});
 
     apiClient.get<any[]>("/mitra/payouts").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (isMounted && res.data && Array.isArray(res.data)) {
         setPayouts(res.data);
       }
     }).catch(() => {});

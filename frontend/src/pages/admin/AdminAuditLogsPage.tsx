@@ -32,7 +32,7 @@ import { apiClient } from "@/lib/api-client";
 import { formatDateIndo } from "@futsal/shared";
 
 export function AdminAuditLogsPage() {
-  const [logs, setLogs] = React.useState<AuditLogItem[]>(MOCK_AUDIT_LOGS);
+  const [logs, setLogs] = React.useState<AuditLogItem[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterAction, setFilterAction] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -41,7 +41,7 @@ export function AdminAuditLogsPage() {
   React.useEffect(() => {
     let isMounted = true;
     apiClient.get<any[]>("/admin/audit-logs").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (isMounted && res.data && Array.isArray(res.data)) {
         setLogs(res.data);
       }
     }).catch(() => {});

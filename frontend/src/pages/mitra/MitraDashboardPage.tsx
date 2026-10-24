@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
 
 export function MitraDashboardPage() {
   const [balance, setBalance] = React.useState(MOCK_MITRA_BALANCE);
-  const [bookings, setBookings] = React.useState<any[]>(MOCK_BOOKINGS);
+  const [bookings, setBookings] = React.useState<any[]>([]);
   const [venues, setVenues] = React.useState<any[]>(MOCK_VENUES);
 
   React.useEffect(() => {

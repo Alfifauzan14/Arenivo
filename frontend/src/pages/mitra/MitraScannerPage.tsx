@@ -46,7 +46,7 @@ export function MitraScannerPage() {
 
   const [venues, setVenues] = React.useState<any[]>(MOCK_VENUES);
   const [selectedVenueId, setSelectedVenueId] = React.useState(MOCK_VENUES[0].id);
-  const [manualCode, setManualCode] = React.useState("TKT-FB-8K2M4Q-9A2");
+  const [manualCode, setManualCode] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 5;
 
@@ -54,7 +54,7 @@ export function MitraScannerPage() {
   React.useEffect(() => {
     let isMounted = true;
     apiClient.get<any[]>("/mitra/venues").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (isMounted && res.data && Array.isArray(res.data)) {
         setVenues(res.data);
         setSelectedVenueId(res.data[0].id);
       }
@@ -72,17 +72,10 @@ export function MitraScannerPage() {
   }, []);
 
   // Default scan result: SAH
-  const [scanResult, setScanResult] = React.useState<ValidationResultState | null>({
-    result: TicketScanResult.SAH,
-    title: "TIKET SAH — CHECK-IN BERHASIL",
-    message: "Validasi gate berhasil. Penyewa dipersilakan memasuki area lapangan.",
-    customerName: "Rizky Ramadhan",
-    field: "Lapangan A (Vinyl Pro)",
-    time: "19:00 – 21:00 WIB (2 Jam)",
-  });
+  const [scanResult, setScanResult] = React.useState<ValidationResultState | null>(null);
 
   // Scans history table
-  const [scansHistory, setScansHistory] = React.useState(MOCK_SCANS);
+  const [scansHistory, setScansHistory] = React.useState<any[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [resultFilter, setResultFilter] = React.useState("semua");
 

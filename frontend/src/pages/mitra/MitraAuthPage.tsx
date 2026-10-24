@@ -23,6 +23,8 @@ import { BrandLogoIcon } from "@/components/common/BrandLogo";
 import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
 import { useToast } from "@/components/ui";
 import { MOCK_CITIES } from "@/lib/mock-data";
+import { supabase } from "@/lib/supabase";
+import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 export function MitraAuthPage() {
@@ -57,16 +59,16 @@ export function MitraAuthPage() {
   };
 
   // State: Login
-  const [loginEmail, setLoginEmail] = React.useState("mitra.spartan@gmail.com");
-  const [loginPassword, setLoginPassword] = React.useState("mitrapass123");
+  const [loginEmail, setLoginEmail] = React.useState("");
+  const [loginPassword, setLoginPassword] = React.useState("");
   const [showLoginPassword, setShowLoginPassword] = React.useState(false);
 
   // State: Register Multi-Step (4 Tahap)
   const [registerStep, setRegisterStep] = React.useState<1 | 2 | 3 | 4>(1);
-  const [managerName, setManagerName] = React.useState("Bambang Hermawan");
-  const [managerPhone, setManagerPhone] = React.useState("081122334455");
-  const [registerEmail, setRegisterEmail] = React.useState("mitra.spartan@gmail.com");
-  const [registerPassword, setRegisterPassword] = React.useState("mitrapass123");
+  const [managerName, setManagerName] = React.useState("");
+  const [managerPhone, setManagerPhone] = React.useState("");
+  const [registerEmail, setRegisterEmail] = React.useState("");
+  const [registerPassword, setRegisterPassword] = React.useState("");
   const [showRegPassword, setShowRegPassword] = React.useState(false);
 
   const handleNextMitraStep1 = (e: React.MouseEvent) => {
@@ -113,29 +115,27 @@ export function MitraAuthPage() {
   };
 
   // Business & Venue Data
-  const [businessName, setBusinessName] = React.useState("Spartan Sport Management");
+  const [businessName, setBusinessName] = React.useState("");
   const [businessType, setBusinessType] = React.useState<"PT" | "CV" | "Perorangan">("PT");
   const [cityId, setCityId] = React.useState(MOCK_CITIES[0]?.id || "");
-  const [venueAddress, setVenueAddress] = React.useState(
-    "Jl. TB Simatupang No. 45, Cilandak Barat, Jakarta Selatan"
-  );
-  const [taxNibNumber, setTaxNibNumber] = React.useState("1234567890123");
-  const [documentFileName, setDocumentFileName] = React.useState<string>("NIB_SIUP_Spartan.pdf");
+  const [venueAddress, setVenueAddress] = React.useState("");
+  const [taxNibNumber, setTaxNibNumber] = React.useState("");
+  const [documentFileName, setDocumentFileName] = React.useState<string>("");
 
   // Bank Account for Payouts
   const [bankName, setBankName] = React.useState("BCA");
-  const [bankAccountNumber, setBankAccountNumber] = React.useState("8830192831");
-  const [bankAccountHolder, setBankAccountHolder] = React.useState("PT SPARTAN OLAHRAGA SEJAHTERA");
+  const [bankAccountNumber, setBankAccountNumber] = React.useState("");
+  const [bankAccountHolder, setBankAccountHolder] = React.useState("");
 
   // Pakta Integritas Checkboxes
-  const [pactDoubleBooking, setPactDoubleBooking] = React.useState(true);
-  const [pactCommission, setPactCommission] = React.useState(true);
-  const [pactRefund, setPactRefund] = React.useState(true);
-  const [pactScanner, setPactScanner] = React.useState(true);
+  const [pactDoubleBooking, setPactDoubleBooking] = React.useState(false);
+  const [pactCommission, setPactCommission] = React.useState(false);
+  const [pactRefund, setPactRefund] = React.useState(false);
+  const [pactScanner, setPactScanner] = React.useState(false);
 
   const [isLoading, setIsLoading] = React.useState(false);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginEmail.trim() || !loginPassword.trim()) {
       addToast("warning", "Mohon isi email dan kata sandi pengelola.", "Data Belum Lengkap");
@@ -143,29 +143,59 @@ export function MitraAuthPage() {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginEmail.trim(),
+        password: loginPassword,
+      });
+
+      if (error) {
+        setIsLoading(false);
+        addToast("error", error.message || "Email atau kata sandi pengelola tidak sesuai.", "Login Gagal");
+        return;
+      }
+
+      if (data.session) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.session.user.id)
+          .single();
+
+        if (profile?.role !== "mitra" && profile?.role !== "admin") {
+          await supabase.auth.signOut();
+          setIsLoading(false);
+          addToast("error", "Akun ini bukan akun pengelola arena/mitra yang terdaftar.", "Akses Ditolak");
+          return;
+        }
+
+        localStorage.setItem("sb_access_token", data.session.access_token);
+        localStorage.setItem("futsal_mitra_authenticated", "true");
+        setIsLoading(false);
+        addToast("success", "Selamat datang kembali di Portal Pengelola!", "Login Mitra Sukses");
+        navigate("/mitra");
+      }
+    } catch (err: any) {
       setIsLoading(false);
-      localStorage.setItem("futsal_mitra_authenticated", "true");
-      addToast(
-        "success",
-        `Selamat datang kembali di Portal Pengelola!`,
-        "Login Mitra Sukses"
-      );
-      navigate("/mitra");
-    }, 500);
+      addToast("error", err.message || "Gagal menghubungi server autentikasi.", "Error");
+    }
   };
 
-  const handleGoogleLogin = () => {
-    localStorage.setItem("futsal_mitra_authenticated", "true");
-    addToast(
-      "success",
-      "Login Mitra dengan akun Google Workspace berhasil!",
-      "Google Auth Berhasil"
-    );
-    navigate("/mitra");
+  const handleGoogleLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/mitra`,
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      addToast("error", err.message || "Login Google gagal.", "Google Auth");
+    }
   };
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!managerName || !managerPhone || !registerEmail || !registerPassword) {
@@ -193,34 +223,53 @@ export function MitraAuthPage() {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      localStorage.setItem("futsal_mitra_authenticated", "true");
-      localStorage.setItem("futsal_mitra_verification_status", "menunggu");
-      localStorage.setItem(
-        "futsal_mitra_profile",
-        JSON.stringify({
-          managerName,
-          managerPhone,
-          businessName,
-          businessType,
-          cityId,
-          venueAddress,
-          taxNibNumber,
-          documentFileName,
-          bankName,
-          bankAccountNumber,
-          bankAccountHolder,
-        })
-      );
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: registerEmail.trim(),
+        password: registerPassword,
+        options: {
+          data: {
+            full_name: managerName.trim(),
+            phone: managerPhone.trim(),
+            role: "mitra",
+          },
+        },
+      });
 
-      addToast(
-        "success",
-        "Pendaftaran berhasil diajukan! Berkas Anda sedang ditinjau oleh Super Admin.",
-        "Pengajuan Kemitraan Terkirim"
-      );
-      navigate("/mitra/application");
-    }, 700);
+      if (error) {
+        setIsLoading(false);
+        addToast("error", error.message || "Pendaftaran mitra gagal.", "Registrasi Gagal");
+        return;
+      }
+
+      if (data.user) {
+        if (data.session) {
+          localStorage.setItem("sb_access_token", data.session.access_token);
+        }
+        localStorage.setItem("futsal_mitra_authenticated", "true");
+        localStorage.setItem("futsal_mitra_verification_status", "menunggu");
+
+        try {
+          await apiClient.post("/mitra/application", {
+            businessName: businessName.trim(),
+            businessType,
+            cityId: cityId || undefined,
+            address: venueAddress.trim(),
+            taxNumber: taxNibNumber.trim(),
+            bankName,
+            bankAccountNumber: bankAccountNumber.trim(),
+            bankAccountHolder: bankAccountHolder.trim(),
+          });
+        } catch {}
+
+        setIsLoading(false);
+        addToast("success", "Pendaftaran berhasil diajukan! Berkas Anda sedang ditinjau oleh Super Admin.", "Pengajuan Kemitraan Terkirim");
+        navigate("/mitra/application");
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      addToast("error", err.message || "Terjadi kesalahan saat pendaftaran.", "Error");
+    }
   };
 
   return (

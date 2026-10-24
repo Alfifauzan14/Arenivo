@@ -37,7 +37,7 @@ import { formatDateIndo, AccountStatus } from "@futsal/shared";
 type UserItem = (typeof MOCK_USERS)[number];
 
 export function AdminUsersPage() {
-  const [users, setUsers] = React.useState<UserItem[]>(MOCK_USERS);
+  const [users, setUsers] = React.useState<UserItem[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -46,7 +46,7 @@ export function AdminUsersPage() {
   React.useEffect(() => {
     let isMounted = true;
     apiClient.get<any[]>("/admin/users").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (isMounted && res.data && Array.isArray(res.data)) {
         setUsers(res.data);
       }
     }).catch(() => {});

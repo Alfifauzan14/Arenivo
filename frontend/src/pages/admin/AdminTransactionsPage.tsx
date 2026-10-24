@@ -42,12 +42,12 @@ export function AdminTransactionsPage() {
   const [selectedBooking, setSelectedBooking] = React.useState<Booking | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
-  const [bookings, setBookings] = React.useState<Booking[]>(MOCK_BOOKINGS);
+  const [bookings, setBookings] = React.useState<Booking[]>([]);
 
   React.useEffect(() => {
     let isMounted = true;
     apiClient.get<any[]>("/admin/bookings").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (isMounted && res.data && Array.isArray(res.data)) {
         setBookings(res.data);
       }
     }).catch(() => {});

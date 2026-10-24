@@ -39,7 +39,7 @@ import { formatRupiah, VenueStatus, type Venue } from "@futsal/shared";
 type VenueItem = Venue;
 
 export function AdminVenuesPage() {
-  const [venues, setVenues] = React.useState<VenueItem[]>(MOCK_VENUES);
+  const [venues, setVenues] = React.useState<VenueItem[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -48,7 +48,7 @@ export function AdminVenuesPage() {
   React.useEffect(() => {
     let isMounted = true;
     apiClient.get<any[]>("/admin/venues").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (isMounted && res.data && Array.isArray(res.data)) {
         setVenues(res.data);
       }
     }).catch(() => {});

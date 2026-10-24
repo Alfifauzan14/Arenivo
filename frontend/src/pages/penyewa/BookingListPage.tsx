@@ -27,24 +27,37 @@ import {
   type Booking,
 } from "@futsal/shared";
 import { cn } from "@/lib/utils";
+import { useSession } from "@/features/auth/context/SessionContext";
 
 export function BookingListPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = React.useState<string>("semua");
+  const { isLoggedIn } = useSession();
   const [searchQuery, setSearchQuery] = React.useState<string>("");
-  const [bookings, setBookings] = React.useState<Booking[]>(MOCK_BOOKINGS);
+  const [bookings, setBookings] = React.useState<Booking[]>([]);
+  const [isLoading, setIsLoading] = React.useState<boolean>(true);
 
   React.useEffect(() => {
     let isMounted = true;
+    if (!isLoggedIn) {
+      setBookings([]);
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
     apiClient.get<Booking[]>("/bookings").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (isMounted && res.data && Array.isArray(res.data)) {
         setBookings(res.data);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (isMounted) setBookings([]);
+    }).finally(() => {
+      if (isMounted) setIsLoading(false);
+    });
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isLoggedIn]);
 
   // Tabs status booking
   const tabsList = [

@@ -62,7 +62,7 @@ const EXTENDED_PAYOUTS: PayoutItem[] = [
 ];
 
 export function AdminPayoutsPage() {
-  const [payouts, setPayouts] = React.useState<PayoutItem[]>(EXTENDED_PAYOUTS);
+  const [payouts, setPayouts] = React.useState<PayoutItem[]>([]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -71,7 +71,7 @@ export function AdminPayoutsPage() {
   React.useEffect(() => {
     let isMounted = true;
     apiClient.get<any[]>("/admin/payouts").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (isMounted && res.data && Array.isArray(res.data)) {
         setPayouts(res.data);
       }
     }).catch(() => {});
