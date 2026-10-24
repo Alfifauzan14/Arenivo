@@ -46,7 +46,7 @@ export function ChatbotWidget() {
     }
   }, [messages, isOpen]);
 
-  const handleSendMessage = (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string) => {
     const text = textToSend || inputValue.trim();
     if (!text) return;
 
@@ -61,7 +61,37 @@ export function ChatbotWidget() {
     setInputValue("");
     setIsTyping(true);
 
-    // Simulasi respons cerdas berdasarkan knowledge base nyata venue & PRD
+    // 1. Coba panggil Live API Google Gemini Flash di Backend
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+      const res = await fetch(`${baseUrl}/chat/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const reply = json.data?.message || json.data?.text || json.data?.reply;
+        if (reply) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `bot-${Date.now()}`,
+              sender: "bot",
+              text: reply,
+              time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+            },
+          ]);
+          setIsTyping(false);
+          return;
+        }
+      }
+    } catch {
+      // Fallback lokal jika backend tidak terjangkau
+    }
+
+    // 2. Fallback cerdas lokal berdasarkan knowledge base PRD
     setTimeout(() => {
       let botReply = "";
 
@@ -99,7 +129,7 @@ Anda dapat langsung klik nama venue untuk mengecek slot kosong jam 19.00 - 22.00
         },
       ]);
       setIsTyping(false);
-    }, 600);
+    }, 400);
   };
 
   return (
