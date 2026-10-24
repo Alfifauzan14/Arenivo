@@ -13,6 +13,7 @@ import { SlotStatus, type Field, type SlotItem, formatRupiah, formatDateIndo } f
 import { generateMockSlots } from "@/lib/mock-data";
 import { useToast } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { useFieldSlotSubscription } from "@/lib/pusher";
 
 export interface SlotPickerGridProps {
   fields: Field[];
@@ -39,6 +40,11 @@ export function SlotPickerGrid({
   );
 
   const currentField = fields.find((f) => f.id === selectedFieldId) || fields[0];
+
+  // Berlangganan event real-time Pusher per lapangan (PRD 9)
+  useFieldSlotSubscription(currentField?.id, React.useCallback((data: any) => {
+    addToast("info", "Jadwal slot diperbarui secara real-time.", "Live Slot Update");
+  }, [addToast]));
 
   // 2. Generate 30 Hari ke Depan untuk Horizontal Date Strip
   const dateOptions = React.useMemo(() => {
