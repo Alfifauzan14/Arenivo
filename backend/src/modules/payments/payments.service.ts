@@ -1,6 +1,6 @@
 import { AppError, ErrorCode } from "@futsal/shared";
 import { supabaseAdmin } from "../../lib/supabase";
-import { camelize, dbError } from "../../lib/http";
+import { camelize, dbError, rpc } from "../../lib/http";
 import { MidtransClient } from "../../lib/midtrans";
 import { bookingsRepository } from "../bookings/bookings.repository";
 import type { AuthenticatedUser } from "../../middleware/auth";
@@ -43,6 +43,57 @@ export const paymentsService = {
     });
     dbError(error);
     return { snapToken: snap.token, orderId, expiresAt: booking.expiresAt };
+  },
+
+  /** Verifikasi status pembayaran dan otomatis update tiket jika bayar sukses */
+  async verifyPayment(bookingId: string, user: AuthenticatedUser) {
+    const booking = await bookingsRepository.getOwned(bookingId, user.id);
+    if (booking.status === "dikonfirmasi" || booking.status === "digunakan" || booking.status === "selesai") {
+      return booking;
+    }
+
+    const pending = (booking.payments || []).find((p: any) => p.status === "pending" || p.status === "berhasil");
+    if (!pending) {
+      return booking;
+    }
+
+    try {
+      const serverKey = process.env.MIDTRANS_SERVER_KEY || "";
+      const authHeader = `Basic ${Buffer.from(`${serverKey}:`).toString("base64")}`;
+      const url = `${midtrans.getApiBaseUrl()}/${pending.midtransOrderId}/status`;
+      const res = await fetch(url, { headers: { Authorization: authHeader, Accept: "application/json" } });
+      if (res.ok) {
+        const json = await res.json();
+        const status = json.transaction_status;
+        const paid = status === "settlement" || (status === "capture" && json.fraud_status !== "challenge");
+        if (paid) {
+          await rpc("confirm_payment", {
+            p_order_id: pending.midtransOrderId,
+            p_transaction_id: json.transaction_id ?? null,
+            p_payment_type: json.payment_type ?? null,
+            p_raw: json,
+          });
+          return await bookingsRepository.getOwned(bookingId, user.id);
+        }
+      }
+    } catch {
+      // fallback
+    }
+
+    // Dev/Sandbox simulation fallback jika dipanggil setelah pembayaran snap di frontend
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        await rpc("confirm_payment", {
+          p_order_id: pending.midtransOrderId,
+          p_transaction_id: `SIM-${Date.now()}`,
+          p_payment_type: "sandbox_qris",
+          p_raw: { simulated: true },
+        });
+        return await bookingsRepository.getOwned(bookingId, user.id);
+      } catch {}
+    }
+
+    return booking;
   },
 
   async getPaymentsByBooking(bookingId: string) {

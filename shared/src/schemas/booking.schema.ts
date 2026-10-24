@@ -51,7 +51,7 @@ export const CreateBookingInputSchema = z.object({
   fieldId: z.string().uuid("ID lapangan tidak valid"),
   customerName: z.string().min(2, "Nama pemesan wajib diisi"),
   customerPhone: z.string().min(9, "Nomor WhatsApp/HP minimal 9 digit"),
-  slotStarts: z.array(z.string().datetime()).min(1, "Pilih minimal 1 jam slot bermain"),
+  slotStarts: z.array(z.string().datetime({ offset: true })).min(1, "Pilih minimal 1 jam slot bermain"),
   promoCode: z.string().optional(),
   notes: z.string().max(250, "Catatan maksimal 250 karakter").optional(),
 });
@@ -62,7 +62,7 @@ export const ManualBookingInputSchema = z.object({
   fieldId: z.string().uuid(),
   customerName: z.string().min(2, "Nama penyewa walk-in wajib diisi"),
   customerPhone: z.string().min(9, "Nomor telepon penyewa wajib diisi"),
-  slotStarts: z.array(z.string().datetime()).min(1, "Pilih minimal 1 slot"),
+  slotStarts: z.array(z.string().datetime({ offset: true })).min(1, "Pilih minimal 1 slot"),
   notes: z.string().optional(),
 });
 
@@ -75,7 +75,7 @@ export const CancelBookingInputSchema = z.object({
 export type CancelBookingInput = z.infer<typeof CancelBookingInputSchema>;
 
 export const RescheduleBookingInputSchema = z.object({
-  newSlotStarts: z.array(z.string().datetime()).min(1, "Pilih slot jadwal baru"),
+  newSlotStarts: z.array(z.string().datetime({ offset: true })).min(1, "Pilih slot jadwal baru"),
 });
 
 export type RescheduleBookingInput = z.infer<typeof RescheduleBookingInputSchema>;

@@ -46,7 +46,7 @@ export const GET = withAuth(
         .eq("status", "selesai"),
       supabaseAdmin
         .from("bookings")
-        .select("*, venues(id, name), fields(id, name), profiles(id, full_name, phone)")
+        .select("*, venues(id, name), fields(id, name), profiles!user_id(id, full_name, phone)")
         .in("venue_id", venueIds)
         .order("created_at", { ascending: false })
         .limit(8)

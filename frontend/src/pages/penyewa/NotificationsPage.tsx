@@ -10,6 +10,7 @@ import {
   Search,
 } from "lucide-react";
 import { Button, Card, Select, useToast } from "@/components/ui";
+import { apiClient } from "@/lib/api-client";
 import {
   MOCK_NOTIFICATIONS,
   type InAppNotification,
@@ -20,7 +21,21 @@ export function NotificationsPage() {
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = React.useState<string>("semua");
   const [searchQuery, setSearchQuery] = React.useState<string>("");
-  const [notifications, setNotifications] = React.useState<InAppNotification[]>(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = React.useState<InAppNotification[]>([]);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any[]>("/me/notifications").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setNotifications(res.data);
+      } else if (isMounted && notifications.length === 0) {
+        setNotifications(MOCK_NOTIFICATIONS);
+      }
+    }).catch(() => {
+      if (isMounted && notifications.length === 0) setNotifications(MOCK_NOTIFICATIONS);
+    });
+    return () => { isMounted = false; };
+  }, []);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 

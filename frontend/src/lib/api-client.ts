@@ -179,29 +179,32 @@ class ApiClient {
     return this.request<T>(path, { method: "GET", params });
   }
 
-  async post<T>(path: string, body?: any): Promise<ApiResponse<T>> {
+  async post<T>(path: string, body?: any, options?: Omit<RequestOptions, "method" | "body">): Promise<ApiResponse<T>> {
     return this.request<T>(path, {
+      ...options,
       method: "POST",
       body: body ? JSON.stringify(body) : undefined,
     });
   }
 
-  async put<T>(path: string, body?: any): Promise<ApiResponse<T>> {
+  async put<T>(path: string, body?: any, options?: Omit<RequestOptions, "method" | "body">): Promise<ApiResponse<T>> {
     return this.request<T>(path, {
+      ...options,
       method: "PUT",
       body: body ? JSON.stringify(body) : undefined,
     });
   }
 
-  async patch<T>(path: string, body?: any): Promise<ApiResponse<T>> {
+  async patch<T>(path: string, body?: any, options?: Omit<RequestOptions, "method" | "body">): Promise<ApiResponse<T>> {
     return this.request<T>(path, {
+      ...options,
       method: "PATCH",
       body: body ? JSON.stringify(body) : undefined,
     });
   }
 
-  async delete<T>(path: string): Promise<ApiResponse<T>> {
-    return this.request<T>(path, { method: "DELETE" });
+  async delete<T>(path: string, options?: Omit<RequestOptions, "method">): Promise<ApiResponse<T>> {
+    return this.request<T>(path, { ...options, method: "DELETE" });
   }
 
   /**

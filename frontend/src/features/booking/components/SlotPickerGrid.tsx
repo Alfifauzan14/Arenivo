@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { SlotStatus, type Field, type SlotItem, formatRupiah, formatDateIndo } from "@futsal/shared";
 import { generateMockSlots } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useFieldSlotSubscription } from "@/lib/pusher";

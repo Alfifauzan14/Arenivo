@@ -26,7 +26,7 @@ import {
   TablePagination,
   useToast,
 } from "@/components/ui";
-import { MOCK_BOOKINGS } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import {
   formatRupiah,
   formatDateIndo,
@@ -37,7 +37,23 @@ import { cn } from "@/lib/utils";
 
 export function MitraBookingsPage() {
   const { addToast } = useToast();
-  const [bookings, setBookings] = React.useState<Booking[]>(MOCK_BOOKINGS);
+  const [bookings, setBookings] = React.useState<Booking[]>([]);
+
+  const loadBookings = React.useCallback(() => {
+    let isMounted = true;
+    apiClient.get<any[]>("/mitra/bookings").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data)) {
+        setBookings(res.data);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    loadBookings();
+  }, [loadBookings]);
   const [activeTab, setActiveTab] = React.useState<string>("semua");
   const [dateFilter, setDateFilter] = React.useState<string>("");
   const [searchQuery, setSearchQuery] = React.useState<string>("");

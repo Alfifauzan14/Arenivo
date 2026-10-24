@@ -29,7 +29,6 @@ import {
   Input,
   useToast,
 } from "@/components/ui";
-import { MOCK_BOOKINGS, MOCK_VENUES, MOCK_TICKETS } from "@/lib/mock-data";
 import { apiClient } from "@/lib/api-client";
 import {
   formatRupiah,
@@ -47,35 +46,64 @@ export function BookingDetailPage() {
   const { addToast } = useToast();
   const isPaymentSuccess = searchParams.get("status") === "success";
 
-  // 1. Resolve Booking dari ID atau default
-  const [booking, setBooking] = React.useState<Booking>(() => {
-    return MOCK_BOOKINGS.find((b) => b.id === id) || MOCK_BOOKINGS[0];
-  });
+  // 1. Live Booking State
+  const [booking, setBooking] = React.useState<Booking>({
+    id: id || "arn-live",
+    bookingCode: "ARN-LIVE",
+    userId: "u-1",
+    venueId: "v-1",
+    fieldId: "f-1",
+    customerName: "Penyewa",
+    customerPhone: "081200000000",
+    playStart: new Date().toISOString(),
+    playEnd: new Date(Date.now() + 3600000).toISOString(),
+    totalHours: 1,
+    subtotal: 0,
+    serviceFee: 0,
+    discount: 0,
+    totalPrice: 0,
+    status: BookingStatus.MENUNGGU_BAYAR,
+    createdAt: new Date().toISOString(),
+  } as unknown as Booking);
 
   const [liveTicket, setLiveTicket] = React.useState<any>(null);
 
   React.useEffect(() => {
     if (!id) return;
     let isMounted = true;
-    apiClient.get<any>(`/bookings/${id}`).then((res) => {
-      if (isMounted && res.data) {
-        setBooking(res.data);
-      }
-    }).catch(() => {});
 
-    apiClient.get<any>(`/bookings/${id}/ticket`).then((res) => {
-      if (isMounted && res.data) {
-        setLiveTicket(res.data);
-      }
-    }).catch(() => {});
+    const loadData = async () => {
+      try {
+        if (isPaymentSuccess) {
+          const payRes = await apiClient.get<any>(`/bookings/${id}/payments`);
+          if (isMounted && payRes.data) {
+            setBooking(payRes.data);
+          }
+        }
+        const bRes = await apiClient.get<any>(`/bookings/${id}`);
+        if (isMounted && bRes.data) {
+          setBooking(bRes.data);
+        }
+        const tRes = await apiClient.get<any>(`/bookings/${id}/ticket`);
+        if (isMounted && tRes.data) {
+          setLiveTicket(tRes.data);
+        }
+      } catch {}
+    };
 
+    loadData();
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, isPaymentSuccess]);
 
-  const defaultTicket = MOCK_TICKETS.find((t) => t.bookingId === booking.id) || MOCK_TICKETS[0];
-  const ticket = liveTicket || defaultTicket;
+  const ticket = liveTicket || {
+    id: "tkt-" + booking.id,
+    bookingId: booking.id,
+    ticketCode: "TKT-" + (booking.bookingCode || "LIVE") + "-01",
+    status: booking.status === BookingStatus.SELESAI || booking.status === BookingStatus.DIGUNAKAN ? "digunakan" : booking.status === BookingStatus.DIBATALKAN ? "dibatalkan" : "aktif",
+    issuedAt: booking.createdAt,
+  };
 
   // 2. Modals State
   const [isInvoiceOpen, setIsInvoiceOpen] = React.useState<boolean>(false);

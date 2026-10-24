@@ -21,6 +21,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { MOCK_FIELDS, generateMockSlots } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import {
   SlotStatus,
   formatRupiah,
@@ -36,7 +37,7 @@ interface ExtendedSlotItem extends SlotItem {
 
 export function MitraSchedulePage() {
   const { addToast } = useToast();
-
+  const [fields, setFields] = React.useState<any[]>(MOCK_FIELDS);
   const [selectedFieldId, setSelectedFieldId] = React.useState(MOCK_FIELDS[0].id);
   const [selectedDate, setSelectedDate] = React.useState(
     new Date().toISOString().split("T")[0]
@@ -195,7 +196,7 @@ export function MitraSchedulePage() {
             label="Pilih Lapangan"
             value={selectedFieldId}
             onChange={(e) => setSelectedFieldId(e.target.value)}
-            options={MOCK_FIELDS.map((f) => ({
+            options={fields.map((f) => ({
               value: f.id,
               label: `${f.name} — ${formatRupiah(f.basePrice)}/jam`,
             }))}
