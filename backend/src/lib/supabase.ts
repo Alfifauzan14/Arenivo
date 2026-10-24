@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "../config/env";
 
 const supabaseUrl = env.SUPABASE_URL || "https://dummy-project.supabase.co";
-const supabaseServiceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY || "dummy-service-role-key";
+const supabaseServiceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SECRET_KEY || "dummy-service-role-key";
 
 /**
  * Klien Supabase Admin (Bypass RLS dengan Service Role Key)

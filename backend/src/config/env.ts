@@ -8,6 +8,9 @@ const envSchema = z.object({
   // Supabase
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  SUPABASE_SECRET_KEY: z.string().min(1).optional(),
+  SUPABASE_PUBLISHABLE_KEY: z.string().optional(),
+  SUPABASE_JWKS_URL: z.string().optional(),
 
   // Midtrans
   MIDTRANS_SERVER_KEY: z.string().optional(),
