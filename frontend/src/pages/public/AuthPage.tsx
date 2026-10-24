@@ -13,6 +13,7 @@ import {
 import { BrandLogoIcon } from "@/components/common/BrandLogo";
 import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
 import { useSession } from "@/features/auth/context/SessionContext";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -117,23 +118,35 @@ export function AuthPage() {
     }, 600);
   };
 
-  const handleSocialLogin = (provider: "google" | "tiktok") => {
+  const handleSocialLogin = async (provider: "google" | "tiktok") => {
     if (provider === "tiktok") {
       navigate("/auth/tiktok/callback");
       return;
     }
 
-    login({
-      fullName: "Rizky Ramadhan (Google)",
-      email: "rizky.ramadhan@gmail.com",
-    });
-
-    addToast(
-      "success",
-      `Berhasil masuk menggunakan akun ${provider.toUpperCase()}!`,
-      "Login Sukses"
-    );
-    navigate("/bookings");
+    if (provider === "google") {
+      try {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: `${window.location.origin}/`,
+          },
+        });
+        if (error) throw error;
+      } catch (err: any) {
+        console.warn("Google OAuth Supabase belum aktif:", err);
+        login({
+          fullName: "Rizky Ramadhan (Google)",
+          email: "rizky.ramadhan@gmail.com",
+        });
+        addToast(
+          "info",
+          "Provider Google belum aktif di dashboard Supabase, beralih ke simulasi.",
+          "Mode Simulasi"
+        );
+        navigate("/bookings");
+      }
+    }
   };
 
   return (

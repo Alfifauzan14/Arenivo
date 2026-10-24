@@ -1,5 +1,6 @@
 import * as React from "react";
 import type { Profile } from "@futsal/shared";
+import { supabase } from "@/lib/supabase";
 
 interface SessionContextType {
   user: Profile | null;
@@ -25,11 +26,12 @@ const DEFAULT_USER: Profile = {
 const SessionContext = React.createContext<SessionContextType | undefined>(undefined);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  // Simpan status sesi di localStorage
+  const [currentUser, setCurrentUser] = React.useState<Profile | null>(null);
   const [isLoggedIn, setIsLoggedIn] = React.useState<boolean>(() => {
     return (
       localStorage.getItem("futsal_logged_in") === "true" ||
-      localStorage.getItem("futsal_auth_token") !== null
+      localStorage.getItem("futsal_auth_token") !== null ||
+      localStorage.getItem("sb_access_token") !== null
     );
   });
 
@@ -42,17 +44,86 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  const login = React.useCallback((_userData?: Partial<Profile>) => {
+  // Sinkronisasi Sesi Supabase Auth (Termasuk Google OAuth)
+  React.useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setIsLoggedIn(true);
+        localStorage.setItem("sb_access_token", session.access_token);
+        localStorage.setItem("futsal_logged_in", "true");
+        setCurrentUser({
+          id: session.user.id,
+          fullName:
+            session.user.user_metadata?.full_name ||
+            session.user.email?.split("@")[0] ||
+            "Pengguna Arenivo",
+          email: session.user.email || "",
+          phone: session.user.phone || session.user.user_metadata?.phone || "081234567890",
+          avatarUrl:
+            session.user.user_metadata?.avatar_url ||
+            session.user.user_metadata?.picture ||
+            DEFAULT_USER.avatarUrl,
+          role: "penyewa",
+          status: "aktif",
+        });
+      } else if (localStorage.getItem("futsal_logged_in") === "true") {
+        setIsLoggedIn(true);
+        setCurrentUser(DEFAULT_USER);
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setIsLoggedIn(true);
+        localStorage.setItem("sb_access_token", session.access_token);
+        localStorage.setItem("futsal_logged_in", "true");
+        setCurrentUser({
+          id: session.user.id,
+          fullName:
+            session.user.user_metadata?.full_name ||
+            session.user.email?.split("@")[0] ||
+            "Pengguna Arenivo",
+          email: session.user.email || "",
+          phone: session.user.phone || session.user.user_metadata?.phone || "081234567890",
+          avatarUrl:
+            session.user.user_metadata?.avatar_url ||
+            session.user.user_metadata?.picture ||
+            DEFAULT_USER.avatarUrl,
+          role: "penyewa",
+          status: "aktif",
+        });
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const login = React.useCallback((userData?: Partial<Profile>) => {
     setIsLoggedIn(true);
     localStorage.setItem("futsal_logged_in", "true");
     localStorage.setItem("futsal_auth_token", `tok_${Date.now()}`);
+    if (userData) {
+      setCurrentUser((prev) => ({
+        ...(prev || DEFAULT_USER),
+        ...userData,
+      }));
+    } else {
+      setCurrentUser(DEFAULT_USER);
+    }
   }, []);
 
-  const logout = React.useCallback(() => {
+  const logout = React.useCallback(async () => {
     setIsLoggedIn(false);
+    setCurrentUser(null);
     localStorage.removeItem("futsal_logged_in");
     localStorage.removeItem("futsal_auth_token");
+    localStorage.removeItem("sb_access_token");
     localStorage.removeItem("futsal_mock_logged_in");
+    await supabase.auth.signOut().catch(() => {});
   }, []);
 
   const toggleSession = React.useCallback(() => {
@@ -60,9 +131,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const next = !prev;
       if (next) {
         localStorage.setItem("futsal_logged_in", "true");
+        setCurrentUser(DEFAULT_USER);
       } else {
         localStorage.removeItem("futsal_logged_in");
         localStorage.removeItem("futsal_auth_token");
+        localStorage.removeItem("sb_access_token");
+        setCurrentUser(null);
       }
       return next;
     });
@@ -73,7 +147,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const next = prev.includes(venueId)
         ? prev.filter((id) => id !== venueId)
         : [...prev, venueId];
-      localStorage.setItem("futsal_favorites", JSON.stringify(next));
+      try {
+        localStorage.setItem("futsal_favorites", JSON.stringify(next));
+      } catch (e) {
+        console.error("Gagal menyimpan favorit:", e);
+      }
       return next;
     });
   }, []);
@@ -83,7 +161,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     [favorites]
   );
 
-  const user = isLoggedIn ? DEFAULT_USER : null;
+  const user = currentUser || (isLoggedIn ? DEFAULT_USER : null);
 
   return (
     <SessionContext.Provider
