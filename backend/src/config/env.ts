@@ -13,6 +13,7 @@ const envSchema = z.object({
   SUPABASE_JWKS_URL: z.string().optional(),
 
   // Midtrans
+  MIDTRANS_MERCHANT_ID: z.string().optional(),
   MIDTRANS_SERVER_KEY: z.string().optional(),
   MIDTRANS_CLIENT_KEY: z.string().optional(),
   MIDTRANS_IS_PRODUCTION: z.string().transform((v) => v === "true").default("false"),
