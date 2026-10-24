@@ -1,0 +1,26 @@
+{
+  "name": "@futsal/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend API Route Handlers for Futsal Booking monorepo",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@futsal/shared": "*",
+    "@supabase/supabase-js": "^2.47.10",
+    "next": "^15.1.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "typescript": "^5.7.2"
+  }
+}

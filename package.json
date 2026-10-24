@@ -1,0 +1,37 @@
+{
+  "name": "arenivo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Arenivo - Satu Aplikasi, Banyak Arena. Pesan lapangan futsal, mini soccer, dan sepak bola terdekat dengan jadwal real-time dan pembayaran instan langsung dari HP Anda.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Alfifauzan14/Arenivo.git"
+  },
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -p \"[{name}]\" -n \"FRONT,BACK\" -c \"cyan,magenta\" \"npm run dev --workspace=@futsal/frontend\" \"npm run dev --workspace=@futsal/backend\"",
+    "dev:frontend": "npm run dev --workspace=@futsal/frontend",
+    "dev:backend": "npm run dev --workspace=@futsal/backend",
+    "build": "npm run build --workspace=@futsal/shared && npm run build --workspace=@futsal/backend && npm run build --workspace=@futsal/frontend",
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck --workspace=@futsal/shared && npm run typecheck --workspace=@futsal/backend && npm run typecheck --workspace=@futsal/frontend"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.0"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}
