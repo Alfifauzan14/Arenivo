@@ -200,6 +200,54 @@ export function CheckoutPage() {
   const [isMidtransOpen, setIsMidtransOpen] = React.useState<boolean>(false);
   const [isSnapLoading, setIsSnapLoading] = React.useState<boolean>(false);
 
+  // Pasang / Muat Midtrans Snap script secara dinamis saat halaman dibuka
+  React.useEffect(() => {
+    const snapScriptUrl = "https://app.sandbox.midtrans.com/snap/snap.js";
+    const clientKey = "Mid-client-3mO8VFRLV5vdpqMW";
+
+    let scriptTag = document.querySelector(`script[src="${snapScriptUrl}"]`) as HTMLScriptElement;
+    if (!scriptTag) {
+      scriptTag = document.createElement("script");
+      scriptTag.src = snapScriptUrl;
+      scriptTag.setAttribute("data-client-key", clientKey);
+      scriptTag.async = true;
+      document.body.appendChild(scriptTag);
+    }
+  }, []);
+
+  // Fungsi pembantu memastikan Snap SDK siap
+  const waitForSnapReady = (): Promise<boolean> => {
+    if (typeof window !== "undefined" && window.snap?.pay) {
+      return Promise.resolve(true);
+    }
+    return new Promise((resolve) => {
+      const snapScriptUrl = "https://app.sandbox.midtrans.com/snap/snap.js";
+      const clientKey = "Mid-client-3mO8VFRLV5vdpqMW";
+
+      let scriptTag = document.querySelector(`script[src="${snapScriptUrl}"]`) as HTMLScriptElement;
+      if (!scriptTag) {
+        scriptTag = document.createElement("script");
+        scriptTag.src = snapScriptUrl;
+        scriptTag.setAttribute("data-client-key", clientKey);
+        scriptTag.async = true;
+        document.body.appendChild(scriptTag);
+      }
+
+      const checkTimer = setInterval(() => {
+        if (window.snap?.pay) {
+          clearInterval(checkTimer);
+          clearTimeout(timeoutTimer);
+          resolve(true);
+        }
+      }, 100);
+
+      const timeoutTimer = setTimeout(() => {
+        clearInterval(checkTimer);
+        resolve(Boolean(window.snap?.pay));
+      }, 4000);
+    });
+  };
+
   const handleOpenPayment = async () => {
     if (isExpired) {
       addToast("error", "Sesi pembayaran sudah habis. Silakan pilih slot jadwal kembali.", "Kedaluwarsa");
@@ -207,35 +255,39 @@ export function CheckoutPage() {
       return;
     }
 
-    // Jika Midtrans Snap SDK terpasang di browser
-    if (typeof window !== "undefined" && window.snap?.pay) {
-      setIsSnapLoading(true);
-      try {
-        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
-        const res = await fetch(`${apiBaseUrl}/payments/snap-token`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            orderId: `${existingBooking.bookingCode || "ARN"}-${Date.now().toString(36).toUpperCase()}`,
-            grossAmount: finalTotalPrice,
-            customerName,
-            customerPhone,
-            customerEmail,
-            itemDetails: [
-              {
-                id: field.id || "field-rent",
-                name: `Sewa ${field.name} (${venue.name})`,
-                price: finalTotalPrice,
-                quantity: 1,
-              },
-            ],
-          }),
-        });
+    setIsSnapLoading(true);
 
-        const json = await res.json();
-        setIsSnapLoading(false);
+    // 1. Tunggu snap.js siap
+    const snapReady = await waitForSnapReady();
 
-        if (json?.data?.token) {
+    // 2. Ambil Snap Token dari backend
+    try {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
+      const res = await fetch(`${apiBaseUrl}/payments/snap-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: `${existingBooking.bookingCode || "ARN"}-${Date.now().toString(36).toUpperCase()}`,
+          grossAmount: finalTotalPrice,
+          customerName,
+          customerPhone,
+          customerEmail,
+          itemDetails: [
+            {
+              id: field.id || "field-rent",
+              name: `Sewa ${field.name} (${venue.name})`,
+              price: finalTotalPrice,
+              quantity: 1,
+            },
+          ],
+        }),
+      });
+
+      const json = await res.json();
+      setIsSnapLoading(false);
+
+      if (json?.data?.token) {
+        if (snapReady && window.snap?.pay) {
           window.snap.pay(json.data.token, {
             onSuccess: (_result: any) => {
               handlePaymentSuccess();
@@ -251,13 +303,18 @@ export function CheckoutPage() {
             },
           });
           return;
+        } else if (json.data.redirectUrl) {
+          // Jika snap popup di-block oleh browser, arahkan langsung ke halaman pembayaran resmi Midtrans
+          window.location.href = json.data.redirectUrl;
+          return;
         }
-      } catch (err) {
-        console.warn("Gagal memanggil Midtrans Snap Token, membuka fallback simulator:", err);
-        setIsSnapLoading(false);
       }
+    } catch (err) {
+      console.warn("Gagal menghubungi gateway Midtrans:", err);
+      setIsSnapLoading(false);
     }
 
+    // Jika internet gagal total atau snap offline, buka simulator sebagai cadangan
     setIsMidtransOpen(true);
   };
 
