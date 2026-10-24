@@ -8,9 +8,17 @@ export interface SendEmailParams {
 }
 
 export class BrevoEmailService {
-  private apiKey = env.BREVO_API_KEY;
-  private senderEmail = env.BREVO_SENDER_EMAIL;
-  private senderName = env.BREVO_SENDER_NAME;
+  private getApiKey(): string | undefined {
+    return env.BREVO_API_KEY || process.env.BREVO_API_KEY;
+  }
+
+  private getSenderEmail(): string {
+    return env.BREVO_SENDER_EMAIL || process.env.BREVO_SENDER_EMAIL || "noreply@arenivo.id";
+  }
+
+  private getSenderName(): string {
+    return env.BREVO_SENDER_NAME || process.env.BREVO_SENDER_NAME || "Arenivo";
+  }
 
   async sendEmail(params: SendEmailParams): Promise<boolean> {
     // Lewati jika email berakhiran .invalid (contoh login TikTok tanpa email per PRD 8)
@@ -19,7 +27,8 @@ export class BrevoEmailService {
       return true;
     }
 
-    if (!this.apiKey) {
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
       console.info(`[Brevo Mock] Email sent to '${params.toEmail}': ${params.subject}`);
       return true;
     }
@@ -30,10 +39,10 @@ export class BrevoEmailService {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
-          "api-key": this.apiKey,
+          "api-key": apiKey,
         },
         body: JSON.stringify({
-          sender: { name: this.senderName, email: this.senderEmail },
+          sender: { name: this.getSenderName(), email: this.getSenderEmail() },
           to: [{ email: params.toEmail, name: params.toName }],
           subject: params.subject,
           htmlContent: params.htmlContent,
@@ -41,10 +50,12 @@ export class BrevoEmailService {
       });
 
       if (!res.ok) {
-        console.error(`[Brevo Error] ${res.statusText}`);
+        const errText = await res.text();
+        console.error(`[Brevo Error ${res.status}]: ${res.statusText} - ${errText}`);
         return false;
       }
 
+      console.info(`[Brevo Live] Email sent successfully to ${params.toEmail}`);
       return true;
     } catch (err) {
       console.error("[Brevo Catch Error]:", err);
