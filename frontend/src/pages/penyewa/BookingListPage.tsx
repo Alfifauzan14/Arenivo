@@ -19,6 +19,7 @@ import {
   Select,
 } from "@/components/ui";
 import { MOCK_BOOKINGS } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import {
   formatRupiah,
   formatDateIndo,
@@ -31,19 +32,32 @@ export function BookingListPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = React.useState<string>("semua");
   const [searchQuery, setSearchQuery] = React.useState<string>("");
+  const [bookings, setBookings] = React.useState<Booking[]>(MOCK_BOOKINGS);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<Booking[]>("/bookings").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setBookings(res.data);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Tabs status booking
   const tabsList = [
-    { id: "semua", label: "Semua Status", badge: MOCK_BOOKINGS.length },
+    { id: "semua", label: "Semua Status", badge: bookings.length },
     {
       id: BookingStatus.MENUNGGU_BAYAR,
       label: "Menunggu Bayar",
-      badge: MOCK_BOOKINGS.filter((b) => b.status === BookingStatus.MENUNGGU_BAYAR).length,
+      badge: bookings.filter((b) => b.status === BookingStatus.MENUNGGU_BAYAR).length,
     },
     {
       id: BookingStatus.DIKONFIRMASI,
       label: "Aktif / Dikonfirmasi",
-      badge: MOCK_BOOKINGS.filter((b) => b.status === BookingStatus.DIKONFIRMASI).length,
+      badge: bookings.filter((b) => b.status === BookingStatus.DIKONFIRMASI).length,
     },
     {
       id: BookingStatus.DIGUNAKAN,
@@ -64,7 +78,7 @@ export function BookingListPage() {
   ];
 
   const filteredBookings = React.useMemo(() => {
-    return MOCK_BOOKINGS.filter((b) => {
+    return bookings.filter((b) => {
       if (activeTab !== "semua" && b.status !== activeTab) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -76,7 +90,7 @@ export function BookingListPage() {
       }
       return true;
     });
-  }, [activeTab, searchQuery]);
+  }, [activeTab, searchQuery, bookings]);
 
   return (
     <div className="min-h-screen">

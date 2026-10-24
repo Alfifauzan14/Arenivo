@@ -16,6 +16,7 @@ import {
 import { Button, Input, Select, Card } from "@/components/ui";
 import { VenueCard } from "@/features/venue/components/VenueCard";
 import { MOCK_VENUES, MOCK_CITIES, MOCK_FACILITIES, MOCK_FIELD_TYPES } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/features/auth/context/SessionContext";
 import { formatRupiah } from "@futsal/shared";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,36 @@ export function VenueExplorePage() {
   const [nearMeActive, setNearMeActive] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<"list" | "split">("list");
   const [mobileFilterOpen, setMobileFilterOpen] = React.useState(false);
+
+  // Live Backend Data States with graceful Mock fallbacks
+  const [venues, setVenues] = React.useState<any[]>(MOCK_VENUES);
+  const [cities, setCities] = React.useState<any[]>(MOCK_CITIES);
+  const [facilities, setFacilities] = React.useState<any[]>(MOCK_FACILITIES);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any[]>("/venues", { limit: 50 }).then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setVenues(res.data);
+      }
+    }).catch(() => {});
+
+    apiClient.get<any[]>("/master/cities").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setCities(res.data);
+      }
+    }).catch(() => {});
+
+    apiClient.get<any[]>("/master/facilities").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setFacilities(res.data);
+      }
+    }).catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Pagination State
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -83,7 +114,7 @@ export function VenueExplorePage() {
 
   // Filter & Sort Logic
   const filteredVenues = React.useMemo(() => {
-    return MOCK_VENUES.filter((venue) => {
+    return venues.filter((venue) => {
       // 1. Filter Favorit
       if (initialFilter === "favorit" && !favorites.includes(venue.id)) {
         return false;
@@ -114,7 +145,7 @@ export function VenueExplorePage() {
 
       // 6. Filter Fasilitas (AND filter)
       if (selectedFacilities.length > 0) {
-        const venueFacilityIds = venue.facilities?.map((f) => f.id) || [];
+        const venueFacilityIds = venue.facilities?.map((f: any) => f.id) || [];
         const hasAll = selectedFacilities.every((fid) => venueFacilityIds.includes(fid));
         if (!hasAll) return false;
       }
@@ -142,6 +173,7 @@ export function VenueExplorePage() {
     sortBy,
     initialFilter,
     favorites,
+    venues,
   ]);
 
   // Pagination slice
@@ -255,7 +287,7 @@ export function VenueExplorePage() {
                 onChange={(e) => setCityFilter(e.target.value)}
                 options={[
                   { value: "all", label: "Semua Kota" },
-                  ...MOCK_CITIES.map((c) => ({ value: c.id, label: c.name })),
+                  ...cities.map((c) => ({ value: c.id, label: c.name })),
                 ]}
               />
             </div>
@@ -313,7 +345,7 @@ export function VenueExplorePage() {
             <div className="space-y-2 pt-2 border-t border-slate-100">
               <label className="text-xs font-bold text-slate-700 block">Fasilitas Venue</label>
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                {MOCK_FACILITIES.map((f) => (
+                {facilities.map((f) => (
                   <label
                     key={f.id}
                     className="flex items-center gap-2.5 text-xs text-slate-600 hover:text-slate-900 cursor-pointer select-none"

@@ -37,6 +37,7 @@ import {
   TablePagination,
 } from "@/components/ui";
 import { MOCK_MITRA_PROFILES } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { formatDateIndo, MitraVerificationStatus, AccountStatus } from "@futsal/shared";
 
 type MitraItem = (typeof MOCK_MITRA_PROFILES)[number] & {
@@ -56,6 +57,18 @@ export function AdminMitraPage() {
   const [filterAccount, setFilterAccount] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any[]>("/admin/mitra").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setMitraList(res.data);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Selected Mitra for detail inspection modal
   const [selectedMitra, setSelectedMitra] = React.useState<MitraItem | null>(null);
@@ -119,6 +132,7 @@ export function AdminMitraPage() {
           : null
       );
     }
+    apiClient.post(`/admin/mitra/${mitraId}/approve`).catch(() => {});
     showToast("Mitra berhasil disetujui! Venue mitra sekarang dapat ditayangkan.");
   };
 
@@ -163,6 +177,7 @@ export function AdminMitraPage() {
     }
 
     showToast(`Pengajuan mitra ditolak dengan alasan: "${rejectionReason.trim()}".`);
+    apiClient.post(`/admin/mitra/${rejectingMitra.id}/reject`, { reason: rejectionReason.trim() }).catch(() => {});
     setRejectingMitra(null);
   };
 

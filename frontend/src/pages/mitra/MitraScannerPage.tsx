@@ -27,6 +27,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { MOCK_VENUES, MOCK_SCANS } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { TicketScanResult } from "@futsal/shared";
 import { cn } from "@/lib/utils";
 
@@ -43,10 +44,32 @@ interface ValidationResultState {
 export function MitraScannerPage() {
   const { addToast } = useToast();
 
+  const [venues, setVenues] = React.useState<any[]>(MOCK_VENUES);
   const [selectedVenueId, setSelectedVenueId] = React.useState(MOCK_VENUES[0].id);
   const [manualCode, setManualCode] = React.useState("TKT-FB-8K2M4Q-9A2");
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 5;
+
+  // Live Backend Loading for Venues and Check-in History
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any[]>("/mitra/venues").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setVenues(res.data);
+        setSelectedVenueId(res.data[0].id);
+      }
+    }).catch(() => {});
+
+    apiClient.get<any[]>("/mitra/check-ins").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setScansHistory(res.data);
+      }
+    }).catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Default scan result: SAH
   const [scanResult, setScanResult] = React.useState<ValidationResultState | null>({
@@ -64,7 +87,7 @@ export function MitraScannerPage() {
   const [resultFilter, setResultFilter] = React.useState("semua");
 
   const selectedVenue =
-    MOCK_VENUES.find((v) => v.id === selectedVenueId) || MOCK_VENUES[0];
+    venues.find((v) => v.id === selectedVenueId) || venues[0];
 
   const filteredScans = React.useMemo(() => {
     return scansHistory.filter((s) => {
@@ -89,11 +112,74 @@ export function MitraScannerPage() {
     return filteredScans.slice(start, start + pageSize);
   }, [filteredScans, currentPage]);
 
-  const handleValidateCode = (code: string) => {
+  const handleValidateCode = async (code: string) => {
     const clean = code.trim().toUpperCase();
     if (!clean) {
       addToast("warning", "Masukkan kode tiket terlebih dahulu.", "Kode Kosong");
       return;
+    }
+
+    // 1. Coba validasi secara LIVE ke Backend API
+    try {
+      const res = await apiClient.post<any>("/mitra/tickets/validate", {
+        code: clean,
+        venueId: selectedVenueId,
+      });
+
+      if (res.data) {
+        const liveResult = res.data.result as TicketScanResult;
+        let title = "TIKET SAH — CHECK-IN BERHASIL";
+        let message = "Validasi gate berhasil. Penyewa dipersilakan memasuki area lapangan.";
+
+        if (liveResult === TicketScanResult.SUDAH_DIPAKAI) {
+          title = "DITOLAK: TIKET SUDAH DIPAKAI";
+          message = "Tiket ini telah dipindai check-in sebelumnya oleh petugas gate.";
+        } else if (liveResult === TicketScanResult.SALAH_WAKTU) {
+          title = "DITOLAK: DI LUAR JADWAL MAIN";
+          message = "Check-in hanya dibuka 30 menit sebelum jam main dimulai hingga jam main selesai.";
+        } else if (liveResult === TicketScanResult.SALAH_VENUE) {
+          title = "DITOLAK: SALAH LOKASI VENUE";
+          message = "Tiket ini terdaftar untuk venue lain, bukan venue ini.";
+        } else if (liveResult === TicketScanResult.DIBATALKAN) {
+          title = "DITOLAK: PESANAN DIBATALKAN";
+          message = "Pesanan ini telah dibatalkan dan tidak lagi berlaku.";
+        } else if (liveResult === TicketScanResult.TIDAK_DITEMUKAN) {
+          title = "DITOLAK: KODE TIDAK DITEMUKAN";
+          message = "Nomor tiket tidak terdaftar dalam sistem database.";
+        }
+
+        const liveState: ValidationResultState = {
+          result: liveResult,
+          title,
+          message,
+          customerName: res.data.customerName || "Penyewa Lapangan",
+          field: res.data.fieldId ? `Lapangan (${res.data.bookingCode || "Booking"})` : "Lapangan",
+          time: res.data.playStart ? `${new Date(res.data.playStart).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB` : undefined,
+          scannedAt: res.data.usedAt ? new Date(res.data.usedAt).toLocaleString("id-ID") : undefined,
+        };
+
+        setScanResult(liveState);
+        const newScan = {
+          id: `scn-${Date.now()}`,
+          ticketId: clean,
+          scannedCode: clean,
+          venueId: selectedVenueId,
+          scannedBy: "Operator Gate (Live)",
+          result: liveResult,
+          scannedAt: new Date().toISOString(),
+        };
+        setScansHistory((prev) => [newScan, ...prev]);
+        setCurrentPage(1);
+
+        if (liveResult === TicketScanResult.SAH) {
+          addToast("success", "Tiket Sah! Check-in berhasil tercatat di database.", "Check-in Berhasil");
+        } else {
+          addToast("error", title, "Validasi Ditolak");
+        }
+        return;
+      }
+    } catch {
+      // Fallback simulasi jika offline atau backend tidak terjangkau
     }
 
     let resultState: ValidationResultState;
@@ -216,7 +302,7 @@ export function MitraScannerPage() {
           <Select
             value={selectedVenueId}
             onChange={(e) => setSelectedVenueId(e.target.value)}
-            options={MOCK_VENUES.map((v) => ({
+            options={venues.map((v) => ({
               value: v.id,
               label: `${v.name} (${v.city?.name})`,
             }))}

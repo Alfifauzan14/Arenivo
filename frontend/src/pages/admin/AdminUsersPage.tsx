@@ -31,6 +31,7 @@ import {
   TablePagination,
 } from "@/components/ui";
 import { MOCK_USERS } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { formatDateIndo, AccountStatus } from "@futsal/shared";
 
 type UserItem = (typeof MOCK_USERS)[number];
@@ -41,6 +42,18 @@ export function AdminUsersPage() {
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any[]>("/admin/users").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setUsers(res.data);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [togglingUser, setTogglingUser] = React.useState<UserItem | null>(null);
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
@@ -81,6 +94,7 @@ export function AdminUsersPage() {
     showToast(
       `Akun pengguna ${togglingUser.fullName} berhasil diubah menjadi ${newStatus.toUpperCase()}.`
     );
+    apiClient.patch(`/admin/users/${togglingUser.id}/status`, { status: newStatus }).catch(() => {});
     setTogglingUser(null);
   };
 

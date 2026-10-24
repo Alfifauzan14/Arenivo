@@ -30,11 +30,36 @@ import {
   TablePagination,
 } from "@/components/ui";
 import { MOCK_BOOKINGS, MOCK_MITRA_BALANCE, MOCK_VENUES } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { formatRupiah, formatDateIndo, BookingStatus } from "@futsal/shared";
 import { cn } from "@/lib/utils";
 
 export function MitraDashboardPage() {
-  const bookings = MOCK_BOOKINGS;
+  const [balance, setBalance] = React.useState(MOCK_MITRA_BALANCE);
+  const [bookings, setBookings] = React.useState<any[]>(MOCK_BOOKINGS);
+  const [venues, setVenues] = React.useState<any[]>(MOCK_VENUES);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any>("/mitra/dashboard").then((res) => {
+      if (isMounted && res.data) {
+        if (res.data.balance) setBalance(res.data.balance);
+        if (Array.isArray(res.data.recentBookings) && res.data.recentBookings.length > 0) {
+          setBookings(res.data.recentBookings);
+        }
+      }
+    }).catch(() => {});
+
+    apiClient.get<any[]>("/mitra/venues").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setVenues(res.data);
+      }
+    }).catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("semua");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -92,7 +117,7 @@ export function MitraDashboardPage() {
             Dashboard Operasional
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-            Ringkasan performa harian dan okupansi {MOCK_VENUES[0].name}
+            Ringkasan performa harian dan okupansi {venues[0]?.name || "Venue Olahraga"}
           </p>
         </div>
 
@@ -170,7 +195,7 @@ export function MitraDashboardPage() {
           </div>
           <div className="mt-2.5 sm:mt-3">
             <span className="text-base sm:text-2xl font-bold font-mono text-slate-900 tabular-nums block truncate">
-              {formatRupiah(MOCK_MITRA_BALANCE.saldoTotal)}
+              {formatRupiah(balance.saldoTotal)}
             </span>
           </div>
           <p className="text-[11px] text-slate-500 mt-1 truncate">Net komisi 10%</p>
@@ -187,7 +212,7 @@ export function MitraDashboardPage() {
           </div>
           <div className="mt-2.5 sm:mt-3">
             <span className="text-base sm:text-2xl font-bold font-mono text-red-600 tabular-nums block truncate">
-              {formatRupiah(MOCK_MITRA_BALANCE.saldoBisaDicairkan)}
+              {formatRupiah(balance.saldoBisaDicairkan)}
             </span>
           </div>
           <div className="mt-1">

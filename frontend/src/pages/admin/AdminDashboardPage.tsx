@@ -13,6 +13,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Card, Button } from "@/components/ui";
+import { apiClient } from "@/lib/api-client";
 import {
   MOCK_VENUES,
   MOCK_BOOKINGS,
@@ -25,19 +26,33 @@ export function AdminDashboardPage() {
   const [downloadingFormat, setDownloadingFormat] = React.useState<string | null>(null);
   const [exportMessage, setExportMessage] = React.useState<string | null>(null);
 
-  // Compute metrics
-  const totalUsers = MOCK_USERS.length;
-  const totalMitra = MOCK_MITRA_PROFILES.length;
-  const pendingMitraCount = MOCK_MITRA_PROFILES.filter(
-    (m) => m.verificationStatus === "menunggu"
-  ).length;
-  const totalVenues = MOCK_VENUES.length;
-  const totalBookings = MOCK_BOOKINGS.length;
-  const gmv = MOCK_BOOKINGS.reduce((acc, curr) => acc + (curr.totalPrice || 0), 0);
-  const platformCommission = MOCK_BOOKINGS.reduce(
-    (acc, curr) => acc + (curr.platformCommission || 0),
-    0
-  );
+  // Live Compute metrics with Supabase API integration
+  const [metrics, setMetrics] = React.useState({
+    totalUsers: MOCK_USERS.length,
+    totalMitra: MOCK_MITRA_PROFILES.length,
+    pendingMitraCount: MOCK_MITRA_PROFILES.filter((m) => m.verificationStatus === "menunggu").length,
+    totalVenues: MOCK_VENUES.length,
+    totalBookings: MOCK_BOOKINGS.length,
+    gmv: MOCK_BOOKINGS.reduce((acc, curr) => acc + (curr.totalPrice || 0), 0),
+    platformCommission: MOCK_BOOKINGS.reduce((acc, curr) => acc + (curr.platformCommission || 0), 0),
+  });
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any>("/admin/dashboard").then((res) => {
+      if (isMounted && res.data) {
+        setMetrics((prev) => ({
+          ...prev,
+          ...res.data,
+        }));
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const { totalUsers, totalMitra, pendingMitraCount, totalVenues, totalBookings, gmv, platformCommission } = metrics;
 
   // Monthly revenue breakdown simulation
   const monthlyStats = [

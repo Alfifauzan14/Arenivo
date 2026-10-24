@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button, Card, Select, Input } from "@/components/ui";
 import { MOCK_VENUES, MOCK_CITIES, MOCK_BANNERS } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { VenueCard } from "@/features/venue/components/VenueCard";
 import { cn } from "@/lib/utils";
 
@@ -71,7 +72,38 @@ export function LandingPage() {
   }, [isHeroPaused]);
 
   // Search Widget State & Defaults for Reset
-  const defaultCity = MOCK_CITIES[0]?.id || "jakarta-selatan";
+  // Live Backend Data States with graceful Mock fallbacks
+  const [venues, setVenues] = React.useState<any[]>(MOCK_VENUES);
+  const [cities, setCities] = React.useState<any[]>(MOCK_CITIES);
+  const [banners, setBanners] = React.useState<any[]>(MOCK_BANNERS);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any[]>("/venues", { limit: 8 }).then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setVenues(res.data);
+      }
+    }).catch(() => {});
+
+    apiClient.get<any[]>("/master/cities").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setCities(res.data);
+      }
+    }).catch(() => {});
+
+    apiClient.get<any[]>("/banners").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setBanners(res.data);
+      }
+    }).catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [venues]);
+
+  // Search Widget State & Defaults for Reset
+  const defaultCity = cities[0]?.id || "jakarta-selatan";
   const defaultDate = new Date().toISOString().split("T")[0];
 
   const [selectedCity, setSelectedCity] = React.useState(defaultCity);
@@ -96,7 +128,7 @@ export function LandingPage() {
   React.useEffect(() => {
     if (isBannerPaused) return;
     const timer = setInterval(() => {
-      setActiveBannerIdx((prev) => (prev + 1) % MOCK_BANNERS.length);
+      setActiveBannerIdx((prev) => (prev + 1) % banners.length);
     }, 4500);
     return () => clearInterval(timer);
   }, [isBannerPaused]);
@@ -145,10 +177,10 @@ export function LandingPage() {
 
   React.useEffect(() => {
     const timer = setInterval(() => {
-      setActiveBannerIdx((prev) => (prev + 1) % MOCK_BANNERS.length);
+      setActiveBannerIdx((prev) => (prev + 1) % banners.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [venues]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,8 +194,8 @@ export function LandingPage() {
 
   // Venue populer
   const popularVenues = React.useMemo(() => {
-    return MOCK_VENUES.slice(0, 6);
-  }, []);
+    return venues.slice(0, 6);
+  }, [venues]);
 
   return (
     <div className="pb-8 sm:pb-12">
@@ -244,7 +276,7 @@ export function LandingPage() {
                 onChange={(e) => setSelectedCity(e.target.value)}
                 className="text-xs font-medium"
               >
-                {MOCK_CITIES.map((c) => (
+                {cities.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -318,7 +350,7 @@ export function LandingPage() {
           className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900 shadow-xs"
         >
           <div className="relative min-h-[195px] sm:min-h-[220px] md:aspect-[24/8] md:max-h-72 w-full overflow-hidden">
-            {MOCK_BANNERS.map((banner, idx) => (
+            {banners.map((banner, idx) => (
               <div
                 key={banner.id}
                 className={cn(
@@ -360,7 +392,7 @@ export function LandingPage() {
           <button
             type="button"
             onClick={() =>
-              setActiveBannerIdx((prev) => (prev - 1 + MOCK_BANNERS.length) % MOCK_BANNERS.length)
+              setActiveBannerIdx((prev) => (prev - 1 + banners.length) % banners.length)
             }
             aria-label="Slide promo sebelumnya"
             className="hidden md:flex absolute left-3.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/95 text-slate-800 hover:bg-white hover:scale-105 transition-all z-20 shadow-xs border border-slate-200 cursor-pointer"
@@ -369,7 +401,7 @@ export function LandingPage() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveBannerIdx((prev) => (prev + 1) % MOCK_BANNERS.length)}
+            onClick={() => setActiveBannerIdx((prev) => (prev + 1) % banners.length)}
             aria-label="Slide promo berikutnya"
             className="hidden md:flex absolute right-3.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/95 text-slate-800 hover:bg-white hover:scale-105 transition-all z-20 shadow-xs border border-slate-200 cursor-pointer"
           >
@@ -378,7 +410,7 @@ export function LandingPage() {
 
           {/* Dots Indicator - Ditempatkan rapi di kanan bawah berbingkai agar tidak menimpa tombol aksi */}
           <div className="absolute bottom-3 right-3 sm:bottom-4 sm:right-5 z-20 flex items-center gap-1.5 bg-black/40 backdrop-blur-xs px-2.5 py-1 rounded-full border border-white/10">
-            {MOCK_BANNERS.map((_, i) => (
+            {banners.map((_, i) => (
               <button
                 key={i}
                 type="button"
@@ -410,7 +442,7 @@ export function LandingPage() {
             to="/venues"
             className="text-xs sm:text-sm font-bold text-red-600 hover:text-red-700 flex items-center gap-1 self-start sm:self-auto"
           >
-            Lihat Semua Venue ({MOCK_VENUES.length}) →
+            Lihat Semua Venue ({venues.length}) →
           </Link>
         </div>
 

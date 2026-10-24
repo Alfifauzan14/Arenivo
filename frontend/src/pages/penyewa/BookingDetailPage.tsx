@@ -30,6 +30,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { MOCK_BOOKINGS, MOCK_VENUES, MOCK_TICKETS } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import {
   formatRupiah,
   formatDateIndo,
@@ -51,7 +52,30 @@ export function BookingDetailPage() {
     return MOCK_BOOKINGS.find((b) => b.id === id) || MOCK_BOOKINGS[0];
   });
 
-  const ticket = MOCK_TICKETS.find((t) => t.bookingId === booking.id) || MOCK_TICKETS[0];
+  const [liveTicket, setLiveTicket] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    if (!id) return;
+    let isMounted = true;
+    apiClient.get<any>(`/bookings/${id}`).then((res) => {
+      if (isMounted && res.data) {
+        setBooking(res.data);
+      }
+    }).catch(() => {});
+
+    apiClient.get<any>(`/bookings/${id}/ticket`).then((res) => {
+      if (isMounted && res.data) {
+        setLiveTicket(res.data);
+      }
+    }).catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
+
+  const defaultTicket = MOCK_TICKETS.find((t) => t.bookingId === booking.id) || MOCK_TICKETS[0];
+  const ticket = liveTicket || defaultTicket;
 
   // 2. Modals State
   const [isInvoiceOpen, setIsInvoiceOpen] = React.useState<boolean>(false);

@@ -32,6 +32,7 @@ import {
   MOCK_MITRA_BALANCE,
   MOCK_PAYOUTS,
 } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { formatRupiah, formatDateIndo } from "@futsal/shared";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +50,24 @@ export function MitraFinancePage() {
 
   const [balance, setBalance] = React.useState(MOCK_MITRA_BALANCE);
   const [payouts, setPayouts] = React.useState(MOCK_PAYOUTS);
+
+  // Live Backend Loading for Balance & Payouts
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any>("/mitra/balance").then((res) => {
+      if (isMounted && res.data) setBalance(res.data);
+    }).catch(() => {});
+
+    apiClient.get<any[]>("/mitra/payouts").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setPayouts(res.data);
+      }
+    }).catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Filter & Pagination states
   const [ledgerSearch, setLedgerSearch] = React.useState("");
@@ -175,6 +194,7 @@ export function MitraFinancePage() {
     };
 
     setPayouts((prev) => [newPayout, ...prev]);
+    apiClient.post<any>("/mitra/payouts", { amount: payoutAmount }).catch(() => {});
     setIsPayoutModalOpen(false);
     setPayoutPage(1);
 

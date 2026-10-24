@@ -27,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import { Modal, Select, useToast } from "@/components/ui";
+import { apiClient } from "@/lib/api-client";
 import {
   MOCK_VENUES,
   MOCK_FIELDS,
@@ -96,8 +97,27 @@ export function VenueDetailPage() {
   const { isFavorite, toggleFavorite } = useSession();
 
   // 1. Temukan venue berdasarkan slug
-  const venue: Venue = React.useMemo(() => {
+  const initialVenue = React.useMemo(() => {
     return MOCK_VENUES.find((v) => v.slug === slug) || MOCK_VENUES[0];
+  }, [slug]);
+
+  const [venue, setVenue] = React.useState<Venue>(initialVenue);
+  const [liveFields, setLiveFields] = React.useState<Field[]>([]);
+
+  React.useEffect(() => {
+    if (!slug) return;
+    let isMounted = true;
+    apiClient.get<any>(`/venues/${slug}`).then((res) => {
+      if (isMounted && res.data) {
+        setVenue(res.data);
+        if (Array.isArray(res.data.fields) && res.data.fields.length > 0) {
+          setLiveFields(res.data.fields);
+        }
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
   }, [slug]);
 
   const favorited = isFavorite(venue.id);
@@ -131,6 +151,7 @@ export function VenueDetailPage() {
 
   // 3. Lapangan yang tersedia untuk venue ini
   const venueFields: Field[] = React.useMemo(() => {
+    if (liveFields.length > 0) return liveFields;
     const matching = MOCK_FIELDS.filter((f) => f.venueId === venue.id);
     if (matching.length > 0) return matching;
 
@@ -166,7 +187,7 @@ export function VenueDetailPage() {
         },
       },
     ];
-  }, [venue.id, venue.startingPrice]);
+  }, [venue.id, venue.startingPrice, liveFields]);
 
   // 4. Generate 30 Hari ke Depan & State Kalender Popover (Sesuai Gambar ke-2)
   const todayStr = React.useMemo(() => {

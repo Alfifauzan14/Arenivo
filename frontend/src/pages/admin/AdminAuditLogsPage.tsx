@@ -28,6 +28,7 @@ import {
   TablePagination,
 } from "@/components/ui";
 import { MOCK_AUDIT_LOGS, type AuditLogItem } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { formatDateIndo } from "@futsal/shared";
 
 export function AdminAuditLogsPage() {
@@ -36,6 +37,18 @@ export function AdminAuditLogsPage() {
   const [filterAction, setFilterAction] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any[]>("/admin/audit-logs").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setLogs(res.data);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =

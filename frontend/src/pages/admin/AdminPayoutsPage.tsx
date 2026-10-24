@@ -32,6 +32,7 @@ import {
   TablePagination,
 } from "@/components/ui";
 import { MOCK_PAYOUTS } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { formatRupiah, formatDateIndo, PayoutStatus, type Payout } from "@futsal/shared";
 
 type PayoutItem = Payout;
@@ -66,6 +67,18 @@ export function AdminPayoutsPage() {
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any[]>("/admin/payouts").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setPayouts(res.data);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [selectedPayout, setSelectedPayout] = React.useState<PayoutItem | null>(null);
 

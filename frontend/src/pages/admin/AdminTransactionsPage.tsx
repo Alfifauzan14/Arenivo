@@ -33,6 +33,7 @@ import {
   TablePagination,
 } from "@/components/ui";
 import { MOCK_BOOKINGS, MOCK_PAYMENTS } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { formatRupiah, formatDateIndo, type Booking } from "@futsal/shared";
 
 export function AdminTransactionsPage() {
@@ -41,8 +42,21 @@ export function AdminTransactionsPage() {
   const [selectedBooking, setSelectedBooking] = React.useState<Booking | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
+  const [bookings, setBookings] = React.useState<Booking[]>(MOCK_BOOKINGS);
 
-  const filteredBookings = MOCK_BOOKINGS.filter((b) => {
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any[]>("/admin/bookings").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setBookings(res.data);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredBookings = bookings.filter((b) => {
     const matchesSearch =
       b.bookingCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -116,30 +130,30 @@ export function AdminTransactionsPage() {
                   setCurrentPage(1);
                 }}
                 options={[
-                  { value: "all", label: `Semua Status (${MOCK_BOOKINGS.length})` },
+                  { value: "all", label: `Semua Status (${bookings.length})` },
                   {
                     value: "menunggu_bayar",
-                    label: `Menunggu (${MOCK_BOOKINGS.filter((b) => b.status === "menunggu_bayar").length})`,
+                    label: `Menunggu (${bookings.filter((b) => b.status === "menunggu_bayar").length})`,
                   },
                   {
                     value: "dikonfirmasi",
-                    label: `Dikonfirmasi (${MOCK_BOOKINGS.filter((b) => b.status === "dikonfirmasi").length})`,
+                    label: `Dikonfirmasi (${bookings.filter((b) => b.status === "dikonfirmasi").length})`,
                   },
                   {
                     value: "digunakan",
-                    label: `Digunakan (${MOCK_BOOKINGS.filter((b) => b.status === "digunakan").length})`,
+                    label: `Digunakan (${bookings.filter((b) => b.status === "digunakan").length})`,
                   },
                   {
                     value: "selesai",
-                    label: `Selesai (${MOCK_BOOKINGS.filter((b) => b.status === "selesai").length})`,
+                    label: `Selesai (${bookings.filter((b) => b.status === "selesai").length})`,
                   },
                   {
                     value: "kedaluwarsa",
-                    label: `Kedaluwarsa (${MOCK_BOOKINGS.filter((b) => b.status === "kedaluwarsa").length})`,
+                    label: `Kedaluwarsa (${bookings.filter((b) => b.status === "kedaluwarsa").length})`,
                   },
                   {
                     value: "dibatalkan",
-                    label: `Dibatalkan (${MOCK_BOOKINGS.filter((b) => b.status === "dibatalkan").length})`,
+                    label: `Dibatalkan (${bookings.filter((b) => b.status === "dibatalkan").length})`,
                   },
                 ]}
               />

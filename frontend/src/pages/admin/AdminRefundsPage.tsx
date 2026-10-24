@@ -32,6 +32,7 @@ import {
   TablePagination,
 } from "@/components/ui";
 import { MOCK_REFUNDS } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { formatRupiah, formatDateIndo, RefundStatus } from "@futsal/shared";
 
 type RefundItem = (typeof MOCK_REFUNDS)[number];
@@ -42,6 +43,18 @@ export function AdminRefundsPage() {
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any[]>("/admin/refunds").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setRefunds(res.data);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [selectedRefund, setSelectedRefund] = React.useState<RefundItem | null>(null);
 

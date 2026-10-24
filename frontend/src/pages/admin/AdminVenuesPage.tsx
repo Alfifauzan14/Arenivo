@@ -33,6 +33,7 @@ import {
   TablePagination,
 } from "@/components/ui";
 import { MOCK_VENUES, MOCK_FIELDS } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { formatRupiah, VenueStatus, type Venue } from "@futsal/shared";
 
 type VenueItem = Venue;
@@ -43,6 +44,18 @@ export function AdminVenuesPage() {
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any[]>("/admin/venues").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setVenues(res.data);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
   const [selectedVenue, setSelectedVenue] = React.useState<VenueItem | null>(null);
   const [actionVenue, setActionVenue] = React.useState<{
     venue: VenueItem;
