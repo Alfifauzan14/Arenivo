@@ -169,7 +169,7 @@ export type FieldStatus = (typeof FieldStatus)[keyof typeof FieldStatus];
  */
 export const AiProvider = {
   GEMINI: "gemini",
-  GROQ: "groq",
+
 } as const;
 
 export type AiProvider = (typeof AiProvider)[keyof typeof AiProvider];

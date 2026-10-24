@@ -35,9 +35,9 @@ const envSchema = z.object({
   FIREBASE_PRIVATE_KEY: z.string().optional(),
 
   // Chatbot AI
-  SYSTEM_AI_PROVIDER: z.enum(["gemini", "groq"]).default("gemini"),
+  SYSTEM_AI_PROVIDER: z.string().default("gemini"),
   GEMINI_API_KEY: z.string().optional(),
-  GROQ_API_KEY: z.string().optional(),
+
 
   // TikTok Login
   TIKTOK_CLIENT_KEY: z.string().optional(),

@@ -255,17 +255,14 @@ export function AdminSettingsPage() {
                 options={[
                   {
                     value: AiProvider.GEMINI,
-                    label: "Google Gemini (Gemini 1.5 Flash - Rekomendasi)",
+                    label: "Google Gemini (Gemini Flash - AI Resmi Arenivo)",
                   },
-                  {
-                    value: AiProvider.GROQ,
-                    label: "Groq (Llama 3.1 8B Instant - Ultra Fast)",
-                  },
+                  
                 ]}
               />
             </div>
             <span className="text-[11px] text-slate-500 block">
-              Sistem backend otomatis mengalihkan ke model cadangan (fallback) jika provider utama mengalami rate limit 429 atau kuota habis.
+              Didukung oleh Google Gemini Flash dengan integrasi katalog venue dan promo aktif secara real-time.
             </span>
           </div>
         </CardContent>
@@ -294,3 +291,4 @@ export function AdminSettingsPage() {
     </div>
   );
 }
+

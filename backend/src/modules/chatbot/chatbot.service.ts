@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase";
-import { env } from "@/config/env";
 import { camelize, dbError } from "@/lib/http";
+import { geminiService } from "@/lib/gemini";
 
 interface ChatInput {
   sessionId?: string;
@@ -45,17 +45,6 @@ export const chatbotService = {
       .eq("is_active", true)
       .limit(5);
 
-    const { data: settingRow } = await supabaseAdmin
-      .from("system_settings")
-      .select("value")
-      .eq("key", "primary_ai_provider")
-      .maybeSingle();
-
-    const primaryProvider =
-      typeof settingRow?.value === "string"
-        ? settingRow.value.replace(/^"|"$/g, "")
-        : env.SYSTEM_AI_PROVIDER || "gemini";
-
     const venueContext = (venues ?? [])
       .map((v: any) => {
         const fieldsList = (v.fields ?? [])
@@ -88,69 +77,16 @@ export const chatbotService = {
     ].join("\n");
 
     let replyText = "";
-    let usedProvider = primaryProvider;
-
-    const tryGemini = async (): Promise<string | null> => {
-      if (!env.GEMINI_API_KEY) return null;
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: `${systemPrompt}\n\nPertanyaan pengguna: ${input.message}` }]
-              }
-            ],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 450 }
-          })
-        }
-      );
-      if (!res.ok) return null;
-      const json: any = await res.json();
-      return json?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-    };
-
-    const tryGroq = async (): Promise<string | null> => {
-      if (!env.GROQ_API_KEY) return null;
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${env.GROQ_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: input.message }
-          ],
-          temperature: 0.3,
-          max_tokens: 450
-        })
-      });
-      if (!res.ok) return null;
-      const json: any = await res.json();
-      return json?.choices?.[0]?.message?.content ?? null;
-    };
+    let usedProvider = "gemini";
 
     try {
-      if (primaryProvider === "groq") {
-        replyText = (await tryGroq()) ?? "";
-        if (!replyText) {
-          usedProvider = "gemini";
-          replyText = (await tryGemini()) ?? "";
-        }
-      } else {
-        replyText = (await tryGemini()) ?? "";
-        if (!replyText) {
-          usedProvider = "groq";
-          replyText = (await tryGroq()) ?? "";
-        }
-      }
-    } catch {
+      replyText = await geminiService.generateReply(input.message, {
+        systemInstruction: systemPrompt,
+        temperature: 0.3,
+        maxOutputTokens: 450,
+      });
+    } catch (err) {
+      console.error("[Chatbot Gemini Error]:", err);
       replyText = "";
     }
 
@@ -169,7 +105,7 @@ export const chatbotService = {
         replyText = `Berikut rekomendasi venue terbaik yang tersedia saat ini:\n${summary}\n\nSilakan pilih venue di atas untuk melihat slot jadwal real-time dan melakukan booking instan.`;
       } else {
         replyText =
-          "Halo! Saya siap membantu Anda mencari lapangan futsal atau sepak bola, mengecek jadwal kosong, serta info promo aktif. Silakan sebutkan kota atau jam bermain yang Anda inginkan.";
+          "Halo! Saya asisten resmi Arenivo. Saya siap membantu Anda mencari lapangan futsal atau sepak bola, mengecek jadwal kosong, serta info promo aktif. Silakan sebutkan kota atau jam bermain yang Anda inginkan.";
       }
     }
 

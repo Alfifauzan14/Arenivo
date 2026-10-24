@@ -18,7 +18,7 @@ export const SystemConfigSchema = z.object({
   defaultServiceFeeRupiah: z.number().int().min(0).default(5000),
   minPayoutAmountRupiah: z.number().int().min(50000).default(100000),
   scannerEarlyCheckinMinutes: z.number().int().min(10).max(120).default(30),
-  primaryAiProvider: z.enum([AiProvider.GEMINI, AiProvider.GROQ]).default(AiProvider.GEMINI),
+  primaryAiProvider: z.literal(AiProvider.GEMINI).default(AiProvider.GEMINI),
 });
 
 export type SystemConfig = z.infer<typeof SystemConfigSchema>;

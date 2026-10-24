@@ -141,7 +141,7 @@ Anda dapat langsung klik nama venue untuk mengecek slot kosong jam 19.00 - 22.00
                 </h4>
                 <p className="text-[10px] text-red-200 flex items-center gap-1">
                   <Sparkles className="w-3 h-3" />
-                  Gemini & Groq Context-Aware
+                  Google Gemini Flash AI
                 </p>
               </div>
             </div>
