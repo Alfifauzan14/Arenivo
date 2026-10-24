@@ -1,27 +1,47 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
-import { Mail, ArrowLeft, CheckCircle2, ShieldAlert } from "lucide-react";
-import { Button, Card, CardHeader, CardTitle, CardContent, Input, useToast } from "@/components/ui";
+import { Mail, ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
+import { useToast } from "@/components/ui";
 import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
 
 export function ForgotPasswordPage() {
   const { addToast } = useToast();
   const [email, setEmail] = React.useState("");
   const [isSent, setIsSent] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       addToast("warning", "Masukkan alamat email Anda terlebih dahulu.", "Email Kosong");
       return;
     }
 
-    setIsSent(true);
-    addToast(
-      "success",
-      `Tautan pemulihan kata sandi telah dikirim ke ${email}.`,
-      "Email Terkirim"
-    );
+    setIsLoading(true);
+    try {
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
+      const res = await fetch(`${apiUrl}/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error?.message || "Gagal mengirim email pemulihan.");
+      }
+
+      setIsSent(true);
+      addToast(
+        "success",
+        `Tautan pemulihan kata sandi telah dikirim ke ${email}. Silakan cek kotak masuk email Anda.`,
+        "Email Terkirim"
+      );
+    } catch (err: any) {
+      addToast("error", err?.message || "Terjadi kesalahan saat memproses permintaan.", "Gagal Mengirim");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -46,13 +66,13 @@ export function ForgotPasswordPage() {
               <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto ring-8 ring-emerald-50/50">
                 <CheckCircle2 className="w-7 h-7" />
               </div>
-              <h3 className="font-black text-lg text-slate-900">Email Pemulihan Terkirim</h3>
+              <h3 className="font-black text-lg text-slate-900">Email Pemulihan Terkirim!</h3>
               <p className="text-xs text-slate-600 leading-relaxed max-w-xs mx-auto">
                 Kami telah mengirimkan tautan ganti kata sandi ke{" "}
-                <strong className="font-mono text-slate-800">{email}</strong>. Silakan periksa Inbox atau folder Spam.
+                <strong className="font-mono text-slate-800">{email}</strong> via Brevo. Silakan periksa folder Inbox atau Spam email Anda.
               </p>
-              <div className="pt-3">
-                <Link to="/login">
+              <div className="pt-3 space-y-2">
+                <Link to="/login" className="block">
                   <button
                     type="button"
                     className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-orange-500 via-red-600 to-rose-700 hover:from-orange-600 hover:via-red-700 hover:to-rose-800 text-white font-bold text-xs uppercase tracking-wider shadow-xs active:scale-[0.99] transition-all cursor-pointer"
@@ -60,6 +80,13 @@ export function ForgotPasswordPage() {
                     Kembali ke Halaman Masuk
                   </button>
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => setIsSent(false)}
+                  className="text-xs text-slate-500 hover:text-red-600 font-semibold cursor-pointer underline"
+                >
+                  Kirim ulang email
+                </button>
               </div>
             </div>
           ) : (
@@ -73,6 +100,7 @@ export function ForgotPasswordPage() {
                     placeholder="nama@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
                     className="w-full bg-transparent border-none outline-none text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 font-medium"
                     required
                   />
@@ -82,9 +110,17 @@ export function ForgotPasswordPage() {
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-orange-500 via-red-600 to-rose-700 hover:from-orange-600 hover:via-red-700 hover:to-rose-800 text-white font-black text-xs uppercase tracking-wider shadow-xs active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2"
+                  disabled={isLoading}
+                  className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-orange-500 via-red-600 to-rose-700 hover:from-orange-600 hover:via-red-700 hover:to-rose-800 text-white font-black text-xs uppercase tracking-wider shadow-xs active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  <span>Kirim Tautan Pemulihan</span>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Mengirim Tautan...</span>
+                    </>
+                  ) : (
+                    <span>Kirim Tautan Pemulihan</span>
+                  )}
                 </button>
               </div>
 
