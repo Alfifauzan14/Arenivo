@@ -76,8 +76,8 @@ export const paymentsService = {
           return await bookingsRepository.getOwned(bookingId, user.id);
         }
       }
-    } catch {
-      // fallback
+    } catch (err) {
+      console.warn("[verifyPayment] Status check to Midtrans API:", err);
     }
 
     // Dev/Sandbox simulation fallback jika dipanggil setelah pembayaran snap di frontend
@@ -90,7 +90,9 @@ export const paymentsService = {
           p_raw: { simulated: true },
         });
         return await bookingsRepository.getOwned(bookingId, user.id);
-      } catch {}
+      } catch (err) {
+        console.warn("[verifyPayment] Simulation fallback:", err);
+      }
     }
 
     return booking;
