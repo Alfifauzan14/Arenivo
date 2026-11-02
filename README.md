@@ -31,6 +31,16 @@
 
 ---
 
+## 📋 Laporan Progres & Perancangan Proyek (Pertemuan 2 November 2026)
+* 📊 **Google Spreadsheet (Task List, Perancangan, Timeline - 8 Tabs Acuan Guru):**  
+  [Buka Spreadsheet Arenivo](https://docs.google.com/spreadsheets/d/1Sz1lZ6RHFI7kGu2sI_SUO6kATCDTOFdyAa43fdqqJYk/edit)
+* 📄 **Google Docs (Laporan Dokumentasi Lengkap & 11 Screenshot Berjudul):**  
+  [Buka Google Docs Arenivo](https://docs.google.com/document/d/1QD0b1M18hYbMUAzZzJ1SIGmP_lUcrRCmFnfQfQkcO7U/edit)
+* 📑 **Dokumentasi Terperinci di Repositori:**  
+  [docs/LAPORAN_PROGRESS_TICKETING.md](docs/LAPORAN_PROGRESS_TICKETING.md)
+
+---
+
 ## 🚀 Memulai (Quick Start)
 
 ### 1. Kloning Repository
