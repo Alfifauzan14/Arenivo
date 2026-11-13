@@ -47,7 +47,6 @@ import {
   MOCK_BOOKINGS,
   MOCK_VENUES,
   MOCK_FIELDS,
-  MOCK_PROMOS,
 } from "@/lib/mock-data";
 import {
   formatRupiah,
@@ -72,6 +71,7 @@ export function CheckoutPage() {
 
   // 1. Resolve Data Booking / Venue
   const venueIdParam = searchParams.get("venueId");
+  const venueSlugParam = searchParams.get("venueSlug");
   const fieldIdParam = searchParams.get("fieldId");
   const dateParam = searchParams.get("date");
   const startHourParam = searchParams.get("startHour");
@@ -79,24 +79,49 @@ export function CheckoutPage() {
   const totalParam = searchParams.get("total");
 
   // Cari booking yang cocok di mock
-  const existingBooking = MOCK_BOOKINGS.find((b) => b.id === bookingId) || MOCK_BOOKINGS[1];
+  const existingBooking = React.useMemo(() => {
+    return MOCK_BOOKINGS.find((b) => b.id === bookingId) || MOCK_BOOKINGS[1];
+  }, [bookingId]);
 
-  // Resolve Venue & Field
-  const venue: Venue = React.useMemo(() => {
-    if (venueIdParam) {
-      const v = MOCK_VENUES.find((item) => item.id === venueIdParam);
-      if (v) return v;
+  // Order Code yang ditampilkan di UI
+  const displayBookingCode = React.useMemo(() => {
+    if (bookingId && bookingId.startsWith("bk-")) {
+      return "BK-" + bookingId.replace(/^bk-/, "").slice(0, 8).toUpperCase();
     }
-    return existingBooking.venue || MOCK_VENUES[0];
-  }, [venueIdParam, existingBooking]);
+    return existingBooking.bookingCode;
+  }, [bookingId, existingBooking.bookingCode]);
 
-  const field: Field = React.useMemo(() => {
-    if (fieldIdParam) {
-      const f = MOCK_FIELDS.find((item) => item.id === fieldIdParam);
-      if (f) return f;
+  // Resolve Venue & Field (prioritaskan data asli dari query param)
+  const [venue, setVenue] = React.useState<Venue>(
+    MOCK_VENUES.find((item) => item.id === venueIdParam) || MOCK_VENUES[0]
+  );
+  const [field, setField] = React.useState<Field>(
+    MOCK_FIELDS.find((item) => item.id === fieldIdParam) || MOCK_FIELDS[0]
+  );
+
+  // Ambil venue & field asli dari API supaya fieldId valid saat POST /bookings
+  React.useEffect(() => {
+    let active = true;
+    async function fetchVenueField() {
+      const slug = venueSlugParam;
+      if (!slug || !fieldIdParam) return;
+      try {
+        const venueRes = await apiClient.get<Venue>(`/venues/${slug}`);
+        if (!active || !venueRes.data) return;
+        setVenue(venueRes.data);
+        const matchedField = (venueRes.data as any)?.fields?.find(
+          (f: Field) => f.id === fieldIdParam
+        );
+        if (matchedField) setField(matchedField);
+      } catch {
+        // Jika API gagal, tetap pakai mock sebagai fallback UI
+      }
     }
-    return existingBooking.field || MOCK_FIELDS[0];
-  }, [fieldIdParam, existingBooking]);
+    fetchVenueField();
+    return () => {
+      active = false;
+    };
+  }, [venueSlugParam, fieldIdParam]);
 
   const playDateStr = dateParam || existingBooking.playStart.split("T")[0];
   const startHour = startHourParam ? parseInt(startHourParam, 10) : 19;
@@ -142,6 +167,13 @@ export function CheckoutPage() {
   const [customerEmail, setCustomerEmail] = React.useState<string>(
     user?.email || "rizky.ramadhan@gmail.com"
   );
+
+  // Sync saat data sesi user selesai dimuat
+  React.useEffect(() => {
+    if (user?.fullName) setCustomerName(user.fullName);
+    if (user?.phone) setCustomerPhone(user.phone);
+    if (user?.email) setCustomerEmail(user.email);
+  }, [user]);
   const [notes, setNotes] = React.useState<string>(existingBooking.notes || "");
 
   // 4. Promo Code Validation
@@ -160,34 +192,37 @@ export function CheckoutPage() {
   const discountAmount = appliedPromo ? appliedPromo.discount : 0;
   const finalTotalPrice = Math.max(0, calculatedSubtotal + serviceFee - discountAmount);
 
-  const handleApplyPromo = () => {
+  const [promoValidating, setPromoValidating] = React.useState(false);
+
+  const handleApplyPromo = async () => {
     const cleanCode = promoInput.trim().toUpperCase();
     if (!cleanCode) {
       addToast("warning", "Masukkan kode promo terlebih dahulu.", "Kode Promo");
       return;
     }
 
-    if (cleanCode === "FUTSALASIK") {
-      setAppliedPromo({
+    setPromoValidating(true);
+    try {
+      const res = await apiClient.post<any>("/promos/validate", {
         code: cleanCode,
-        discount: 25000,
-        description: "Diskon Promo FUTSALASIK Rp25.000",
+        venueId: venue.id,
+        subtotal: calculatedSubtotal,
       });
-      addToast("success", "Kode promo FUTSALASIK berhasil digunakan! Hemat Rp25.000.", "Promo Aktif");
-    } else if (cleanCode === "WEEKENDSERU" || cleanCode === "HEMAT10") {
-      const disc = Math.round(calculatedSubtotal * 0.1);
+      const result = res.data;
       setAppliedPromo({
-        code: cleanCode,
-        discount: disc,
-        description: `Diskon 10% (${formatRupiah(disc)})`,
+        code: result.code,
+        discount: result.discount,
+        description: result.discountType === "fixed"
+          ? `Diskon ${formatRupiah(result.discountValue)}`
+          : `Diskon ${result.discountValue}% (maks ${formatRupiah(result.discount)})`,
       });
-      addToast("success", `Kode promo ${cleanCode} berhasil digunakan! Hemat ${formatRupiah(disc)}.`, "Promo Aktif");
-    } else {
-      addToast(
-        "error",
-        `Kode promo "${cleanCode}" tidak valid atau kuota telah habis. Coba kode: FUTSALASIK atau HEMAT10.`,
-        "Promo Tidak Ditemukan"
-      );
+      addToast("success", `Kode promo ${result.code} berhasil digunakan! Hemat ${formatRupiah(result.discount)}.`, "Promo Aktif");
+    } catch (err: any) {
+      const msg = err?.data?.error?.message || err?.message || `Kode promo "${cleanCode}" tidak valid atau syarat belum terpenuhi.`;
+      addToast("error", msg, "Promo Tidak Valid");
+      setAppliedPromo(null);
+    } finally {
+      setPromoValidating(false);
     }
   };
 
@@ -203,9 +238,11 @@ export function CheckoutPage() {
 
   // Pasang / Muat Midtrans Snap script secara dinamis saat halaman dibuka
   React.useEffect(() => {
-    const snapScriptUrl = "https://app.sandbox.midtrans.com/snap/snap.js";
-    const clientKey = "Mid-client-3mO8VFRLV5vdpqMW";
+    const snapScriptUrl =
+      import.meta.env.VITE_MIDTRANS_SNAP_URL || "https://app.sandbox.midtrans.com/snap/snap.js";
+    const clientKey = import.meta.env.VITE_MIDTRANS_CLIENT_KEY || "";
 
+    if (!clientKey) return;
     let scriptTag = document.querySelector(`script[src="${snapScriptUrl}"]`) as HTMLScriptElement;
     if (!scriptTag) {
       scriptTag = document.createElement("script");
@@ -222,8 +259,9 @@ export function CheckoutPage() {
       return Promise.resolve(true);
     }
     return new Promise((resolve) => {
-      const snapScriptUrl = "https://app.sandbox.midtrans.com/snap/snap.js";
-      const clientKey = "Mid-client-3mO8VFRLV5vdpqMW";
+      const snapScriptUrl =
+        import.meta.env.VITE_MIDTRANS_SNAP_URL || "https://app.sandbox.midtrans.com/snap/snap.js";
+      const clientKey = import.meta.env.VITE_MIDTRANS_CLIENT_KEY || "";
 
       let scriptTag = document.querySelector(`script[src="${snapScriptUrl}"]`) as HTMLScriptElement;
       if (!scriptTag) {
@@ -275,15 +313,21 @@ export function CheckoutPage() {
         slotStarts.push(`${playDateStr}T${padH}:00:00+07:00`);
       }
 
+      // Validasi nomor WhatsApp sebelum request
+      const cleanPhone = (customerPhone || "").trim();
+      if (!cleanPhone || cleanPhone.length < 9) {
+        throw new Error("Nomor WhatsApp minimal 9 digit. Silakan lengkapi form pemesan.");
+      }
+
       // 2. Create Real Booking in PostgreSQL Database
       const idempotencyKey = "chk-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
       const bookingPayload = {
-        fieldId: field.id || "370b8fb7-e526-4b38-989f-7e7012592d86",
+        fieldId: field.id || "f1111111-1111-1111-1111-111111111111",
         slotStarts,
-        customerName,
-        customerPhone,
+        customerName: customerName.trim() || user?.fullName || "Penyewa Lapangan",
+        customerPhone: cleanPhone,
         promoCode: appliedPromo?.code,
-        notes: "Booking online via Arenivo Web",
+        notes: notes.trim() || "Booking online via Arenivo Web",
       };
 
       const createRes = await apiClient.post<any>("/bookings", bookingPayload, {
@@ -292,7 +336,11 @@ export function CheckoutPage() {
 
       const realBookingId = createRes.data?.id;
       if (!realBookingId) {
-        throw new Error("Gagal membuat reservasi slot. Pastikan jam slot belum diambil penyewa lain.");
+        const serverMsg = createRes.data?.error?.message || createRes.data?.message;
+        throw new Error(
+          serverMsg ||
+          "Server tidak merespons dengan benar. Pastikan backend aktif dan coba lagi."
+        );
       }
       setActiveCreatedBookingId(realBookingId);
 
@@ -331,9 +379,21 @@ export function CheckoutPage() {
     } catch (err: any) {
       console.error("[Midtrans/Booking Error]:", err);
       setIsSnapLoading(false);
+
+      // Extract the most specific error message available
+      const detailsMsg = Array.isArray(err?.error?.details)
+        ? err.error.details.map((d: any) => `${d.field ? d.field + ': ' : ''}${d.issue || d.message}`).join(", ")
+        : null;
+
+      const errorMessage =
+        detailsMsg ||
+        err?.error?.message ||   // API error response format
+        err?.message ||           // Standard Error object
+        "Slot jam tersebut mungkin baru saja diambil oleh penyewa lain.";
+
       addToast(
         "error",
-        err?.message || "Slot jam tersebut mungkin baru saja diambil oleh penyewa lain.",
+        errorMessage,
         "Gagal Memproses Booking"
       );
     }
@@ -563,8 +623,8 @@ export function CheckoutPage() {
                     <Tag className="w-5 h-5 text-red-600" />
                     Kode Promo Diskon
                   </span>
-                  <span className="text-[11px] font-normal text-slate-400 font-mono">
-                    Coba: FUTSALASIK
+                  <span className="text-[11px] font-normal text-slate-400">
+                    Masukkan kode promo untuk dapat diskon
                   </span>
                 </CardTitle>
               </CardHeader>
@@ -595,7 +655,7 @@ export function CheckoutPage() {
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="Masukkan kode promo (misal: FUTSALASIK)"
+                      placeholder="Masukkan kode promo"
                       value={promoInput}
                       onChange={(e) => setPromoInput(e.target.value)}
                       className="flex-1 text-xs uppercase font-mono p-2.5 rounded-lg border border-slate-200 shadow-xs focus:outline-none focus:ring-1 focus:ring-red-600 focus:border-red-600"
@@ -605,9 +665,10 @@ export function CheckoutPage() {
                       variant="outline"
                       size="sm"
                       onClick={handleApplyPromo}
+                      disabled={promoValidating}
                       className="font-bold text-xs"
                     >
-                      Gunakan
+                      {promoValidating ? "Memeriksa..." : "Gunakan"}
                     </Button>
                   </div>
                 )}
@@ -621,7 +682,7 @@ export function CheckoutPage() {
               <div className="border-b border-slate-100 pb-3">
                 <h3 className="font-bold text-base text-slate-900">Rincian Pembayaran</h3>
                 <span className="text-[11px] text-slate-400 font-mono">
-                  Order ID: {existingBooking.bookingCode}
+                  Order ID: {displayBookingCode}
                 </span>
               </div>
 
@@ -698,7 +759,7 @@ export function CheckoutPage() {
       <MidtransSnapModal
         isOpen={isMidtransOpen}
         onClose={() => setIsMidtransOpen(false)}
-        bookingCode={existingBooking.bookingCode}
+        bookingCode={displayBookingCode}
         venueName={venue.name}
         fieldName={field.name}
         totalPrice={finalTotalPrice}

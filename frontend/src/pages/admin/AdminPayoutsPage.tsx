@@ -31,38 +31,15 @@ import {
   Modal,
   TablePagination,
 } from "@/components/ui";
-import { MOCK_PAYOUTS } from "@/lib/mock-data";
+import { TableLoadingSkeleton } from "@/components/common/LoadingStates";
 import { apiClient } from "@/lib/api-client";
 import { formatRupiah, formatDateIndo, PayoutStatus, type Payout } from "@futsal/shared";
 
 type PayoutItem = Payout;
 
-const EXTENDED_PAYOUTS: PayoutItem[] = [
-  ...MOCK_PAYOUTS,
-  {
-    id: "po-3",
-    mitraId: "m2222222-2222-2222-2222-222222222222",
-    amount: 3200000,
-    status: "menunggu",
-    bankName: "Mandiri",
-    bankAccountNumber: "1310098765432",
-    bankAccountHolder: "CV Champion Sport Bandung",
-    createdAt: "2026-10-15T09:10:00+07:00",
-  },
-  {
-    id: "po-4",
-    mitraId: "m4444444-4444-4444-4444-444444444444",
-    amount: 500000,
-    status: "ditolak",
-    bankName: "BRI",
-    bankAccountNumber: "002101928374",
-    bankAccountHolder: "Agus Santoso",
-    createdAt: "2026-10-11T10:00:00+07:00",
-  },
-];
-
 export function AdminPayoutsPage() {
   const [payouts, setPayouts] = React.useState<PayoutItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -70,11 +47,14 @@ export function AdminPayoutsPage() {
 
   React.useEffect(() => {
     let isMounted = true;
+    setLoading(true);
     apiClient.get<any[]>("/admin/payouts").then((res) => {
       if (isMounted && res.data && Array.isArray(res.data)) {
         setPayouts(res.data);
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (isMounted) setLoading(false);
+    });
     return () => {
       isMounted = false;
     };
@@ -197,6 +177,10 @@ export function AdminPayoutsPage() {
     showToast(`Pengajuan pencairan saldo ${rejectingPayout.bankAccountHolder} ditolak.`);
     setRejectingPayout(null);
   };
+
+  if (loading) {
+    return <TableLoadingSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

@@ -29,23 +29,36 @@ import {
   TableCell,
   TablePagination,
 } from "@/components/ui";
-import { MOCK_BOOKINGS, MOCK_MITRA_BALANCE, MOCK_VENUES } from "@/lib/mock-data";
+import { LoadingSkeleton } from "@/components/common/LoadingStates";
 import { apiClient } from "@/lib/api-client";
 import { formatRupiah, formatDateIndo, BookingStatus } from "@futsal/shared";
 import { cn } from "@/lib/utils";
 
 export function MitraDashboardPage() {
-  const [balance, setBalance] = React.useState(MOCK_MITRA_BALANCE);
+  const [balance, setBalance] = React.useState<any>(null);
   const [bookings, setBookings] = React.useState<any[]>([]);
-  const [venues, setVenues] = React.useState<any[]>(MOCK_VENUES);
+  const [venues, setVenues] = React.useState<any[]>([]);
+  const [todayOccupancy, setTodayOccupancy] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  // UI state hooks - MUST be before any early return
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState("semua");
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const pageSize = 4;
 
   React.useEffect(() => {
     let isMounted = true;
+    setLoading(true);
+
     apiClient.get<any>("/mitra/dashboard").then((res) => {
       if (isMounted && res.data) {
         if (res.data.balance) setBalance(res.data.balance);
         if (Array.isArray(res.data.recentBookings) && res.data.recentBookings.length > 0) {
           setBookings(res.data.recentBookings);
+        }
+        if (Array.isArray(res.data.todayOccupancy)) {
+          setTodayOccupancy(res.data.todayOccupancy);
         }
       }
     }).catch(() => {});
@@ -54,16 +67,33 @@ export function MitraDashboardPage() {
       if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
         setVenues(res.data);
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (isMounted) setLoading(false);
+    });
 
     return () => {
       isMounted = false;
     };
   }, []);
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState("semua");
-  const [currentPage, setCurrentPage] = React.useState(1);
-  const pageSize = 4;
+
+  // All hooks BEFORE early return
+  // Fallback jika balance belum ter-load
+  const currentBalance = balance || { saldoTotal: 0, saldoTertahan: 0, saldoBisaDicairkan: 0 };
+
+  // Compute occupancy stats from real API data
+  const allSlots = React.useMemo(() => {
+    return todayOccupancy.flatMap((field: any) => 
+      (field.slots || []).map((slot: any) => ({
+        ...slot,
+        fieldName: field.fieldName,
+        venueName: field.venueName,
+      }))
+    );
+  }, [todayOccupancy]);
+
+  const totalSlotsToday = allSlots.length;
+  const occupiedSlotsToday = allSlots.filter((s: any) => s.status === "terisi" || s.status === "dikunci").length;
+  const occupancyPercentage = totalSlotsToday > 0 ? Math.round((occupiedSlotsToday / totalSlotsToday) * 100) : 0;
 
   const filteredBookings = React.useMemo(() => {
     return bookings.filter((b) => {
@@ -89,24 +119,9 @@ export function MitraDashboardPage() {
     return filteredBookings.slice(start, start + pageSize);
   }, [filteredBookings, currentPage]);
 
-  const occupancyData = [
-    { hour: "10:00", occupied: false },
-    { hour: "11:00", occupied: false },
-    { hour: "13:00", occupied: false },
-    { hour: "14:00", occupied: true },
-    { hour: "15:00", occupied: true },
-    { hour: "16:00", occupied: true },
-    { hour: "17:00", occupied: true },
-    { hour: "18:00", occupied: false },
-    { hour: "19:00", occupied: true },
-    { hour: "20:00", occupied: true },
-    { hour: "21:00", occupied: true },
-    { hour: "22:00", occupied: true },
-  ];
-
-  const totalSlotsToday = occupancyData.length;
-  const occupiedSlotsToday = occupancyData.filter((o) => o.occupied).length;
-  const occupancyPercentage = Math.round((occupiedSlotsToday / totalSlotsToday) * 100);
+  if (loading) {
+    return <LoadingSkeleton />;
+  }
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -195,7 +210,7 @@ export function MitraDashboardPage() {
           </div>
           <div className="mt-2.5 sm:mt-3">
             <span className="text-base sm:text-2xl font-bold font-mono text-slate-900 tabular-nums block truncate">
-              {formatRupiah(balance.saldoTotal)}
+              {formatRupiah(currentBalance.saldoTotal)}
             </span>
           </div>
           <p className="text-[11px] text-slate-500 mt-1 truncate">Net komisi 10%</p>
@@ -212,7 +227,7 @@ export function MitraDashboardPage() {
           </div>
           <div className="mt-2.5 sm:mt-3">
             <span className="text-base sm:text-2xl font-bold font-mono text-red-600 tabular-nums block truncate">
-              {formatRupiah(balance.saldoBisaDicairkan)}
+              {formatRupiah(currentBalance.saldoBisaDicairkan)}
             </span>
           </div>
           <div className="mt-1">
@@ -231,46 +246,73 @@ export function MitraDashboardPage() {
         <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 sm:p-5 border-b border-slate-100">
           <div>
             <CardTitle className="text-sm sm:text-base">
-              Status Jam Operasional (10:00 – 22:00 WIB)
+              Status Jam Operasional (07:00 – 22:00 WIB)
             </CardTitle>
             <CardDescription className="text-xs mt-0.5">
-              Pantau ketersediaan jam bermain hari ini
+              Pantau ketersediaan jam bermain hari ini (real-time)
             </CardDescription>
           </div>
           <div className="flex items-center gap-4 text-xs text-slate-600 shrink-0">
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm bg-red-600" /> Terisi
+              <span className="w-2.5 h-2.5 rounded-sm bg-red-600" /> Terisi/Dikunci
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm bg-amber-500" /> Diblokir
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-sm bg-white border border-slate-300" /> Kosong
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm bg-slate-200" /> Lewat
             </span>
           </div>
         </CardHeader>
 
         <CardContent className="p-4 sm:p-5 pt-4">
-          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-2">
-            {occupancyData.map((item) => (
-              <div
-                key={item.hour}
-                className={`p-2 rounded-lg border text-center transition-colors ${
-                  item.occupied
-                    ? "bg-red-50 border-red-200 text-red-700"
-                    : "bg-white border-slate-200 text-slate-600"
-                }`}
-              >
-                <span className="block font-mono text-xs font-bold tabular-nums">
-                  {item.hour}
-                </span>
-                <span
-                  className={`block text-[10px] font-semibold mt-0.5 ${
-                    item.occupied ? "text-red-600" : "text-slate-400"
-                  }`}
-                >
-                  {item.occupied ? "Terisi" : "Kosong"}
-                </span>
-              </div>
-            ))}
-          </div>
+          {todayOccupancy.length === 0 ? (
+            <div className="py-8 text-center text-slate-500 text-xs">
+              Tidak ada data okupansi (belum ada lapangan aktif)
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {todayOccupancy.map((field: any) => (
+                <div key={field.fieldId} className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-xs text-slate-800">{field.fieldName}</span>
+                    <span className="text-[11px] text-slate-500">{field.venueName}</span>
+                  </div>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 xl:grid-cols-12 gap-1.5">
+                    {(field.slots || []).map((slot: any) => {
+                      const isOccupied = slot.status === "terisi" || slot.status === "dikunci";
+                      const isBlocked = slot.status === "diblokir";
+                      const isPast = slot.status === "lewat";
+                      return (
+                        <div
+                          key={slot.hour}
+                          className={`p-1.5 rounded border text-center transition-colors ${
+                            isOccupied
+                              ? "bg-red-50 border-red-200 text-red-700"
+                              : isBlocked
+                              ? "bg-amber-50 border-amber-200 text-amber-700"
+                              : isPast
+                              ? "bg-slate-50 border-slate-200 text-slate-400"
+                              : "bg-white border-slate-200 text-slate-600"
+                          }`}
+                        >
+                          <span className="block font-mono text-[10px] font-bold tabular-nums">
+                            {slot.timeLabel}
+                          </span>
+                          <span className="block text-[9px] font-semibold mt-0.5">
+                            {isOccupied ? "Terisi" : isBlocked ? "Blokir" : isPast ? "Lewat" : "Kosong"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

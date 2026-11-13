@@ -16,7 +16,7 @@ export const PaymentSchema = z.object({
   ]),
   snapToken: z.string().nullable().optional(),
   paidAt: z.string().datetime().nullable().optional(),
-  rawNotification: z.record(z.any()).nullable().optional(),
+  rawNotification: z.record(z.string(), z.any()).nullable().optional(),
   createdAt: z.string().datetime().optional(),
   updatedAt: z.string().datetime().optional(),
 });

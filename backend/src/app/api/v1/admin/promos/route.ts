@@ -23,7 +23,13 @@ const patchPromoSchema = z.object({
   id: z.string().uuid(),
   isActive: z.boolean().optional(),
   quota: z.number().int().min(0).optional(),
-  endDate: z.string().datetime().optional()
+  endDate: z.string().datetime().optional(),
+  code: z.string().min(3).max(30).optional(),
+  discountType: z.enum(["percent", "fixed"]).optional(),
+  discountValue: z.number().int().min(1).optional(),
+  maxDiscount: z.number().int().nullable().optional(),
+  minSpend: z.number().int().min(0).optional(),
+  venueId: z.string().uuid().nullable().optional()
 });
 
 export const GET = withAuth(
@@ -71,7 +77,13 @@ export const PATCH = withAuth(
       .update({
         ...(body.isActive !== undefined ? { is_active: body.isActive } : {}),
         ...(body.quota !== undefined ? { quota: body.quota } : {}),
-        ...(body.endDate !== undefined ? { end_date: body.endDate } : {})
+        ...(body.endDate !== undefined ? { end_date: body.endDate } : {}),
+        ...(body.code !== undefined ? { code: body.code.toUpperCase().trim() } : {}),
+        ...(body.discountType !== undefined ? { discount_type: body.discountType } : {}),
+        ...(body.discountValue !== undefined ? { discount_value: body.discountValue } : {}),
+        ...(body.maxDiscount !== undefined ? { max_discount: body.maxDiscount } : {}),
+        ...(body.minSpend !== undefined ? { min_spend: body.minSpend } : {}),
+        ...(body.venueId !== undefined ? { venue_id: body.venueId } : {})
       })
       .eq("id", body.id)
       .select("*")

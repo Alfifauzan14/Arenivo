@@ -26,7 +26,7 @@ import {
   TablePagination,
   useToast,
 } from "@/components/ui";
-import { MOCK_VENUES, MOCK_SCANS } from "@/lib/mock-data";
+import { MOCK_VENUES } from "@/lib/mock-data";
 import { apiClient } from "@/lib/api-client";
 import { TicketScanResult } from "@futsal/shared";
 import { cn } from "@/lib/utils";

@@ -12,6 +12,7 @@ export const GET = withAuth(
     const mitraId = user.mitraProfile?.id ?? user.id;
     const venueIds = await mitraRepository.venueIds(mitraId);
     const balance = await mitraRepository.balance(mitraId);
+    const todayOccupancy = await mitraRepository.todayOccupancy(mitraId);
 
     if (venueIds.length === 0) {
       return ok(req, {
@@ -20,7 +21,8 @@ export const GET = withAuth(
         totalBookings: 0,
         activeBookings: 0,
         completedBookings: 0,
-        recentBookings: []
+        recentBookings: [],
+        todayOccupancy: []
       });
     }
 
@@ -58,7 +60,8 @@ export const GET = withAuth(
       totalBookings: totalBookings ?? 0,
       activeBookings: activeBookings ?? 0,
       completedBookings: completedBookings ?? 0,
-      recentBookings: camelize(recentBookings ?? [])
+      recentBookings: camelize(recentBookings ?? []),
+      todayOccupancy
     });
   },
   { allowedRoles: [UserRole.MITRA, UserRole.ADMIN] }

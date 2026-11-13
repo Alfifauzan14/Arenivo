@@ -36,16 +36,30 @@ import {
   Modal,
   TablePagination,
 } from "@/components/ui";
-import { MOCK_MITRA_PROFILES } from "@/lib/mock-data";
+import { TableLoadingSkeleton } from "@/components/common/LoadingStates";
 import { apiClient } from "@/lib/api-client";
 import { formatDateIndo, MitraVerificationStatus, AccountStatus } from "@futsal/shared";
 
-type MitraItem = (typeof MOCK_MITRA_PROFILES)[number] & {
+interface MitraItem {
+  id: string;
+  businessName: string;
+  businessAddress: string;
+  email: string;
+  phone: string;
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountHolder: string;
+  documentUrl: string;
+  verificationStatus: string;
+  rejectionReason: string | null;
+  verifiedAt?: string;
+  verifiedBy?: string;
   accountStatus?: "aktif" | "diblokir";
-};
+}
 
 export function AdminMitraPage() {
   const [mitraList, setMitraList] = React.useState<MitraItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterVerification, setFilterVerification] = React.useState<string>("all");
@@ -55,11 +69,14 @@ export function AdminMitraPage() {
 
   React.useEffect(() => {
     let isMounted = true;
+    setLoading(true);
     apiClient.get<any[]>("/admin/mitra").then((res) => {
       if (isMounted && res.data && Array.isArray(res.data)) {
         setMitraList(res.data);
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (isMounted) setLoading(false);
+    });
     return () => {
       isMounted = false;
     };
@@ -194,6 +211,10 @@ export function AdminMitraPage() {
       `Akun mitra ${mitra.businessName} telah diubah menjadi ${newStatus.toUpperCase()}.`
     );
   };
+
+  if (loading) {
+    return <TableLoadingSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

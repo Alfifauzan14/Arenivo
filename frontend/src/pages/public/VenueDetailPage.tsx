@@ -31,7 +31,6 @@ import { apiClient } from "@/lib/api-client";
 import {
   MOCK_VENUES,
   MOCK_FIELDS,
-  MOCK_REVIEWS,
   MOCK_FACILITIES,
   generateMockSlots,
 } from "@/lib/mock-data";
@@ -176,7 +175,7 @@ export function VenueDetailPage() {
 
     return [
       {
-        id: `fld-${venue.id}-1`,
+        id: "f1111111-1111-1111-1111-111111111111",
         venueId: venue.id,
         fieldTypeId: "t1111111-1111-1111-1111-111111111111",
         name: "Lapangan A (Vinyl Pro)",
@@ -191,7 +190,7 @@ export function VenueDetailPage() {
         },
       },
       {
-        id: `fld-${venue.id}-2`,
+        id: "f2222222-2222-2222-2222-222222222222",
         venueId: venue.id,
         fieldTypeId: "t2222222-2222-2222-2222-222222222222",
         name: "Lapangan B (Interlock Elite)",
@@ -373,12 +372,26 @@ export function VenueDetailPage() {
     return `${startHour}:00 - ${endHour}:00 (${selectedSlots.length} Jam)`;
   }, [selectedSlots]);
 
-  // 5. Ulasan untuk venue ini
-  const venueReviews: Review[] = React.useMemo(() => {
-    const list = MOCK_REVIEWS.filter((r) => r.venueId === venue.id);
-    if (list.length > 0) return list;
-    return MOCK_REVIEWS;
-  }, [venue.id]);
+  // 5. Ulasan untuk venue ini (fetch from API)
+  const [venueReviews, setVenueReviews] = React.useState<Review[]>([]);
+
+  React.useEffect(() => {
+    if (!venue?.id) return;
+    let active = true;
+    apiClient
+      .get<Review[]>(`/venues/${venue.slug}/reviews`, { limit: 20 })
+      .then((res) => {
+        if (active && res.data) {
+          setVenueReviews(Array.isArray(res.data) ? res.data : []);
+        }
+      })
+      .catch(() => {
+        // Reviews optional — leave empty
+      });
+    return () => {
+      active = false;
+    };
+  }, [venue?.id, venue?.slug]);
 
   // Helper YouTube Embed
   const youtubeEmbedUrl = React.useMemo(() => {
@@ -395,7 +408,7 @@ export function VenueDetailPage() {
     if (venue.rules) {
       return venue.rules
         .split("\n")
-        .map((r) => r.replace(/^\d+[\.\)]\s*/, "").trim())
+        .map((r) => r.replace(/^\d+[.)]\s*/, "").trim())
         .filter(Boolean);
     }
     return [
@@ -438,8 +451,11 @@ export function VenueDetailPage() {
     const startHour = sorted[0].hour;
     const hoursCount = selectedSlots.length;
 
+    // Generate temporary pre-booking ID yang unik setiap sesi pemesanan
+    const tempBookingId = "bk-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
+
     navigate(
-      `/checkout/bk-22222222-2222-2222-2222-222222222222?venueId=${venue.id}&fieldId=${selectedField.id}&date=${selectedDate}&startHour=${startHour}&hours=${hoursCount}&total=${totalPrice}`
+      `/checkout/${tempBookingId}?venueSlug=${venue.slug}&venueId=${venue.id}&fieldId=${selectedField.id}&date=${selectedDate}&startHour=${startHour}&hours=${hoursCount}&total=${totalPrice}`
     );
   };
 
@@ -488,6 +504,8 @@ export function VenueDetailPage() {
           <img
             src={activePhoto}
             alt={venue.name}
+            loading="eager"
+            decoding="async"
             className="w-full h-full object-cover transition-all duration-300"
           />
 
@@ -950,6 +968,8 @@ export function VenueDetailPage() {
                       <img
                         src={fieldPhoto}
                         alt={field.name}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover"
                       />
                       <button

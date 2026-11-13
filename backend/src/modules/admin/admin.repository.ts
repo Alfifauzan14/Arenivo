@@ -16,7 +16,12 @@ export const adminRepository = {
     if (p.q) q = q.ilike("business_name", `%${p.q}%`);
     const { data, error, count } = await q;
     dbError(error);
-    return { rows: camelize<any[]>(data || []), total: count || 0 };
+    // Merge mitra_profiles.phone with profiles.phone for display
+    const rows = camelize<any[]>(data || []).map((r: any) => ({
+      ...r,
+      phone: r.phone || r.profile?.phone || null
+    }));
+    return { rows, total: count || 0 };
   },
 
   /** Dokumen usaha privat: berikan signed URL berumur pendek */
@@ -126,6 +131,20 @@ export const adminRepository = {
     const { data, error } = await supabaseAdmin.from("system_settings").select("*");
     dbError(error);
     return Object.fromEntries((data || []).map((r: any) => [r.key, r.value]));
+  },
+
+  async reviews(p: { q?: string; from: number; to: number }) {
+    let q = supabaseAdmin
+      .from("reviews")
+      .select("*, user:profiles(full_name, avatar_url), venue:venues(name)", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(p.from, p.to);
+    if (p.q) {
+      q = q.or(`comment.ilike.%${p.q}%,user.full_name.ilike.%${p.q}%,venue.name.ilike.%${p.q}%`);
+    }
+    const { data, error, count } = await q;
+    dbError(error);
+    return { rows: camelize<any[]>(data || []), total: count || 0 };
   },
 
   async updateSettings(adminId: string, patch: Record<string, unknown>) {

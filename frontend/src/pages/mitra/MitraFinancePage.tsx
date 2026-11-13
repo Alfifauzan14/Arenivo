@@ -28,10 +28,6 @@ import {
   TablePagination,
   useToast,
 } from "@/components/ui";
-import {
-  MOCK_MITRA_BALANCE,
-  MOCK_PAYOUTS,
-} from "@/lib/mock-data";
 import { apiClient } from "@/lib/api-client";
 import { formatRupiah, formatDateIndo } from "@futsal/shared";
 import { cn } from "@/lib/utils";

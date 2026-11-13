@@ -18,15 +18,61 @@ import {
   X,
   ExternalLink,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { BrandLogoIcon } from "@/components/common/BrandLogo";
 import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
 import { cn } from "@/lib/utils";
+import { useSession } from "@/features/auth/context/SessionContext";
 
 export function AdminLayout() {
+  const { user, isLoggedIn } = useSession();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const [authorized, setAuthorized] = React.useState(false);
+
+  // Protect admin routes - only allow admin role
+  React.useEffect(() => {
+    const checkAuth = async () => {
+      const adminFlag = localStorage.getItem("futsal_admin_authenticated");
+      if (!isLoggedIn || !adminFlag || user?.role !== "admin") {
+        localStorage.removeItem("futsal_admin_authenticated");
+        navigate("/admin/login", { replace: true });
+      } else {
+        setAuthorized(true);
+      }
+    };
+    checkAuth();
+  }, [isLoggedIn, user, navigate]);
+
+  // Show loader while checking auth
+  if (!authorized) {
+    return (
+      <div className="bg-slate-50 min-h-screen py-12 px-4 flex flex-col justify-center items-center text-slate-900 relative">
+        <CleanBackgroundPattern variant="subtle" />
+        <div className="w-full max-w-sm space-y-6 relative z-10">
+          <div className="text-center space-y-2">
+            <Link to="/" className="inline-block hover:opacity-90 transition-opacity">
+              <BrandLogoIcon size="lg" className="w-14 h-14 mx-auto" />
+            </Link>
+            <h1 className="text-xl font-black text-slate-900 tracking-tight">
+              Aren<span className="text-red-600">ivo</span> Admin
+            </h1>
+            <p className="text-xs text-slate-500">
+              Memverifikasi akses administrator...
+            </p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 text-red-600 animate-spin" />
+              <span className="text-sm text-slate-600">Mengalihkan ke login...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const menuSections = [
     {
@@ -84,6 +130,8 @@ export function AdminLayout() {
 
   const handleLogout = () => {
     localStorage.removeItem("futsal_admin_authenticated");
+    localStorage.removeItem("sb_access_token");
+    localStorage.removeItem("futsal_logged_in");
     navigate("/admin/login");
   };
 

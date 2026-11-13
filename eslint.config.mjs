@@ -12,6 +12,8 @@ export default tsPlugin.config(
       "**/coverage/**",
       "**/supabase/migrations/**",
       "**/*.d.ts",
+      ".opencode/**",
+      "backend/scripts/**",
     ],
   },
   js.configs.recommended,

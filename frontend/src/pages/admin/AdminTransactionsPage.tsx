@@ -32,7 +32,8 @@ import {
   Modal,
   TablePagination,
 } from "@/components/ui";
-import { MOCK_BOOKINGS, MOCK_PAYMENTS } from "@/lib/mock-data";
+import { TableLoadingSkeleton } from "@/components/common/LoadingStates";
+import { MOCK_PAYMENTS } from "@/lib/mock-data";
 import { apiClient } from "@/lib/api-client";
 import { formatRupiah, formatDateIndo, type Booking } from "@futsal/shared";
 
@@ -43,14 +44,18 @@ export function AdminTransactionsPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
   const [bookings, setBookings] = React.useState<Booking[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     let isMounted = true;
+    setLoading(true);
     apiClient.get<any[]>("/admin/bookings").then((res) => {
       if (isMounted && res.data && Array.isArray(res.data)) {
         setBookings(res.data);
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (isMounted) setLoading(false);
+    });
     return () => {
       isMounted = false;
     };
@@ -76,6 +81,10 @@ export function AdminTransactionsPage() {
   const getPaymentForBooking = (bookingId: string) => {
     return MOCK_PAYMENTS.find((p) => p.bookingId === bookingId);
   };
+
+  if (loading) {
+    return <TableLoadingSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

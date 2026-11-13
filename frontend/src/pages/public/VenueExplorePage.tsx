@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { Button, Input, Select, Card } from "@/components/ui";
 import { VenueCard } from "@/features/venue/components/VenueCard";
-import { MOCK_VENUES, MOCK_CITIES, MOCK_FACILITIES, MOCK_FIELD_TYPES } from "@/lib/mock-data";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/features/auth/context/SessionContext";
 import { formatRupiah } from "@futsal/shared";

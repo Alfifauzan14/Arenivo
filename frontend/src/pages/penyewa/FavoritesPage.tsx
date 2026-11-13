@@ -3,14 +3,45 @@ import { Link } from "react-router-dom";
 import { Heart, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/features/auth/context/SessionContext";
-import { MOCK_VENUES } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { VenueCard } from "@/features/venue/components/VenueCard";
+import type { Venue } from "@futsal/shared";
 
 export function FavoritesPage() {
   const { favorites } = useSession();
+  const [venues, setVenues] = React.useState<Venue[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
-  const favoritedVenues = React.useMemo(() => {
-    return MOCK_VENUES.filter((v) => favorites.includes(v.id));
+  React.useEffect(() => {
+    let isMounted = true;
+    if (favorites.length === 0) {
+      setVenues([]);
+      setLoading(false);
+      return;
+    }
+
+    // Fetch favorites langsung dari API /me/favorites (backend sudah join venue data)
+    setLoading(true);
+    apiClient.get<any[]>("/me/favorites")
+      .then((res) => {
+        if (!isMounted) return;
+        setVenues((Array.isArray(res.data) ? res.data : []) as Venue[]);
+      })
+      .catch(() => {
+        // Fallback: fetch semua venue lalu filter
+        if (!isMounted) return;
+        apiClient.get<any[]>("/venues", { limit: 50 })
+          .then((r) => {
+            if (!isMounted) return;
+            const all = Array.isArray(r.data) ? r.data : [];
+            setVenues(all.filter((v) => favorites.includes(v.id)) as Venue[]);
+          })
+          .catch(() => {});
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+    return () => { isMounted = false; };
   }, [favorites]);
 
   return (
@@ -30,7 +61,7 @@ export function FavoritesPage() {
           </div>
 
           <span className="text-xs font-mono font-bold text-red-700 bg-white px-3 py-1.5 rounded-lg border border-white shadow-xs self-start sm:self-auto">
-            {favoritedVenues.length} venue tersimpan
+            {venues.length} venue tersimpan
           </span>
         </div>
       </section>
@@ -38,9 +69,9 @@ export function FavoritesPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
 
         {/* Content: Cards Grid or Empty State */}
-        {favoritedVenues.length > 0 ? (
+        {venues.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {favoritedVenues.map((venue) => (
+            {venues.map((venue) => (
               <VenueCard key={venue.id} venue={venue} />
             ))}
           </div>

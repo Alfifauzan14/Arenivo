@@ -151,7 +151,9 @@ export function AuthPage() {
               email: email.trim(),
               phone: phone.trim(),
             });
-          } catch {}
+          } catch {
+            // Profil opsional — pendaftaran akun tetap berlanjut
+          }
 
           if (data.session) {
             localStorage.setItem("sb_access_token", data.session.access_token);

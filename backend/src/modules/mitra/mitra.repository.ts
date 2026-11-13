@@ -2,7 +2,86 @@ import { AppError, ErrorCode } from "@futsal/shared";
 import { supabaseAdmin } from "../../lib/supabase";
 import { rpc, camelize, dbError, orNotFound } from "../../lib/http";
 
+const WIB_OFFSET = 7 * 60 * 60000; // WIB is UTC+7 in milliseconds
+
 export const mitraRepository = {
+  /** Get today's occupancy for all fields of a mitra */
+  async todayOccupancy(mitraId: string) {
+    const ids = await this.venueIds(mitraId);
+    if (!ids.length) return [];
+
+    const nowUtc = new Date();
+    // Convert to WIB for date calculation
+    const wibNow = new Date(nowUtc.getTime() + WIB_OFFSET);
+    const yyyy = wibNow.getUTCFullYear();
+    const mm = String(wibNow.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(wibNow.getUTCDate()).padStart(2, "0");
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    const currentWibHour = wibNow.getUTCHours();
+
+    const { data: fields } = await supabaseAdmin
+      .from("fields")
+      .select("id, name, venue:venues!inner(id, name)")
+      .in("venue_id", ids)
+      .eq("status", "aktif") as any;
+    
+    if (!fields || fields.length === 0) return [];
+
+    const fieldIds = fields.map((f: any) => f.id);
+    
+    // Get slot reservations for today (stored as UTC in DB)
+    const { data: reservations } = await supabaseAdmin
+      .from("slot_reservations")
+      .select("field_id, slot_start, type, booking_id, booking:bookings!inner(status, expires_at)")
+      .in("field_id", fieldIds)
+      .eq("is_active", true)
+      .gte("slot_start", `${dateStr}T00:00:00+07:00`)
+      .lt("slot_start", `${dateStr}T23:59:59+07:00`);
+
+    const byField = new Map<string, Map<number, any>>();
+    
+    for (const res of reservations || []) {
+      if (!byField.has(res.field_id)) byField.set(res.field_id, new Map());
+      const fieldMap = byField.get(res.field_id)!;
+      // Convert slot_start from UTC to WIB hour
+      const slotStartUtc = new Date(res.slot_start).getTime();
+      const slotStartWib = new Date(slotStartUtc + WIB_OFFSET);
+      const wibHour = slotStartWib.getUTCHours();
+      const booking = Array.isArray(res.booking) ? res.booking[0] : res.booking;
+      let status = "tersedia";
+      if (res.type === "blokir") status = "diblokir";
+      else if (booking?.status === "menunggu_bayar") {
+        if (booking?.expires_at && new Date(booking.expires_at).getTime() > nowUtc.getTime()) {
+          status = "dikunci";
+        }
+      } else if (booking) status = "terisi";
+      fieldMap.set(wibHour, { status, bookingId: res.booking_id });
+    }
+
+    const result = [];
+    for (const field of fields) {
+      const fieldReservations = byField.get(field.id) || new Map();
+      const slots = [];
+      for (let hour = 7; hour <= 22; hour++) {
+        const res = fieldReservations.get(hour);
+        let status = res?.status;
+        if (!status) {
+          // Only mark as "lewat" if current WIB hour is strictly past this slot
+          status = hour < currentWibHour ? "lewat" : "tersedia";
+        }
+        slots.push({
+          hour,
+          timeLabel: `${String(hour).padStart(2, "0")}.00 - ${String((hour + 1) % 24).padStart(2, "0")}.00`,
+          status,
+          bookingId: res?.bookingId || null,
+        });
+      }
+      const venueName = Array.isArray(field.venue) ? field.venue[0]?.name : field.venue?.name;
+      result.push({ fieldId: field.id, fieldName: field.name, venueName, slots });
+    }
+    return result;
+  },
+
   async venueIds(mitraId: string): Promise<string[]> {
     const { data, error } = await supabaseAdmin.from("venues").select("id").eq("mitra_id", mitraId);
     dbError(error);

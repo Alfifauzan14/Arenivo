@@ -21,7 +21,6 @@ import {
   useToast,
 } from "@/components/ui";
 import { MOCK_FIELDS, generateMockSlots } from "@/lib/mock-data";
-import { apiClient } from "@/lib/api-client";
 import {
   SlotStatus,
   formatRupiah,

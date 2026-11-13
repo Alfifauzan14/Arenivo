@@ -43,12 +43,7 @@ export function publicRoute<C = any>(fn: (req: Request, ctx: C) => Promise<NextR
 }
 
 export async function parseBody<T>(req: Request, schema: ZodSchema<T>): Promise<T> {
-  let raw: unknown = {};
-  try {
-    raw = await req.json();
-  } catch {
-    raw = {};
-  }
+  const raw: unknown = await req.json().catch(() => ({}));
   return schema.parse(raw);
 }
 

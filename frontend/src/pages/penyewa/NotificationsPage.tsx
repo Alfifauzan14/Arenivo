@@ -26,28 +26,39 @@ export function NotificationsPage() {
   React.useEffect(() => {
     let isMounted = true;
     apiClient.get<any[]>("/me/notifications").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (!isMounted) return;
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
         setNotifications(res.data);
-      } else if (isMounted && notifications.length === 0) {
+      } else {
         setNotifications(MOCK_NOTIFICATIONS);
       }
     }).catch(() => {
-      if (isMounted && notifications.length === 0) setNotifications(MOCK_NOTIFICATIONS);
+      if (isMounted) setNotifications(MOCK_NOTIFICATIONS);
     });
     return () => { isMounted = false; };
   }, []);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  const handleMarkAllRead = () => {
+  const handleMarkAllRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    try {
+      await apiClient.patch("/me/notifications", {});
+    } catch {
+      // Silent fail — UI already updated optimistically
+    }
     addToast("success", "Semua notifikasi telah ditandai sebagai dibaca.", "Notifikasi Dibaca");
   };
 
-  const handleMarkItemRead = (id: string) => {
+  const handleMarkItemRead = async (id: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
     );
+    try {
+      await apiClient.patch("/me/notifications", { ids: [id] });
+    } catch {
+      // Silent fail — UI already updated optimistically
+    }
   };
 
   const filtered = React.useMemo(() => {

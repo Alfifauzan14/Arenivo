@@ -8,7 +8,7 @@ import {
   DollarSign,
   Clock,
   Sparkles,
-  ShieldAlert,
+  Loader2,
 } from "lucide-react";
 import {
   Card,
@@ -18,25 +18,27 @@ import {
   CardContent,
   CardFooter,
   Button,
-  Input,
   Select,
 } from "@/components/ui";
-import { MOCK_SYSTEM_CONFIG } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
+import { LoadingSkeleton, ErrorState } from "@/components/common/LoadingStates";
 import { AiProvider, type SystemConfig } from "@futsal/shared";
 
-export function AdminSettingsPage() {
-  const [config, setConfig] = React.useState<SystemConfig>(() => {
-    const saved = localStorage.getItem("futsal_system_settings");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        // fallback
-      }
-    }
-    return MOCK_SYSTEM_CONFIG;
-  });
+const DEFAULT_CONFIG: SystemConfig = {
+  bookingExpirationMinutes: 15,
+  maxBookingDaysAhead: 30,
+  defaultPlatformCommissionPercent: 10,
+  defaultServiceFeeRupiah: 5000,
+  minPayoutAmountRupiah: 100000,
+  scannerEarlyCheckinMinutes: 30,
+  primaryAiProvider: AiProvider.GEMINI,
+};
 
+export function AdminSettingsPage() {
+  const [config, setConfig] = React.useState<SystemConfig>(DEFAULT_CONFIG);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [saving, setSaving] = React.useState(false);
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -44,18 +46,85 @@ export function AdminSettingsPage() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleSave = () => {
-    localStorage.setItem("futsal_system_settings", JSON.stringify(config));
-    showToast(
-      "Konfigurasi platform berhasil diperbarui dan diterapkan ke seluruh sistem secara dinamis!"
-    );
+  // Fetch config from API on mount
+  React.useEffect(() => {
+    let active = true;
+    setLoading(true);
+    apiClient
+      .get<Record<string, any>>("/admin/settings")
+      .then((res) => {
+        if (!active) return;
+        const data = res.data || {};
+        // system_settings returns key->value map; each value may be a nested object
+        const cfg: SystemConfig = {
+          bookingExpirationMinutes: Number(data.bookingExpirationMinutes?.value ?? data.bookingExpirationMinutes ?? 15),
+          maxBookingDaysAhead: Number(data.maxBookingDaysAhead?.value ?? data.maxBookingDaysAhead ?? 30),
+          defaultPlatformCommissionPercent: Number(data.defaultPlatformCommissionPercent?.value ?? data.defaultPlatformCommissionPercent ?? 10),
+          defaultServiceFeeRupiah: Number(data.defaultServiceFeeRupiah?.value ?? data.defaultServiceFeeRupiah ?? 5000),
+          minPayoutAmountRupiah: Number(data.minPayoutAmountRupiah?.value ?? data.minPayoutAmountRupiah ?? 100000),
+          scannerEarlyCheckinMinutes: Number(data.scannerEarlyCheckinMinutes?.value ?? data.scannerEarlyCheckinMinutes ?? 30),
+          primaryAiProvider: (data.primaryAiProvider?.value ?? data.primaryAiProvider ?? AiProvider.GEMINI) as any,
+        };
+        setConfig(cfg);
+        setError(null);
+      })
+      .catch((err: any) => {
+        if (active) setError(err?.data?.error?.message || "Gagal memuat pengaturan.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      // Save each config value as a system_settings row
+      const patch: Record<string, unknown> = {};
+      (Object.keys(config) as (keyof SystemConfig)[]).forEach((key) => {
+        patch[key] = config[key];
+      });
+      await apiClient.patch("/admin/settings", patch);
+      showToast("Konfigurasi platform berhasil disimpan dan diterapkan ke seluruh sistem.");
+    } catch (err: any) {
+      showToast(err?.data?.error?.message || "Gagal menyimpan konfigurasi.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleReset = () => {
-    setConfig(MOCK_SYSTEM_CONFIG);
-    localStorage.setItem("futsal_system_settings", JSON.stringify(MOCK_SYSTEM_CONFIG));
-    showToast("Pengaturan sistem dikembalikan ke nilai default standar.");
+    setConfig(DEFAULT_CONFIG);
+    showToast("Pengaturan dikembalikan ke nilai default. Klik Simpan untuk menerapkan.");
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 w-64 bg-slate-200 rounded animate-pulse" />
+        <LoadingSkeleton />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        message={error}
+        onRetry={() => {
+          setError(null);
+          setLoading(true);
+          apiClient
+            .get("/admin/settings")
+            .then(() => window.location.reload())
+            .finally(() => setLoading(false));
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -281,10 +350,20 @@ export function AdminSettingsPage() {
           <Button
             size="sm"
             onClick={handleSave}
+            disabled={saving}
             className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
           >
-            <Save className="w-3.5 h-3.5 mr-1.5" />
-            Simpan Konfigurasi
+            {saving ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                Menyimpan...
+              </>
+            ) : (
+              <>
+                <Save className="w-3.5 h-3.5 mr-1.5" />
+                Simpan Konfigurasi
+              </>
+            )}
           </Button>
         </CardFooter>
       </Card>

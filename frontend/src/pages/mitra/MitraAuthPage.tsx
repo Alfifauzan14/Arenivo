@@ -260,7 +260,9 @@ export function MitraAuthPage() {
             bankAccountNumber: bankAccountNumber.trim(),
             bankAccountHolder: bankAccountHolder.trim(),
           });
-        } catch {}
+        } catch {
+          // Sinkronisasi profil mitra gagal — pendaftaran tetap dianggap berhasil
+        }
 
         setIsLoading(false);
         addToast("success", "Pendaftaran berhasil diajukan! Berkas Anda sedang ditinjau oleh Super Admin.", "Pengajuan Kemitraan Terkirim");

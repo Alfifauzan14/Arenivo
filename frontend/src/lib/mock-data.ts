@@ -94,21 +94,21 @@ export const MOCK_VENUES: Venue[] = [
       {
         id: "p1",
         venueId: "v1111111-1111-1111-1111-111111111111",
-        url: "https://images.unsplash.com/photo-1575361204480-aadea25e6e68?auto=format&fit=crop&w=1200&q=80",
+        url: "https://images.unsplash.com/photo-1579952363873-27f5b4c4f5b2?auto=format&fit=crop&w=600&q=80",
         isCover: true,
         sortOrder: 0,
       },
       {
         id: "p2",
         venueId: "v1111111-1111-1111-1111-111111111111",
-        url: "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?auto=format&fit=crop&w=1200&q=80",
+        url: "https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=600&q=80",
         isCover: false,
         sortOrder: 1,
       },
       {
         id: "p3",
         venueId: "v1111111-1111-1111-1111-111111111111",
-        url: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80",
+        url: "https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=600&q=80",
         isCover: false,
         sortOrder: 2,
       },
@@ -142,14 +142,14 @@ export const MOCK_VENUES: Venue[] = [
       {
         id: "p4",
         venueId: "v2222222-2222-2222-2222-222222222222",
-        url: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80",
+        url: "https://images.unsplash.com/photo-1612225220822-30ab95978d91?auto=format&fit=crop&w=600&q=80",
         isCover: true,
         sortOrder: 0,
       },
       {
         id: "p5",
         venueId: "v2222222-2222-2222-2222-222222222222",
-        url: "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?auto=format&fit=crop&w=1200&q=80",
+        url: "https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=600&q=80",
         isCover: false,
         sortOrder: 1,
       },
@@ -183,7 +183,7 @@ export const MOCK_VENUES: Venue[] = [
       {
         id: "p6",
         venueId: "v3333333-3333-3333-3333-333333333333",
-        url: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80",
+        url: "https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=600&q=80",
         isCover: true,
         sortOrder: 0,
       },
@@ -217,7 +217,7 @@ export const MOCK_VENUES: Venue[] = [
       {
         id: "p7",
         venueId: "v4444444-4444-4444-4444-444444444444",
-        url: "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?auto=format&fit=crop&w=1200&q=80",
+        url: "https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=600&q=80",
         isCover: true,
         sortOrder: 0,
       },
@@ -246,7 +246,7 @@ export const MOCK_VENUES: Venue[] = [
       {
         id: "p8",
         venueId: "v5555555-5555-5555-5555-555555555555",
-        url: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80",
+        url: "https://images.unsplash.com/photo-1612225220822-30ab95978d91?auto=format&fit=crop&w=600&q=80",
         isCover: true,
         sortOrder: 0,
       },
@@ -275,7 +275,7 @@ export const MOCK_VENUES: Venue[] = [
       {
         id: "p9",
         venueId: "v6666666-6666-6666-6666-666666666666",
-        url: "https://images.unsplash.com/photo-1575361204480-aadea25e6e68?auto=format&fit=crop&w=1200&q=80",
+        url: "https://images.unsplash.com/photo-1579952363873-27f5b4c4f5b2?auto=format&fit=crop&w=600&q=80",
         isCover: true,
         sortOrder: 0,
       },
@@ -286,7 +286,7 @@ export const MOCK_VENUES: Venue[] = [
 
 export const MOCK_FIELDS: Field[] = [
   {
-    id: "fld-1",
+    id: "f1111111-1111-1111-1111-111111111111",
     venueId: MOCK_VENUES[0].id,
     fieldTypeId: MOCK_FIELD_TYPES[0].id,
     name: "Lapangan A (Vinyl Pro)",
@@ -297,7 +297,7 @@ export const MOCK_FIELDS: Field[] = [
     fieldType: MOCK_FIELD_TYPES[0],
   },
   {
-    id: "fld-2",
+    id: "f2222222-2222-2222-2222-222222222222",
     venueId: MOCK_VENUES[0].id,
     fieldTypeId: MOCK_FIELD_TYPES[1].id,
     name: "Lapangan B (Interlock Elite)",
@@ -308,7 +308,7 @@ export const MOCK_FIELDS: Field[] = [
     fieldType: MOCK_FIELD_TYPES[1],
   },
   {
-    id: "fld-3",
+    id: "f3333333-3333-3333-3333-333333333333",
     venueId: MOCK_VENUES[1].id,
     fieldTypeId: MOCK_FIELD_TYPES[3].id,
     name: "Mini Soccer Lapangan 1",
@@ -319,7 +319,7 @@ export const MOCK_FIELDS: Field[] = [
     fieldType: MOCK_FIELD_TYPES[3],
   },
   {
-    id: "fld-4",
+    id: "f4444444-4444-4444-4444-444444444444",
     venueId: MOCK_VENUES[1].id,
     fieldTypeId: MOCK_FIELD_TYPES[3].id,
     name: "Mini Soccer Lapangan 2",
@@ -330,7 +330,7 @@ export const MOCK_FIELDS: Field[] = [
     fieldType: MOCK_FIELD_TYPES[3],
   },
   {
-    id: "fld-5",
+    id: "f5555555-5555-5555-5555-555555555555",
     venueId: MOCK_VENUES[2].id,
     fieldTypeId: MOCK_FIELD_TYPES[1].id,
     name: "Lapangan Utama Darmo",
@@ -438,7 +438,7 @@ export const MOCK_NOTIFICATIONS: InAppNotification[] = [
 // 7. Data Slot Jadwal Per Jam (Matriks Ketersediaan)
 // -----------------------------------------------------------------------------
 export function generateMockSlots(fieldId: string, dateStr: string): SlotItem[] {
-  const isMini = fieldId === "fld-3" || fieldId === "fld-4";
+  const isMini = fieldId === "f3333333-3333-3333-3333-333333333333" || fieldId === "f4444444-4444-4444-4444-444444444444";
   const basePrice = isMini ? 350000 : 175000;
   const hours = [
     { hour: 8, status: SlotStatus.LEWAT },
@@ -671,18 +671,18 @@ export const MOCK_PAYOUTS: Payout[] = [
 export const MOCK_BANNERS: Banner[] = [
   {
     id: "b1",
-    title: "Main Futsal Malam Hemat Diskon 20%!",
+    title: "Diskon 25% Main Malam Futsal & Mini Soccer",
     imageUrl:
-      "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=600&q=80",
     linkUrl: "/venues",
     sortOrder: 0,
     isActive: true,
   },
   {
     id: "b2",
-    title: "Turnamen Mini Soccer Komunitas Akhir Pekan",
+    title: "Spesial Hari Olahraga: Cashback Rp50.000 QRIS",
     imageUrl:
-      "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=600&q=80",
     linkUrl: "/venues",
     sortOrder: 1,
     isActive: true,
@@ -691,7 +691,7 @@ export const MOCK_BANNERS: Banner[] = [
     id: "b3",
     title: "Garansi 100% Bebas Double Booking dengan Sistem Real-Time",
     imageUrl:
-      "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1612225220822-30ab95978d91?auto=format&fit=crop&w=600&q=80",
     linkUrl: "/venues",
     sortOrder: 2,
     isActive: true,

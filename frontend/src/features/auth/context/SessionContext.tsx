@@ -1,6 +1,7 @@
 import * as React from "react";
 import type { Profile } from "@futsal/shared";
 import { supabase } from "@/lib/supabase";
+import { apiClient } from "@/lib/api-client";
 
 interface SessionContextType {
   user: Profile | null;
@@ -18,14 +19,7 @@ const SessionContext = React.createContext<SessionContextType | undefined>(undef
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = React.useState<Profile | null>(null);
   const [isLoggedIn, setIsLoggedIn] = React.useState<boolean>(false);
-  const [favorites, setFavorites] = React.useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem("futsal_favorites");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [favorites, setFavorites] = React.useState<string[]>([]);
 
   const loadUserProfile = React.useCallback(async (userId: string, userMeta?: any, email?: string) => {
     try {
@@ -46,6 +40,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           status: profile.status || "aktif",
         });
         setIsLoggedIn(true);
+
+        // Load favorites dari API (bukan localStorage)
+        try {
+          const favRes = await apiClient.get<any[]>("/me/favorites");
+          if (favRes.data && Array.isArray(favRes.data)) {
+            setFavorites(favRes.data.map((v: any) => v.id));
+          }
+        } catch {
+          // Favorit API butuh auth — abaikan jika belum login
+        }
         return;
       }
     } catch (err) {
@@ -128,19 +132,26 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut().catch(() => {});
   }, []);
 
-  const toggleFavorite = React.useCallback((venueId: string) => {
-    setFavorites((prev) => {
-      const next = prev.includes(venueId)
-        ? prev.filter((id) => id !== venueId)
-        : [...prev, venueId];
-      try {
-        localStorage.setItem("futsal_favorites", JSON.stringify(next));
-      } catch (e) {
-        console.error("Gagal menyimpan favorit:", e);
+  const toggleFavorite = React.useCallback(async (venueId: string) => {
+    const isFav = favorites.includes(venueId);
+    // Optimistic update
+    setFavorites((prev) =>
+      prev.includes(venueId) ? prev.filter((id) => id !== venueId) : [...prev, venueId]
+    );
+
+    try {
+      if (isFav) {
+        await apiClient.delete(`/me/favorites?venueId=${venueId}`);
+      } else {
+        await apiClient.put("/me/favorites", { venueId });
       }
-      return next;
-    });
-  }, []);
+    } catch {
+      // Revert on error
+      setFavorites((prev) =>
+        prev.includes(venueId) ? prev.filter((id) => id !== venueId) : [...prev, venueId]
+      );
+    }
+  }, [favorites]);
 
   const isFavorite = React.useCallback(
     (venueId: string) => favorites.includes(venueId),

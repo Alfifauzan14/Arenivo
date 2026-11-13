@@ -27,12 +27,14 @@ import {
   Select,
   TablePagination,
 } from "@/components/ui";
-import { MOCK_AUDIT_LOGS, type AuditLogItem } from "@/lib/mock-data";
+import { TableLoadingSkeleton } from "@/components/common/LoadingStates";
+import { type AuditLogItem } from "@/lib/mock-data";
 import { apiClient } from "@/lib/api-client";
 import { formatDateIndo } from "@futsal/shared";
 
 export function AdminAuditLogsPage() {
   const [logs, setLogs] = React.useState<AuditLogItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterAction, setFilterAction] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -40,11 +42,14 @@ export function AdminAuditLogsPage() {
 
   React.useEffect(() => {
     let isMounted = true;
+    setLoading(true);
     apiClient.get<any[]>("/admin/audit-logs").then((res) => {
       if (isMounted && res.data && Array.isArray(res.data)) {
         setLogs(res.data);
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (isMounted) setLoading(false);
+    });
     return () => {
       isMounted = false;
     };
@@ -83,6 +88,10 @@ export function AdminAuditLogsPage() {
         return <Badge variant="neutral">{action}</Badge>;
     }
   };
+
+  if (loading) {
+    return <TableLoadingSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

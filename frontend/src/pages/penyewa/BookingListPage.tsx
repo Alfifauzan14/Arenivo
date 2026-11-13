@@ -18,7 +18,7 @@ import {
   Button,
   Select,
 } from "@/components/ui";
-import { MOCK_BOOKINGS } from "@/lib/mock-data";
+import { LoadingSkeleton } from "@/components/common/LoadingStates";
 import { apiClient } from "@/lib/api-client";
 import {
   formatRupiah,
@@ -75,18 +75,22 @@ export function BookingListPage() {
     {
       id: BookingStatus.DIGUNAKAN,
       label: "Sedang Digunakan",
+      badge: bookings.filter((b) => b.status === BookingStatus.DIGUNAKAN).length,
     },
     {
       id: BookingStatus.SELESAI,
       label: "Selesai",
+      badge: bookings.filter((b) => b.status === BookingStatus.SELESAI).length,
     },
     {
       id: BookingStatus.KEDALUWARSA,
       label: "Kedaluwarsa",
+      badge: bookings.filter((b) => b.status === BookingStatus.KEDALUWARSA).length,
     },
     {
       id: BookingStatus.DIBATALKAN,
       label: "Dibatalkan",
+      badge: bookings.filter((b) => b.status === BookingStatus.DIBATALKAN).length,
     },
   ];
 
@@ -104,6 +108,22 @@ export function BookingListPage() {
       return true;
     });
   }, [activeTab, searchQuery, bookings]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen">
+        <section className="relative bg-gradient-to-r from-red-800 via-red-700 to-red-800 text-white py-6 sm:py-8 md:py-10 overflow-hidden border-b border-red-900/30">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 relative z-10">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Riwayat Booking Lapangan</h1>
+            <p className="text-xs sm:text-sm text-red-100 mt-1">Memuat data booking Anda...</p>
+          </div>
+        </section>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+          <LoadingSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">

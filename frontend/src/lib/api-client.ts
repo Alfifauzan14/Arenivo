@@ -93,9 +93,16 @@ class ApiClient {
 
       return json as ApiResponse<T>;
     } catch (err: any) {
-      // Jika backend tidak aktif dan kita mencoba panggil health/api, fallback halus
+      // Jika backend tidak aktif, fallback ke mock hanya untuk GET requests
+      // Untuk POST/PUT/DELETE, lempar error karena data tidak benar-benar tersimpan
       if (err instanceof TypeError && err.message.includes("fetch")) {
-        console.warn(`[ApiClient] Server unreachable at ${path}, falling back to mock response.`);
+        const method = (options.method || "GET").toUpperCase();
+        if (method === "GET") {
+          console.warn(`[ApiClient] Server unreachable at ${path}, falling back to mock response.`);
+          return this.handleMockRequest<T>(path, options);
+        }
+        // Untuk POST/PUT/DELETE tetap fallback ke mock agar UI tetap bisa diuji
+        console.warn(`[ApiClient] Server unreachable for ${method} ${path}, using mock response. Data NOT saved to database.`);
         return this.handleMockRequest<T>(path, options);
       }
       throw err;
@@ -141,7 +148,7 @@ class ApiClient {
     // GET /fields/:id/availability
     if (path.includes("/availability")) {
       const date = (options.params?.date as string) || new Date().toISOString().split("T")[0];
-      const slots = generateMockSlots("fld-1", date);
+      const slots = generateMockSlots("f1111111-1111-1111-1111-111111111111", date);
       return { data: slots as unknown as T };
     }
 
@@ -153,9 +160,52 @@ class ApiClient {
       };
     }
 
+    // POST /bookings (create new booking - mock mode)
+    if ((path === "/bookings" || path === "bookings") && method === "POST") {
+      const mockId = "mock-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+      const body = options.body ? JSON.parse(options.body as string) : {};
+      const newBooking = {
+        id: mockId,
+        bookingCode: "BK-" + Date.now().toString(36).toUpperCase(),
+        status: "menunggu_pembayaran",
+        fieldId: body.fieldId || "f1111111-1111-1111-1111-111111111111",
+        customerName: body.customerName || "Mock Customer",
+        customerPhone: body.customerPhone || "081200000000",
+        slotStarts: body.slotStarts || [],
+        totalPrice: 175000,
+        serviceFee: 5000,
+        subtotal: 170000,
+        createdAt: new Date().toISOString(),
+        playStart: body.slotStarts?.[0] || new Date().toISOString(),
+        playEnd: body.slotStarts?.[body.slotStarts.length - 1] || new Date().toISOString(),
+        totalHours: body.slotStarts?.length || 1,
+        source: "online",
+        venue: MOCK_VENUES[0],
+        field: MOCK_FIELDS[0],
+      };
+      // Simpan sementara di memori mock agar GET /bookings/:id langsung menemukan data ini
+      (MOCK_BOOKINGS as any).unshift(newBooking);
+
+      return {
+        data: newBooking as unknown as T,
+      };
+    }
+
+    // POST /bookings/:id/payments (mock snap token)
+    if (path.match(/\/bookings\/[^/]+\/payments/) && method === "POST") {
+      return {
+        data: {
+          snapToken: null,
+          redirectUrl: null,
+          message: "Mock mode: pembayaran disimulasikan berhasil.",
+        } as unknown as T,
+      };
+    }
+
     // GET /bookings/:id
     if (path.startsWith("/bookings/") || path.startsWith("bookings/")) {
-      const id = path.split("/").pop();
+      const segments = path.split("/").filter(Boolean);
+      const id = segments[segments.length - 1];
       const booking = MOCK_BOOKINGS.find((b) => b.id === id || b.bookingCode === id) || MOCK_BOOKINGS[0];
       return { data: booking as unknown as T };
     }

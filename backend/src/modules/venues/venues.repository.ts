@@ -3,7 +3,8 @@ import { camelize, dbError, orNotFound } from "../../lib/http";
 
 const VENUE_SELECT = `*, city:cities(*), photos:venue_photos(*),
   facilities:venue_facilities(facility:facilities(*)),
-  fields(id, base_price, status, field_type:field_types(*))`;
+  fields(id, base_price, status, field_type:field_types(*)),
+  mitra:mitra_profiles!inner(verification_status)`;
 
 function shape(row: any) {
   const v = camelize<any>(row);
@@ -30,7 +31,11 @@ export interface VenueFilter {
 
 export const venuesRepository = {
   async list(filter: VenueFilter) {
-    let q = supabaseAdmin.from("venues").select(VENUE_SELECT).eq("status", "aktif");
+    let q = supabaseAdmin
+      .from("venues")
+      .select(VENUE_SELECT)
+      .eq("status", "aktif")
+      .eq("mitra.verification_status", "disetujui");
     if (filter.q) q = q.ilike("name", `%${filter.q}%`);
     if (filter.cityId) q = q.eq("city_id", filter.cityId);
     if (filter.minRating) q = q.gte("rating_avg", filter.minRating);
@@ -55,6 +60,7 @@ export const venuesRepository = {
       .select(VENUE_SELECT + ", refund_rules(*)")
       .eq("slug", slug)
       .eq("status", "aktif")
+      .eq("mitra.verification_status", "disetujui")
       .maybeSingle();
     dbError(error);
     return shape(orNotFound(data));

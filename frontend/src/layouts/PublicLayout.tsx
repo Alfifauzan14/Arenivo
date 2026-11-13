@@ -9,11 +9,8 @@ import {
   ChevronRight,
   Clock,
   Compass,
-  Facebook,
   Heart,
   HelpCircle,
-  Instagram,
-  Linkedin,
   Lock,
   LogOut,
   Mail,
@@ -25,12 +22,17 @@ import {
   ShieldCheck,
   Sparkles,
   Tag,
-  Twitter,
   User,
   Users,
   X,
-  Youtube,
 } from "lucide-react";
+import {
+  Facebook,
+  Instagram,
+  Linkedin,
+  Twitter,
+  Youtube,
+} from "@/components/common/BrandIcons";
 import { Button } from "@/components/ui/button";
 import { BrandLogo, BrandLogoIcon } from "@/components/common/BrandLogo";
 import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
@@ -68,8 +70,13 @@ export function PublicLayout() {
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    try {
+      await apiClient.patch("/me/notifications", {});
+    } catch {
+      // Silent fail — UI already updated
+    }
   };
 
   // Route Conditions
@@ -310,8 +317,10 @@ export function PublicLayout() {
                     className="flex items-center gap-1.5 p-1 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
                   >
                     <img
-                      src={user?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80"}
+                      src={user?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=75"}
                       alt="Avatar"
+                      loading="lazy"
+                      decoding="async"
                       className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover ring-2 ring-red-600/20"
                     />
                     <span className="text-xs font-bold text-slate-800 hidden sm:inline-block max-w-[120px] truncate">
@@ -515,9 +524,11 @@ export function PublicLayout() {
                         <img
                           src={
                             user?.avatarUrl ||
-                            "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80"
+                            "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=75"
                           }
                           alt="Avatar"
+                          loading="lazy"
+                          decoding="async"
                           className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200 shrink-0"
                         />
                         <div className="min-w-0">

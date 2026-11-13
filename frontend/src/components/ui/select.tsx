@@ -46,7 +46,14 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
       if (options && options.length > 0) return options;
       const opts: SelectOption[] = [];
       React.Children.forEach(children, (child) => {
-        if (React.isValidElement(child) && child.type === "option") {
+        if (
+          React.isValidElement<{
+            value?: string | number;
+            disabled?: boolean;
+            children?: React.ReactNode;
+          }>(child) &&
+          child.type === "option"
+        ) {
           const rawChildren = child.props.children;
           const labelText = Array.isArray(rawChildren)
             ? rawChildren.join("")

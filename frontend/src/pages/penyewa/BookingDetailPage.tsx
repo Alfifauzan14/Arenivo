@@ -88,7 +88,9 @@ export function BookingDetailPage() {
         if (isMounted && tRes.data) {
           setLiveTicket(tRes.data);
         }
-      } catch {}
+      } catch {
+        // Tiket mungkin belum tersedia — ditangani oleh state UI lain
+      }
     };
 
     loadData();

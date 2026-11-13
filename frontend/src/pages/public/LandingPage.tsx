@@ -20,7 +20,6 @@ import {
   Zap,
 } from "lucide-react";
 import { Button, Card, Select, Input } from "@/components/ui";
-import { MOCK_VENUES, MOCK_CITIES, MOCK_BANNERS } from "@/lib/mock-data";
 import { apiClient } from "@/lib/api-client";
 import { VenueCard } from "@/features/venue/components/VenueCard";
 import { cn } from "@/lib/utils";
@@ -28,29 +27,29 @@ import { cn } from "@/lib/utils";
 const HERO_SLIDES = [
   {
     id: 1,
-    imageUrl: "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=1920&q=85",
-    alt: "Lapangan Tenis & Arena Olahraga Outdoor",
-    title: "Super Sport\nCommunity App",
-    subtitle: "Platform all-in-one untuk sewa lapangan, cari lawan sparring, atau cari kawan main bareng. Olahraga makin mudah dan menyenangkan!",
+    imageUrl: "https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=1600&q=80",
+    alt: "Lapangan Futsal Indoor dengan Lampu Sorot",
+    title: "Sewa Lapangan Futsal\n& Mini Soccer Cepat",
+    subtitle: "Platform all-in-one untuk sewa lapangan futsal dan mini soccer. Ketersediaan slot real-time, bebas double booking, konfirmasi bayar otomatis via QRIS.",
   },
   {
     id: 2,
-    imageUrl: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1920&q=85",
-    alt: "Arena Futsal & Lapangan Rumput Sintetis",
-    title: "Sewa Lapangan Futsal\n& Mini Soccer Cepat",
-    subtitle: "Ketersediaan slot jam terkunci real-time bebas double booking, konfirmasi bayar otomatis via Midtrans QRIS, dan E-Tiket instan.",
+    imageUrl: "https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1600&q=80",
+    alt: "Pemain Futsal Beraksi di Lapangan Indoor",
+    title: "Main Futsal\nBebas Ribet",
+    subtitle: "Pesan lapangan futsal favorit tim Anda dalam hitungan menit. E-Tiket instan, pembayaran QRIS, dan jaminan slot terkunci.",
   },
   {
     id: 3,
-    imageUrl: "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?auto=format&fit=crop&w=1920&q=85",
-    alt: "Stadion Mini Soccer Berstandar Internasional",
-    title: "Main Bareng Komunitas\n& Lawan Sparring",
-    subtitle: "Jelajahi ratusan venue olahraga terbaik di berbagai kota. Fasilitas shower, tribun penonton, ruang ganti, dan kantin lengkap.",
+    imageUrl: "https://images.unsplash.com/photo-1612225220822-30ab95978d91?auto=format&fit=crop&w=1600&q=80",
+    alt: "Lapangan Mini Soccer Rumput Sintetis",
+    title: "Mini Soccer\nBerkualitas",
+    subtitle: "Jelajahi venue mini soccer terbaik di berbagai kota. Fasilitas shower, tribun penonton, ruang ganti, dan parkir luas.",
   },
   {
     id: 4,
-    imageUrl: "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?auto=format&fit=crop&w=1920&q=85",
-    alt: "Gelanggang Olahraga Indoor Multi-Sport",
+    imageUrl: "https://images.unsplash.com/photo-1579952363873-27f5b4c4f5b2?auto=format&fit=crop&w=1600&q=80",
+    alt: "Tim Futsal Bermain di Lapangan Indoor",
     title: "Kupon Diskon Spesial\nHemat Setiap Pekan",
     subtitle: "Nikmati voucher potongan harga eksklusif saat checkout agar patungan sewa lapangan favorit tim makin hemat.",
   },
@@ -100,7 +99,7 @@ export function LandingPage() {
     return () => {
       isMounted = false;
     };
-  }, [venues]);
+  }, []);
 
   // Search Widget State & Defaults for Reset
   const defaultCity = cities[0]?.id || "jakarta-selatan";
@@ -135,52 +134,35 @@ export function LandingPage() {
 
   const [openFaqIndex, setOpenFaqIndex] = React.useState<number | null>(null);
 
-  const faqList = [
-    {
-      question: "Apa kelebihan sewa lapangan yang tersedia di Arenivo?",
-      answers: [
-        "Proses booking mudah: Anda dapat memesan jadwal lapangan secara online melalui website kapan saja tanpa perlu antre atau datang langsung.",
-        "Bebas double booking: Sistem mengunci slot secara real-time selama 15 menit saat Anda melakukan pembayaran sehingga jadwal dijamin aman.",
-        "Pilihan beragam: Tersedia berbagai jenis lapangan futsal (vinyl, interlock, sintetis) dan mini soccer di berbagai kota.",
-        "Harga sewa transparan & bervariasi: Menampilkan tarif per sesi secara langsung sesuai jam pagi, siang, atau malam.",
-        "Promo menarik: Terdapat berbagai kode voucher diskon dari venue maupun promo spesial platform setiap minggunya.",
-      ],
-    },
-    {
-      question: "Bagaimana cara memesan lapangan di Arenivo?",
-      answers: [
-        "Pilih kota, tanggal bermain, atau nama venue pada kolom pencarian di Beranda atau menu Cari Lapangan.",
-        "Klik tombol 'Pilih Jam' pada kartu venue untuk melihat daftar lapangan dan ketersediaan jadwal.",
-        "Pilih tanggal dan klik slot jam bermain yang tersedia (bisa memilih beberapa jam berurutan), lalu klik 'Lanjut ke Pembayaran'.",
-        "Selesaikan pembayaran melalui Midtrans (QRIS, Virtual Account Bank, atau E-Wallet). E-Tiket QR Code akan langsung aktif secara otomatis.",
-      ],
-    },
-    {
-      question: "Berapa biaya sewa lapangan yang tersedia di Arenivo?",
-      answers: [
-        "Biaya sewa lapangan sangat bervariasi tergantung kota, jenis lapangan (Futsal atau Mini Soccer), serta waktu bermain (jam reguler vs jam malam/akhir pekan), mulai dari Rp 140.000 hingga Rp 250.000 per sesi.",
-      ],
-    },
-    {
-      question: "Apakah ada diskon atau promo khusus untuk penyewaan lapangan?",
-      answers: [
-        "Ya! Anda dapat menggunakan kode voucher promo yang tersedia di halaman Promo atau langsung memilih kode diskon venue saat berada di halaman Checkout sebelum membayar.",
-      ],
-    },
-    {
-      question: "Bagaimana cara menemukan lapangan yang sesuai dengan kebutuhan saya?",
-      answers: [
-        "Gunakan fitur filter di halaman Cari Lapangan untuk menyaring venue berdasarkan lokasi kota, batas harga maksimal, rating penyewa tertinggi, fasilitas (parkir, shower, tribun, musholla), hingga urutan venue terdekat.",
-      ],
-    },
-  ];
+  // FAQ fetched from API (admin-editable via system_settings)
+  const [faqList, setFaqList] = React.useState<{ question: string; answers: string[] }[]>([]);
 
   React.useEffect(() => {
+    let active = true;
+    apiClient
+      .get<{ faq?: { question: string; answers: string[] }[] }>("/settings")
+      .then((res) => {
+        if (!active) return;
+        const faq = res.data?.faq;
+        if (Array.isArray(faq) && faq.length > 0) {
+          setFaqList(faq);
+        }
+      })
+      .catch(() => {
+        // If API fails, FAQ stays empty — admin can set it
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (banners.length === 0) return;
     const timer = setInterval(() => {
       setActiveBannerIdx((prev) => (prev + 1) % banners.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, [venues]);
+  }, [banners]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -217,6 +199,8 @@ export function LandingPage() {
             <img
               src={slide.imageUrl}
               alt={slide.alt}
+              loading={idx === 0 ? "eager" : "lazy"}
+              decoding="async"
               className={cn(
                 "w-full h-full object-cover object-center transition-transform duration-7000 ease-out",
                 idx === activeHeroIdx ? "scale-105" : "scale-100"
@@ -361,6 +345,8 @@ export function LandingPage() {
                 <img
                   src={banner.imageUrl}
                   alt={banner.title}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover opacity-70"
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-900/75 sm:via-slate-900/40 to-transparent flex items-center p-4 sm:p-8 md:p-10">
@@ -565,6 +551,7 @@ export function LandingPage() {
       </section>
 
       {/* 7. SEKSI FAQ ACCORDION (TANPA CARD, LEBAR SEJAJAR KONTEN UTAMA) */}
+      {faqList.length > 0 && (
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-6">
         <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 text-center mb-6 sm:mb-8">
           FAQ
@@ -617,6 +604,7 @@ export function LandingPage() {
           })}
         </div>
       </section>
+      )}
 
       {/* 8. JAMINAN & NILAI LAYANAN / TRUST BADGES (DI BAWAH FAQ SESUAI GAMBAR REFERENSI USER) */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-2">

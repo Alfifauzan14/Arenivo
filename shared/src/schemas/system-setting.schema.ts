@@ -3,7 +3,7 @@ import { AiProvider } from "../constants/enums";
 
 export const SystemSettingSchema = z.object({
   key: z.string().min(1),
-  value: z.record(z.any()),
+  value: z.record(z.string(), z.any()),
   description: z.string().nullable().optional(),
   updatedBy: z.string().uuid().nullable().optional(),
   updatedAt: z.string().datetime().optional(),

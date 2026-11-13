@@ -13,18 +13,14 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Card, Button } from "@/components/ui";
+import { LoadingSkeleton } from "@/components/common/LoadingStates";
 import { apiClient } from "@/lib/api-client";
-import {
-  MOCK_VENUES,
-  MOCK_BOOKINGS,
-  MOCK_MITRA_PROFILES,
-  MOCK_USERS,
-} from "@/lib/mock-data";
 import { formatRupiah } from "@futsal/shared";
 
 export function AdminDashboardPage() {
   const [downloadingFormat, setDownloadingFormat] = React.useState<string | null>(null);
   const [exportMessage, setExportMessage] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
   // Live Compute metrics with Supabase API integration
   const [metrics, setMetrics] = React.useState({
@@ -39,6 +35,7 @@ export function AdminDashboardPage() {
 
   React.useEffect(() => {
     let isMounted = true;
+    setLoading(true);
     apiClient.get<any>("/admin/dashboard").then((res) => {
       if (isMounted && res.data) {
         setMetrics((prev) => ({
@@ -46,13 +43,19 @@ export function AdminDashboardPage() {
           ...res.data,
         }));
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (isMounted) setLoading(false);
+    });
     return () => {
       isMounted = false;
     };
   }, []);
 
   const { totalUsers, totalMitra, pendingMitraCount, totalVenues, totalBookings, gmv, platformCommission } = metrics;
+
+  if (loading) {
+    return <LoadingSkeleton />;
+  }
 
   // Monthly revenue breakdown simulation
   const monthlyStats = [
@@ -129,7 +132,7 @@ export function AdminDashboardPage() {
             </div>
           </div>
           <p className="text-2xl font-bold text-slate-900 mt-2 font-mono tabular-nums">
-            {formatRupiah(gmv > 100000000 ? gmv : 114250000)}
+            {formatRupiah(gmv)}
           </p>
           <div className="flex items-center gap-1.5 mt-2 text-[11px] text-emerald-600 font-medium">
             <TrendingUp className="w-3 h-3" />
@@ -145,7 +148,7 @@ export function AdminDashboardPage() {
             </div>
           </div>
           <p className="text-2xl font-bold text-red-600 mt-2 font-mono tabular-nums">
-            {formatRupiah(platformCommission > 10000000 ? platformCommission : 11425000)}
+            {formatRupiah(platformCommission)}
           </p>
           <span className="text-[11px] text-slate-400 mt-2 block">
             Pendapatan bersih platform
@@ -160,7 +163,7 @@ export function AdminDashboardPage() {
             </div>
           </div>
           <p className="text-2xl font-bold text-slate-900 mt-2 font-mono tabular-nums">
-            428 Pesanan
+            {totalBookings} Pesanan
           </p>
           <div className="flex items-center gap-1.5 mt-2 text-[11px] text-blue-600 font-medium">
             <span>98.2% pembayaran via QRIS & VA</span>

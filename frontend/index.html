@@ -16,12 +16,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Arenivo" />
-    <!-- Midtrans Snap JS SDK (Sandbox) -->
-    <script
-      type="text/javascript"
-      src="https://app.sandbox.midtrans.com/snap/snap.js"
-      data-client-key="Mid-client-3mO8VFRLV5vdpqMW"
-    ></script>
+    <!-- Midtrans Snap JS SDK (Sandbox) - loaded async, only needed on Checkout -->
+    <link rel="preconnect" href="https://app.sandbox.midtrans.com" />
+    <link rel="preconnect" href="https://images.unsplash.com" />
+    <link rel="dns-prefetch" href="https://images.unsplash.com" />
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased selection:bg-red-500 selection:text-white min-h-screen font-sans">
     <div id="root"></div>

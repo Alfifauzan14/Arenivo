@@ -30,14 +30,24 @@ import {
   Modal,
   TablePagination,
 } from "@/components/ui";
-import { MOCK_USERS } from "@/lib/mock-data";
+import { TableLoadingSkeleton } from "@/components/common/LoadingStates";
 import { apiClient } from "@/lib/api-client";
 import { formatDateIndo, AccountStatus } from "@futsal/shared";
 
-type UserItem = (typeof MOCK_USERS)[number];
+interface UserItem {
+  id: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  avatarUrl?: string;
+  bookingsCount: number;
+  createdAt?: string;
+  status: string;
+}
 
 export function AdminUsersPage() {
   const [users, setUsers] = React.useState<UserItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -45,11 +55,14 @@ export function AdminUsersPage() {
 
   React.useEffect(() => {
     let isMounted = true;
+    setLoading(true);
     apiClient.get<any[]>("/admin/users").then((res) => {
       if (isMounted && res.data && Array.isArray(res.data)) {
         setUsers(res.data);
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (isMounted) setLoading(false);
+    });
     return () => {
       isMounted = false;
     };
@@ -97,6 +110,10 @@ export function AdminUsersPage() {
     apiClient.patch(`/admin/users/${togglingUser.id}/status`, { status: newStatus }).catch(() => {});
     setTogglingUser(null);
   };
+
+  if (loading) {
+    return <TableLoadingSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

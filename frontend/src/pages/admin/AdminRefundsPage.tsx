@@ -31,14 +31,28 @@ import {
   Modal,
   TablePagination,
 } from "@/components/ui";
-import { MOCK_REFUNDS } from "@/lib/mock-data";
+import { TableLoadingSkeleton } from "@/components/common/LoadingStates";
 import { apiClient } from "@/lib/api-client";
 import { formatRupiah, formatDateIndo, RefundStatus } from "@futsal/shared";
 
-type RefundItem = (typeof MOCK_REFUNDS)[number];
+interface RefundItem {
+  id: string;
+  bookingCode: string;
+  customerName: string;
+  venueName: string;
+  reason: string;
+  amount: number;
+  refundPercent: number;
+  status: string;
+  midtransRefundKey?: string;
+  rejectionReason?: string;
+  processedBy?: string;
+  processedAt?: string;
+}
 
 export function AdminRefundsPage() {
   const [refunds, setRefunds] = React.useState<RefundItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -46,11 +60,14 @@ export function AdminRefundsPage() {
 
   React.useEffect(() => {
     let isMounted = true;
+    setLoading(true);
     apiClient.get<any[]>("/admin/refunds").then((res) => {
       if (isMounted && res.data && Array.isArray(res.data)) {
         setRefunds(res.data);
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (isMounted) setLoading(false);
+    });
     return () => {
       isMounted = false;
     };
@@ -215,6 +232,10 @@ export function AdminRefundsPage() {
     showToast(`Klaim refund ${rejectingRefund.bookingCode} berhasil ditolak.`);
     setRejectingRefund(null);
   };
+
+  if (loading) {
+    return <TableLoadingSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

@@ -14,25 +14,8 @@ import {
   AlertTriangle,
   X,
 } from "lucide-react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-  Badge,
-  Button,
-  Select,
-  Modal,
-  TablePagination,
-} from "@/components/ui";
-import { MOCK_VENUES, MOCK_FIELDS } from "@/lib/mock-data";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, Button, Select, Modal, TablePagination } from "@/components/ui";
+import { TableLoadingSkeleton } from "@/components/common/LoadingStates";
 import { apiClient } from "@/lib/api-client";
 import { formatRupiah, VenueStatus, type Venue } from "@futsal/shared";
 
@@ -40,6 +23,7 @@ type VenueItem = Venue;
 
 export function AdminVenuesPage() {
   const [venues, setVenues] = React.useState<VenueItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -47,11 +31,14 @@ export function AdminVenuesPage() {
 
   React.useEffect(() => {
     let isMounted = true;
+    setLoading(true);
     apiClient.get<any[]>("/admin/venues").then((res) => {
       if (isMounted && res.data && Array.isArray(res.data)) {
         setVenues(res.data);
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (isMounted) setLoading(false);
+    });
     return () => {
       isMounted = false;
     };
@@ -101,6 +88,10 @@ export function AdminVenuesPage() {
     );
     setActionVenue(null);
   };
+
+  if (loading) {
+    return <TableLoadingSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

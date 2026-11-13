@@ -16,7 +16,7 @@ const envSchema = z.object({
   MIDTRANS_MERCHANT_ID: z.string().optional(),
   MIDTRANS_SERVER_KEY: z.string().optional(),
   MIDTRANS_CLIENT_KEY: z.string().optional(),
-  MIDTRANS_IS_PRODUCTION: z.string().transform((v) => v === "true").default("false"),
+  MIDTRANS_IS_PRODUCTION: z.string().transform((v) => v === "true").default(false),
 
   // Pusher
   PUSHER_APP_ID: z.string().optional(),

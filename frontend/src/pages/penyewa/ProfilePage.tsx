@@ -8,9 +8,6 @@ import {
   Lock,
   Bell,
   ShieldCheck,
-  CheckCircle2,
-  AlertTriangle,
-  Smartphone,
   LogOut,
   Loader2,
 } from "lucide-react";

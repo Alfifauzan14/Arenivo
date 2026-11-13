@@ -76,7 +76,7 @@ export const chatbotService = {
       promoContext || "Belum ada promo aktif."
     ].join("\n");
 
-    let replyText = "";
+    let replyText: string;
     let usedProvider = "gemini";
 
     try {

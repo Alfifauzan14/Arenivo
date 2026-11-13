@@ -1,18 +1,16 @@
 import * as React from "react";
 import {
   Image as ImageIcon,
-  Tag,
-  MessageSquare,
   Plus,
   Edit2,
   Trash2,
   CheckCircle2,
   Eye,
   EyeOff,
-  ExternalLink,
   Star,
   Search,
   X,
+  Loader2,
 } from "lucide-react";
 import {
   Card,
@@ -28,8 +26,24 @@ import {
   Modal,
   TablePagination,
 } from "@/components/ui";
-import { MOCK_BANNERS, MOCK_PROMOS, MOCK_REVIEWS, MOCK_VENUES } from "@/lib/mock-data";
-import { formatRupiah, formatDateIndo, type Banner, type Promo, type Review } from "@futsal/shared";
+import { apiClient } from "@/lib/api-client";
+import { LoadingSkeleton, ErrorState } from "@/components/common/LoadingStates";
+import { ImageUploadInput } from "@/components/common/ImageUploadInput";
+import { formatRupiah, formatDateIndo, type Banner, type Promo } from "@futsal/shared";
+
+interface ReviewRow {
+  id: string;
+  bookingId: string;
+  userId: string;
+  venueId: string;
+  rating: number;
+  comment: string;
+  reply: string | null;
+  isVisible: boolean;
+  createdAt?: string;
+  user?: { fullName: string; avatarUrl: string | null } | null;
+  venue?: { name: string } | null;
+}
 
 export function AdminContentPage() {
   const [activeTab, setActiveTab] = React.useState("banners");
@@ -38,10 +52,12 @@ export function AdminContentPage() {
   const [reviewPage, setReviewPage] = React.useState(1);
   const pageSize = 8;
 
-  // States
-  const [banners, setBanners] = React.useState<Banner[]>(MOCK_BANNERS);
-  const [promos, setPromos] = React.useState<Promo[]>(MOCK_PROMOS);
-  const [reviews, setReviews] = React.useState<Review[]>(MOCK_REVIEWS);
+  // Data states
+  const [banners, setBanners] = React.useState<Banner[]>([]);
+  const [promos, setPromos] = React.useState<Promo[]>([]);
+  const [reviews, setReviews] = React.useState<ReviewRow[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   // Modals
   const [bannerModalOpen, setBannerModalOpen] = React.useState(false);
@@ -49,30 +65,109 @@ export function AdminContentPage() {
   const [bannerTitle, setBannerTitle] = React.useState("");
   const [bannerImageUrl, setBannerImageUrl] = React.useState("");
   const [bannerLinkUrl, setBannerLinkUrl] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
 
   const [promoModalOpen, setPromoModalOpen] = React.useState(false);
   const [editingPromo, setEditingPromo] = React.useState<Promo | null>(null);
   const [promoCode, setPromoCode] = React.useState("");
   const [promoType, setPromoType] = React.useState<"fixed" | "percent">("fixed");
   const [promoValue, setPromoValue] = React.useState(25000);
-  const [promoMinSpend, setPromoMinSpend] = React.useState(150000);
+  const [promoMaxDiscount, setPromoMaxDiscount] = React.useState<number | null>(null);
+  const [promoMinSpend, setPromoMinSpend] = React.useState(100000);
   const [promoQuota, setPromoQuota] = React.useState(100);
+  const [promoEndDate, setPromoEndDate] = React.useState("");
+
+  // FAQ state
+  const [faqItems, setFaqItems] = React.useState<{ question: string; answers: string[] }[]>([]);
+  const [faqSaving, setFaqSaving] = React.useState(false);
 
   // Toast
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
-
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // BANNER ACTIONS
+  // ====== FETCH DATA ON LOAD ======
+  const fetchBanners = React.useCallback(async () => {
+    try {
+      const res = await apiClient.get<Banner[]>("/admin/banners");
+      setBanners(Array.isArray(res.data) ? res.data : []);
+    } catch (err: any) {
+      setError(err?.data?.error?.message || "Gagal memuat banner.");
+    }
+  }, []);
+
+  const fetchPromos = React.useCallback(async () => {
+    try {
+      const res = await apiClient.get<Promo[]>("/admin/promos");
+      setPromos(Array.isArray(res.data) ? res.data : []);
+    } catch (err: any) {
+      setError(err?.data?.error?.message || "Gagal memuat promo.");
+    }
+  }, []);
+
+  const fetchReviews = React.useCallback(async () => {
+    try {
+      const res = await apiClient.get<{ rows: ReviewRow[]; total: number }>(
+        "/admin/reviews",
+        searchQuery ? { q: searchQuery } : undefined
+      );
+      // Backend returns { rows, total } or array
+      if (Array.isArray(res.data)) {
+        setReviews(res.data as any);
+      } else if (res.data && (res.data as any).rows) {
+        setReviews((res.data as any).rows);
+      } else {
+        setReviews([]);
+      }
+    } catch (err: any) {
+      setError(err?.data?.error?.message || "Gagal memuat ulasan.");
+    }
+  }, [searchQuery]);
+
+  const fetchFaq = React.useCallback(async () => {
+    try {
+      const res = await apiClient.get<{ faq?: { question: string; answers: string[] }[] }>(
+        "/settings"
+      );
+      if (res.data?.faq && Array.isArray(res.data.faq)) {
+        setFaqItems(res.data.faq);
+      }
+    } catch {
+      // FAQ not yet set — that's ok
+    }
+  }, []);
+
+  // Load all data on mount
+  React.useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    Promise.all([fetchBanners(), fetchPromos(), fetchReviews(), fetchFaq()]).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Refetch reviews when search changes
+  React.useEffect(() => {
+    if (activeTab === "reviews" && searchQuery !== undefined) {
+      const t = setTimeout(() => fetchReviews(), 300);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, activeTab]);
+
+  // ====== BANNER ACTIONS ======
   const handleOpenCreateBanner = () => {
     setEditingBanner(null);
     setBannerTitle("");
-    setBannerImageUrl(
-      "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80"
-    );
+    setBannerImageUrl("");
     setBannerLinkUrl("/venues");
     setBannerModalOpen(true);
   };
@@ -85,59 +180,84 @@ export function AdminContentPage() {
     setBannerModalOpen(true);
   };
 
-  const handleSaveBanner = () => {
-    if (!bannerTitle.trim() || !bannerImageUrl.trim()) return;
-
-    if (editingBanner) {
-      setBanners((prev) =>
-        prev.map((b) =>
-          b.id === editingBanner.id
-            ? {
-                ...b,
-                title: bannerTitle.trim(),
-                imageUrl: bannerImageUrl.trim(),
-                linkUrl: bannerLinkUrl.trim() || "/venues",
-              }
-            : b
-        )
-      );
-      showToast(`Banner "${bannerTitle}" berhasil diperbarui.`);
-    } else {
-      const newBanner: Banner = {
-        id: `bnr-${Date.now()}`,
-        title: bannerTitle.trim(),
-        imageUrl: bannerImageUrl.trim(),
-        linkUrl: bannerLinkUrl.trim() || "/venues",
-        sortOrder: banners.length,
-        isActive: true,
-      };
-      setBanners((prev) => [...prev, newBanner]);
-      showToast(`Banner baru "${bannerTitle}" berhasil ditambahkan.`);
+  const handleSaveBanner = async () => {
+    if (!bannerTitle.trim() || !bannerImageUrl.trim()) {
+      showToast("Judul dan gambar banner wajib diisi.");
+      return;
     }
 
-    setBannerModalOpen(false);
+    setSaving(true);
+    try {
+      if (editingBanner) {
+        await apiClient.patch<Banner>("/admin/banners", {
+          id: editingBanner.id,
+          title: bannerTitle.trim(),
+          imageUrl: bannerImageUrl.trim(),
+          linkUrl: bannerLinkUrl.trim() || null,
+        });
+        showToast(`Banner "${bannerTitle}" berhasil diperbarui.`);
+      } else {
+        await apiClient.post<Banner>("/admin/banners", {
+          title: bannerTitle.trim(),
+          imageUrl: bannerImageUrl.trim(),
+          linkUrl: bannerLinkUrl.trim() || null,
+          sortOrder: banners.length,
+          isActive: true,
+        });
+        showToast(`Banner baru "${bannerTitle}" berhasil ditambahkan.`);
+      }
+      setBannerModalOpen(false);
+      await fetchBanners();
+    } catch (err: any) {
+      showToast(err?.data?.error?.message || "Gagal menyimpan banner.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleToggleBannerActive = (bannerId: string) => {
+  const handleToggleBannerActive = async (bannerId: string, current: boolean) => {
+    // Optimistic
     setBanners((prev) =>
-      prev.map((b) => (b.id === bannerId ? { ...b, isActive: !b.isActive } : b))
+      prev.map((b) => (b.id === bannerId ? { ...b, isActive: !current } : b))
     );
-    showToast("Status tayang banner berhasil diubah.");
+    try {
+      await apiClient.patch("/admin/banners", { id: bannerId, isActive: !current });
+      showToast("Status tayang banner berhasil diubah.");
+    } catch {
+      // Revert
+      setBanners((prev) =>
+        prev.map((b) => (b.id === bannerId ? { ...b, isActive: current } : b))
+      );
+      showToast("Gagal mengubah status banner.");
+    }
   };
 
-  const handleDeleteBanner = (bannerId: string) => {
+  const handleDeleteBanner = async (bannerId: string) => {
+    if (!confirm("Hapus banner ini? Tindakan tidak bisa dibatalkan.")) return;
     setBanners((prev) => prev.filter((b) => b.id !== bannerId));
-    showToast("Banner berhasil dihapus.");
+    try {
+      // Backend doesn't have DELETE; use PATCH isActive=false
+      await apiClient.patch("/admin/banners", { id: bannerId, isActive: false });
+      showToast("Banner berhasil dinonaktifkan.");
+      await fetchBanners();
+    } catch {
+      showToast("Gagal menonaktifkan banner.");
+      await fetchBanners();
+    }
   };
 
-  // PROMO ACTIONS
+  // ====== PROMO ACTIONS ======
   const handleOpenCreatePromo = () => {
     setEditingPromo(null);
     setPromoCode("");
-    setPromoType("fixed");
-    setPromoValue(25000);
-    setPromoMinSpend(150000);
+    setPromoType("percent");
+    setPromoValue(10);
+    setPromoMaxDiscount(25000);
+    setPromoMinSpend(100000);
     setPromoQuota(100);
+    // Default end date: 30 days from now
+    const d = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    setPromoEndDate(d.toISOString().slice(0, 16));
     setPromoModalOpen(true);
   };
 
@@ -146,84 +266,114 @@ export function AdminContentPage() {
     setPromoCode(p.code);
     setPromoType(p.discountType);
     setPromoValue(p.discountValue);
+    setPromoMaxDiscount(p.maxDiscount ?? null);
     setPromoMinSpend(p.minSpend);
     setPromoQuota(p.quota);
+    setPromoEndDate(p.endDate ? new Date(p.endDate).toISOString().slice(0, 16) : "");
     setPromoModalOpen(true);
   };
 
-  const handleSavePromo = () => {
-    if (!promoCode.trim()) return;
-
-    if (editingPromo) {
-      setPromos((prev) =>
-        prev.map((p) =>
-          p.id === editingPromo.id
-            ? {
-                ...p,
-                code: promoCode.trim().toUpperCase(),
-                discountType: promoType,
-                discountValue: promoValue,
-                minSpend: promoMinSpend,
-                quota: promoQuota,
-              }
-            : p
-        )
-      );
-      showToast(`Kode Promo ${promoCode.toUpperCase()} berhasil diperbarui.`);
-    } else {
-      const newPromo: Promo = {
-        id: `pr-${Date.now()}`,
-        code: promoCode.trim().toUpperCase(),
-        discountType: promoType,
-        discountValue: promoValue,
-        minSpend: promoMinSpend,
-        quota: promoQuota,
-        usedCount: 0,
-        startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        isActive: true,
-      };
-      setPromos((prev) => [...prev, newPromo]);
-      showToast(`Kode Promo ${promoCode.toUpperCase()} berhasil dibuat.`);
+  const handleSavePromo = async () => {
+    if (!promoCode.trim()) {
+      showToast("Kode promo wajib diisi.");
+      return;
+    }
+    if (!promoEndDate) {
+      showToast("Tanggal berakhir promo wajib diisi.");
+      return;
     }
 
-    setPromoModalOpen(false);
+    setSaving(true);
+    try {
+      if (editingPromo) {
+        await apiClient.patch<Promo>("/admin/promos", {
+          id: editingPromo.id,
+          code: promoCode.trim().toUpperCase(),
+          discountType: promoType,
+          discountValue: promoValue,
+          maxDiscount: promoMaxDiscount,
+          minSpend: promoMinSpend,
+          quota: promoQuota,
+          endDate: new Date(promoEndDate).toISOString(),
+        });
+        showToast(`Kode Promo ${promoCode.toUpperCase()} berhasil diperbarui.`);
+      } else {
+        await apiClient.post<Promo>("/admin/promos", {
+          code: promoCode.trim().toUpperCase(),
+          discountType: promoType,
+          discountValue: promoValue,
+          maxDiscount: promoMaxDiscount,
+          minSpend: promoMinSpend,
+          quota: promoQuota,
+          endDate: new Date(promoEndDate).toISOString(),
+        });
+        showToast(`Kode Promo ${promoCode.toUpperCase()} berhasil dibuat.`);
+      }
+      setPromoModalOpen(false);
+      await fetchPromos();
+    } catch (err: any) {
+      showToast(err?.data?.error?.message || "Gagal menyimpan promo.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleTogglePromoActive = (promoId: string) => {
+  const handleTogglePromoActive = async (promoId: string, current: boolean) => {
     setPromos((prev) =>
-      prev.map((p) => (p.id === promoId ? { ...p, isActive: !p.isActive } : p))
+      prev.map((p) => (p.id === promoId ? { ...p, isActive: !current } : p))
     );
-    showToast("Status keaktifan voucher promo berhasil diubah.");
+    try {
+      await apiClient.patch("/admin/promos", { id: promoId, isActive: !current });
+      showToast("Status keaktifan promo berhasil diubah.");
+    } catch {
+      setPromos((prev) =>
+        prev.map((p) => (p.id === promoId ? { ...p, isActive: current } : p))
+      );
+      showToast("Gagal mengubah status promo.");
+    }
   };
 
-  const handleDeletePromo = (promoId: string) => {
+  const handleDeletePromo = async (promoId: string) => {
+    if (!confirm("Nonaktifkan promo ini?")) return;
     setPromos((prev) => prev.filter((p) => p.id !== promoId));
-    showToast("Promo voucher berhasil dihapus.");
+    try {
+      await apiClient.patch("/admin/promos", { id: promoId, isActive: false });
+      showToast("Promo berhasil dinonaktifkan.");
+      await fetchPromos();
+    } catch {
+      showToast("Gagal menonaktifkan promo.");
+      await fetchPromos();
+    }
   };
 
-  // REVIEW MODERATION ACTIONS
-  const handleToggleReviewVisibility = (reviewId: string) => {
+  // ====== REVIEW MODERATION ======
+  const handleToggleReviewVisibility = async (reviewId: string, current: boolean) => {
     setReviews((prev) =>
-      prev.map((r) => {
-        if (r.id === reviewId) {
-          const nextState = !r.isVisible;
-          showToast(
-            nextState
-              ? "Ulasan sekarang ditampilkan ke publik."
-              : "Ulasan berhasil disembunyikan dari publik."
-          );
-          return { ...r, isVisible: nextState };
-        }
-        return r;
-      })
+      prev.map((r) => (r.id === reviewId ? { ...r, isVisible: !current } : r))
     );
+    try {
+      await apiClient.patch(`/admin/reviews/${reviewId}/status`, {
+        isVisible: !current,
+      });
+      showToast(
+        !current
+          ? "Ulasan sekarang ditampilkan ke publik."
+          : "Ulasan berhasil disembunyikan dari publik."
+      );
+    } catch {
+      setReviews((prev) =>
+        prev.map((r) => (r.id === reviewId ? { ...r, isVisible: current } : r))
+      );
+      showToast("Gagal mengubah status ulasan.");
+    }
   };
 
   const getVenueName = (venueId: string) => {
-    return MOCK_VENUES.find((v) => v.id === venueId)?.name || "Venue Olahraga";
+    const r = reviews.find((rv) => rv.venueId === venueId);
+    return r?.venue?.name || "Venue Olahraga";
   };
 
+  // ====== FILTERED DATA ======
   const filteredBanners = React.useMemo(() => {
     if (!searchQuery.trim()) return banners;
     const q = searchQuery.toLowerCase();
@@ -245,11 +395,35 @@ export function AdminContentPage() {
     const q = searchQuery.toLowerCase();
     return reviews.filter(
       (r) =>
-        (r.userName || "").toLowerCase().includes(q) ||
+        (r.user?.fullName || "").toLowerCase().includes(q) ||
         (r.comment || "").toLowerCase().includes(q) ||
         getVenueName(r.venueId).toLowerCase().includes(q)
     );
   }, [reviews, searchQuery]);
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 w-64 bg-slate-200 rounded animate-pulse" />
+        <LoadingSkeleton />
+      </div>
+    );
+  }
+
+  if (error && banners.length === 0 && promos.length === 0 && reviews.length === 0) {
+    return (
+      <ErrorState
+        message={error}
+        onRetry={() => {
+          setError(null);
+          setLoading(true);
+          Promise.all([fetchBanners(), fetchPromos(), fetchReviews()]).finally(() =>
+            setLoading(false)
+          );
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -257,10 +431,10 @@ export function AdminContentPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
-            Manajemen Konten & Moderasi Ulasan
+            Manajemen Konten
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Kelola banner hero promo, kupon diskon platform, dan moderasi sensor review penyewa
+            Kelola banner promo, kode diskon, dan moderasi ulasan penyewa
           </p>
         </div>
 
@@ -271,7 +445,7 @@ export function AdminContentPage() {
             className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4 mr-1.5" />
-            Tambah Banner Promo
+            Tambah Banner
           </Button>
         )}
 
@@ -282,7 +456,7 @@ export function AdminContentPage() {
             className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4 mr-1.5" />
-            Tambah Kode Promo Baru
+            Tambah Promo
           </Button>
         )}
       </div>
@@ -300,12 +474,11 @@ export function AdminContentPage() {
         </div>
       )}
 
-      {/* Unified Table/Content Card */}
+      {/* Main Card */}
       <Card className="bg-white border-slate-200 shadow-xs overflow-hidden">
-        {/* Unified Filter Toolbar & Category Select */}
+        {/* Filter Toolbar */}
         <div className="p-3.5 sm:p-4 bg-white border-b border-slate-100">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-            {/* Search Input */}
             <div className="relative flex-1 min-w-0">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
@@ -314,7 +487,7 @@ export function AdminContentPage() {
                   activeTab === "banners"
                     ? "Cari judul banner atau tautan..."
                     : activeTab === "promos"
-                    ? "Cari kode promo diskon..."
+                    ? "Cari kode promo..."
                     : "Cari nama penyewa, ulasan, atau venue..."
                 }
                 value={searchQuery}
@@ -340,7 +513,6 @@ export function AdminContentPage() {
               )}
             </div>
 
-            {/* Category Dropdown (Samakan seperti halaman lain) */}
             <div className="w-full sm:w-64 shrink-0">
               <Select
                 value={activeTab}
@@ -352,25 +524,34 @@ export function AdminContentPage() {
                 }}
                 options={[
                   { value: "banners", label: `Banner Promo (${banners.length})` },
-                  { value: "promos", label: `Kode Promo Global (${promos.length})` },
+                  { value: "promos", label: `Kode Promo (${promos.length})` },
                   { value: "reviews", label: `Moderasi Ulasan (${reviews.length})` },
+                  { value: "faq", label: `FAQ (${faqItems.length})` },
                 ]}
               />
             </div>
           </div>
         </div>
 
-        {/* 1. BANNERS TAB */}
+        {/* BANNERS TAB */}
         {activeTab === "banners" && (
           <div className="p-4 sm:p-5">
             {filteredBanners.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400">
-                Tidak ada banner promo yang sesuai dengan kriteria pencarian.
+              <div className="py-12 text-center">
+                <ImageIcon className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <p className="text-xs text-slate-400">
+                  {searchQuery
+                    ? "Tidak ada banner yang sesuai pencarian."
+                    : "Belum ada banner. Klik \"Tambah Banner\" untuk membuat."}
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredBanners.map((b) => (
-                  <div key={b.id} className="overflow-hidden bg-white border border-slate-200 rounded-xl shadow-xs group flex flex-col">
+                  <div
+                    key={b.id}
+                    className="overflow-hidden bg-white border border-slate-200 rounded-xl shadow-xs group flex flex-col"
+                  >
                     <div className="relative aspect-16/9 bg-slate-100 overflow-hidden">
                       <img
                         src={b.imageUrl}
@@ -385,22 +566,32 @@ export function AdminContentPage() {
                     </div>
                     <div className="p-3.5 space-y-2 flex-1 flex flex-col justify-between">
                       <div>
-                        <h3 className="font-bold text-xs text-slate-900 line-clamp-2">{b.title}</h3>
+                        <h3 className="font-bold text-xs text-slate-900 line-clamp-2">
+                          {b.title}
+                        </h3>
                         <span className="text-[11px] font-mono text-slate-400 block truncate mt-1">
-                          Tautan: {b.linkUrl}
+                          → {b.linkUrl || "/venues"}
                         </span>
                       </div>
-
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleToggleBannerActive(b.id)}
+                          onClick={() => handleToggleBannerActive(b.id, b.isActive)}
                           className="h-7 text-xs px-2"
                         >
-                          {b.isActive ? "Sembunyikan" : "Tayangkan"}
+                          {b.isActive ? (
+                            <>
+                              <EyeOff className="w-3 h-3 mr-1" />
+                              Sembunyikan
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3 h-3 mr-1" />
+                              Tayangkan
+                            </>
+                          )}
                         </Button>
-
                         <div className="flex items-center gap-1">
                           <Button
                             variant="outline"
@@ -428,7 +619,7 @@ export function AdminContentPage() {
           </div>
         )}
 
-        {/* 2. PROMOS TAB */}
+        {/* PROMOS TAB */}
         {activeTab === "promos" && (
           <>
             <Table>
@@ -438,6 +629,7 @@ export function AdminContentPage() {
                   <TableHead className="text-xs">Nilai Diskon</TableHead>
                   <TableHead className="text-xs">Min. Belanja</TableHead>
                   <TableHead className="text-xs text-center">Kuota Terpakai</TableHead>
+                  <TableHead className="text-xs">Berakhir</TableHead>
                   <TableHead className="text-xs">Status</TableHead>
                   <TableHead className="text-xs text-right">Aksi</TableHead>
                 </TableRow>
@@ -445,71 +637,72 @@ export function AdminContentPage() {
               <TableBody>
                 {filteredPromos.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
-                      Tidak ada kode promo yang cocok dengan pencarian.
+                    <TableCell colSpan={7} className="h-32 text-center text-xs text-slate-400">
+                      {searchQuery
+                        ? "Tidak ada promo yang cocok."
+                        : "Belum ada promo. Klik \"Tambah Promo\" untuk membuat."}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredPromos.slice((promoPage - 1) * pageSize, promoPage * pageSize).map((p) => (
-                    <TableRow key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                      <TableCell>
-                        <span className="font-mono font-bold text-xs text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md">
-                          {p.code}
-                        </span>
-                      </TableCell>
-
-                      <TableCell className="font-bold text-xs text-slate-900">
-                        {p.discountType === "fixed"
-                          ? formatRupiah(p.discountValue)
-                          : `${p.discountValue}% (Maks. ${formatRupiah(p.maxDiscount || 0)})`}
-                      </TableCell>
-
-                      <TableCell className="text-xs font-mono text-slate-600">
-                        {formatRupiah(p.minSpend)}
-                      </TableCell>
-
-                      <TableCell className="text-center font-mono text-xs">
-                        {p.usedCount} / {p.quota}
-                      </TableCell>
-
-                      <TableCell>
-                        <Badge variant={p.isActive ? "success" : "default"}>
-                          {p.isActive ? "AKTIF" : "NONAKTIF"}
-                        </Badge>
-                      </TableCell>
-
-                      <TableCell className="text-right space-x-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleTogglePromoActive(p.id)}
-                          className="h-7 text-xs px-2"
-                        >
-                          {p.isActive ? "Nonaktifkan" : "Aktifkan"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenEditPromo(p)}
-                          className="h-7 text-xs px-2"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleDeletePromo(p.id)}
-                          className="h-7 text-xs px-2"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filteredPromos
+                    .slice((promoPage - 1) * pageSize, promoPage * pageSize)
+                    .map((p) => (
+                      <TableRow key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                        <TableCell>
+                          <span className="font-mono font-bold text-xs text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md">
+                            {p.code}
+                          </span>
+                        </TableCell>
+                        <TableCell className="font-bold text-xs text-slate-900">
+                          {p.discountType === "fixed"
+                            ? formatRupiah(p.discountValue)
+                            : `${p.discountValue}% (Maks. ${formatRupiah(p.maxDiscount || 0)})`}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono text-slate-600">
+                          {formatRupiah(p.minSpend)}
+                        </TableCell>
+                        <TableCell className="text-center font-mono text-xs">
+                          {p.usedCount} / {p.quota === 0 ? "∞" : p.quota}
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-600">
+                          {p.endDate ? formatDateIndo(p.endDate) : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={p.isActive ? "success" : "default"}>
+                            {p.isActive ? "AKTIF" : "NONAKTIF"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right space-x-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleTogglePromoActive(p.id, p.isActive)}
+                            className="h-7 text-xs px-2"
+                          >
+                            {p.isActive ? "Nonaktifkan" : "Aktifkan"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEditPromo(p)}
+                            className="h-7 text-xs px-2"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleDeletePromo(p.id)}
+                            className="h-7 text-xs px-2"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
                 )}
               </TableBody>
             </Table>
-
             {filteredPromos.length > pageSize && (
               <TablePagination
                 currentPage={promoPage}
@@ -521,7 +714,7 @@ export function AdminContentPage() {
           </>
         )}
 
-        {/* 3. REVIEWS TAB */}
+        {/* REVIEWS TAB */}
         {activeTab === "reviews" && (
           <>
             <Table>
@@ -529,9 +722,9 @@ export function AdminContentPage() {
                 <TableRow>
                   <TableHead className="text-xs">Penyewa & Venue</TableHead>
                   <TableHead className="text-xs">Rating</TableHead>
-                  <TableHead className="text-xs">Komentar Ulasan</TableHead>
+                  <TableHead className="text-xs">Komentar</TableHead>
                   <TableHead className="text-xs">Balasan Mitra</TableHead>
-                  <TableHead className="text-xs">Status Publik</TableHead>
+                  <TableHead className="text-xs">Status</TableHead>
                   <TableHead className="text-xs text-right">Moderasi</TableHead>
                 </TableRow>
               </TableHeader>
@@ -539,74 +732,76 @@ export function AdminContentPage() {
                 {filteredReviews.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-32 text-center text-xs text-slate-400">
-                      Tidak ada ulasan penyewa yang cocok dengan pencarian.
+                      {searchQuery
+                        ? "Tidak ada ulasan yang cocok."
+                        : "Belum ada ulasan dari penyewa."}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredReviews.slice((reviewPage - 1) * pageSize, reviewPage * pageSize).map((r) => (
-                    <TableRow key={r.id} className="hover:bg-slate-50/80 transition-colors">
-                      <TableCell>
-                        <span className="font-bold text-xs text-slate-900 block">{r.userName}</span>
-                        <span className="text-[11px] text-slate-500 block truncate max-w-[160px]">
-                          {getVenueName(r.venueId)}
-                        </span>
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="flex items-center gap-1 font-bold text-xs text-amber-600">
-                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                          <span>{r.rating}.0</span>
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <p className="text-xs text-slate-700 leading-relaxed max-w-sm line-clamp-3">
-                          {r.comment}
-                        </p>
-                      </TableCell>
-
-                      <TableCell>
-                        {r.reply ? (
-                          <p className="text-[11px] text-slate-500 italic max-w-xs line-clamp-2">
-                            "{r.reply}"
+                  filteredReviews
+                    .slice((reviewPage - 1) * pageSize, reviewPage * pageSize)
+                    .map((r) => (
+                      <TableRow key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                        <TableCell>
+                          <span className="font-bold text-xs text-slate-900 block">
+                            {r.user?.fullName || "Penyewa"}
+                          </span>
+                          <span className="text-[11px] text-slate-500 block truncate max-w-[160px]">
+                            {r.venue?.name || "Venue"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 font-bold text-xs text-amber-600">
+                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                            <span>{r.rating}.0</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <p className="text-xs text-slate-700 leading-relaxed max-w-sm line-clamp-3">
+                            {r.comment}
                           </p>
-                        ) : (
-                          <span className="text-[11px] text-slate-400">Belum dibalas</span>
-                        )}
-                      </TableCell>
-
-                      <TableCell>
-                        <Badge variant={r.isVisible ? "success" : "danger"}>
-                          {r.isVisible ? "DITAMPILKAN" : "DISEMBUNYIKAN"}
-                        </Badge>
-                      </TableCell>
-
-                      <TableCell className="text-right">
-                        <Button
-                          variant={r.isVisible ? "danger" : "outline"}
-                          size="sm"
-                          onClick={() => handleToggleReviewVisibility(r.id)}
-                          className="h-7 text-xs px-2.5"
-                        >
-                          {r.isVisible ? (
-                            <>
-                              <EyeOff className="w-3.5 h-3.5 mr-1" />
-                              Sembunyikan
-                            </>
+                        </TableCell>
+                        <TableCell>
+                          {r.reply ? (
+                            <p className="text-[11px] text-slate-500 italic max-w-xs line-clamp-2">
+                              "{r.reply}"
+                            </p>
                           ) : (
-                            <>
-                              <Eye className="w-3.5 h-3.5 mr-1" />
-                              Tampilkan
-                            </>
+                            <span className="text-[11px] text-slate-400">Belum dibalas</span>
                           )}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={r.isVisible ? "success" : "danger"}>
+                            {r.isVisible ? "DITAMPILKAN" : "DISEMBUNYIKAN"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant={r.isVisible ? "danger" : "outline"}
+                            size="sm"
+                            onClick={() =>
+                              handleToggleReviewVisibility(r.id, r.isVisible)
+                            }
+                            className="h-7 text-xs px-2.5"
+                          >
+                            {r.isVisible ? (
+                              <>
+                                <EyeOff className="w-3.5 h-3.5 mr-1" />
+                                Sembunyikan
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="w-3.5 h-3.5 mr-1" />
+                                Tampilkan
+                              </>
+                            )}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
                 )}
               </TableBody>
             </Table>
-
             {filteredReviews.length > pageSize && (
               <TablePagination
                 currentPage={reviewPage}
@@ -617,6 +812,139 @@ export function AdminContentPage() {
             )}
           </>
         )}
+
+        {/* FAQ TAB */}
+        {activeTab === "faq" && (
+          <div className="p-4 sm:p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-slate-500">
+                Daftar pertanyaan yang tampil di halaman Beranda penyewa. Edit atau tambah FAQ
+                baru, lalu klik "Simpan FAQ".
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setFaqItems((prev) => [...prev, { question: "", answers: [""] }])
+                }
+                className="text-xs"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                Tambah FAQ
+              </Button>
+            </div>
+
+            {faqItems.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400">
+                Belum ada FAQ. Klik "Tambah FAQ" untuk membuat pertanyaan baru.
+              </div>
+            ) : (
+              faqItems.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="border border-slate-200 rounded-lg p-3.5 space-y-3 bg-slate-50/50"
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-bold text-slate-400 mt-1.5">#{idx + 1}</span>
+                    <input
+                      type="text"
+                      value={item.question}
+                      onChange={(e) => {
+                        const next = [...faqItems];
+                        next[idx] = { ...next[idx], question: e.target.value };
+                        setFaqItems(next);
+                      }}
+                      placeholder="Pertanyaan FAQ..."
+                      className="flex-1 h-9 px-3 text-xs font-semibold bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-red-600"
+                    />
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => setFaqItems((prev) => prev.filter((_, i) => i !== idx))}
+                      className="h-9 px-2"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2 pl-7">
+                    {item.answers.map((ans, aIdx) => (
+                      <div key={aIdx} className="flex items-start gap-2">
+                        <span className="text-[11px] text-slate-400 mt-1.5">•</span>
+                        <textarea
+                          value={ans}
+                          onChange={(e) => {
+                            const next = [...faqItems];
+                            const newAnswers = [...next[idx].answers];
+                            newAnswers[aIdx] = e.target.value;
+                            next[idx] = { ...next[idx], answers: newAnswers };
+                            setFaqItems(next);
+                          }}
+                          placeholder="Jawaban..."
+                          rows={2}
+                          className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-red-600 resize-none"
+                        />
+                        {item.answers.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...faqItems];
+                              next[idx] = {
+                                ...next[idx],
+                                answers: next[idx].answers.filter((_, i) => i !== aIdx),
+                              };
+                              setFaqItems(next);
+                            }}
+                            className="text-slate-400 hover:text-red-600 mt-1.5"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = [...faqItems];
+                        next[idx] = {
+                          ...next[idx],
+                          answers: [...next[idx].answers, ""],
+                        };
+                        setFaqItems(next);
+                      }}
+                      className="text-[11px] text-red-600 hover:text-red-700 font-medium ml-4"
+                    >
+                      + Tambah jawaban
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+
+            {faqItems.length > 0 && (
+              <div className="flex justify-end pt-2 border-t border-slate-100">
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    setFaqSaving(true);
+                    try {
+                      await apiClient.patch("/admin/settings", { faq: faqItems });
+                      showToast("FAQ berhasil disimpan dan langsung tampil di Beranda.");
+                    } catch (err: any) {
+                      showToast(err?.data?.error?.message || "Gagal menyimpan FAQ.");
+                    } finally {
+                      setFaqSaving(false);
+                    }
+                  }}
+                  disabled={faqSaving}
+                  className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
+                >
+                  {faqSaving ? "Menyimpan..." : "Simpan FAQ"}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* BANNER MODAL */}
@@ -624,11 +952,11 @@ export function AdminContentPage() {
         <Modal
           isOpen={bannerModalOpen}
           onClose={() => setBannerModalOpen(false)}
-          title={editingBanner ? "Edit Banner Promo" : "Tambah Banner Promo Baru"}
+          title={editingBanner ? "Edit Banner" : "Tambah Banner Baru"}
         >
           <div className="space-y-4 text-xs">
             <div className="space-y-1">
-              <label className="font-semibold text-slate-800">Judul / Headline Banner</label>
+              <label className="font-semibold text-slate-800">Judul Banner</label>
               <input
                 type="text"
                 value={bannerTitle}
@@ -638,16 +966,12 @@ export function AdminContentPage() {
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="font-semibold text-slate-800">URL Gambar (Rasio 16:9 HD)</label>
-              <input
-                type="text"
-                value={bannerImageUrl}
-                onChange={(e) => setBannerImageUrl(e.target.value)}
-                placeholder="https://images.unsplash.com/..."
-                className="w-full h-9 px-3 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-600"
-              />
-            </div>
+            <ImageUploadInput
+              value={bannerImageUrl}
+              onChange={setBannerImageUrl}
+              label="Gambar Banner (Rasio 16:9)"
+              bucket="venue-photos"
+            />
 
             <div className="space-y-1">
               <label className="font-semibold text-slate-800">URL Tautan Tujuan</label>
@@ -658,6 +982,9 @@ export function AdminContentPage() {
                 placeholder="/venues"
                 className="w-full h-9 px-3 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-600"
               />
+              <p className="text-[11px] text-slate-400">
+                Halaman yang terbuka saat banner diklik (mis. /venues, /venues/nama-venue)
+              </p>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
@@ -672,9 +999,17 @@ export function AdminContentPage() {
               <Button
                 size="sm"
                 onClick={handleSaveBanner}
+                disabled={saving}
                 className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
               >
-                Simpan Banner
+                {saving ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  "Simpan Banner"
+                )}
               </Button>
             </div>
           </div>
@@ -712,9 +1047,10 @@ export function AdminContentPage() {
                   <option value="percent">Persentase (%)</option>
                 </select>
               </div>
-
               <div className="space-y-1">
-                <label className="font-semibold text-slate-800">Nilai Potongan</label>
+                <label className="font-semibold text-slate-800">
+                  Nilai Potongan {promoType === "percent" ? "(%)" : "(Rp)"}
+                </label>
                 <input
                   type="number"
                   value={promoValue}
@@ -723,6 +1059,23 @@ export function AdminContentPage() {
                 />
               </div>
             </div>
+
+            {promoType === "percent" && (
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-800">
+                  Maks. Diskon (Rp) — kosongkan jika tanpa batas
+                </label>
+                <input
+                  type="number"
+                  value={promoMaxDiscount ?? ""}
+                  onChange={(e) =>
+                    setPromoMaxDiscount(e.target.value ? Number(e.target.value) : null)
+                  }
+                  placeholder="25000"
+                  className="w-full h-9 px-3 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-600"
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -734,9 +1087,8 @@ export function AdminContentPage() {
                   className="w-full h-9 px-3 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-600"
                 />
               </div>
-
               <div className="space-y-1">
-                <label className="font-semibold text-slate-800">Kuota Pemakaian</label>
+                <label className="font-semibold text-slate-800">Kuota Pemakaian (0 = ∞)</label>
                 <input
                   type="number"
                   value={promoQuota}
@@ -744,6 +1096,16 @@ export function AdminContentPage() {
                   className="w-full h-9 px-3 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-600"
                 />
               </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-800">Berlaku Sampai</label>
+              <input
+                type="datetime-local"
+                value={promoEndDate}
+                onChange={(e) => setPromoEndDate(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-600"
+              />
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
@@ -758,9 +1120,17 @@ export function AdminContentPage() {
               <Button
                 size="sm"
                 onClick={handleSavePromo}
+                disabled={saving}
                 className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
               >
-                Simpan Promo
+                {saving ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  "Simpan Promo"
+                )}
               </Button>
             </div>
           </div>
