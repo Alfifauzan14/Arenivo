@@ -28,6 +28,9 @@ pnpm-debug.log*
 # IDE & OS
 .vscode
 .idea
+
+# OpenCode
+.opencode/
 *.suo
 *.ntvs*
 *.njsproj
