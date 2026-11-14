@@ -48,3 +48,27 @@ Thumbs.db
 # TypeScript Cache
 *.tsbuildinfo
 .eslintcache
+
+# Dependencies & Builds (double guard)
+node_modules/
+vendor/
+venv/
+dist/
+build/
+*.tsbuildinfo
+
+# Database & Logs
+*.sqlite
+*.sqlite3
+*.db
+*.log
+
+# Videos & giant binaries
+*.mp4
+*.mkv
+*.iso
+*.zip
+*.exe
+
+# Internal documents (jangan di-push)
+docs/
