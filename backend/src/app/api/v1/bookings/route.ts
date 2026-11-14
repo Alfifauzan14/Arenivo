@@ -2,6 +2,7 @@ import { AppError, ErrorCode, CreateBookingInputSchema } from "@futsal/shared";
 import { withAuth } from "@/middleware/auth";
 import { ok, parseBody, pagination, meta } from "@/lib/http";
 import { handleOptions } from "@/middleware/cors";
+import { bookingRateLimit } from "@/middleware/rate-limiter";
 import { pusherService } from "@/lib/pusher";
 import { bookingsRepository } from "@/modules/bookings/bookings.repository";
 
@@ -15,7 +16,7 @@ export const GET = withAuth(async (req, user) => {
 }, PENYEWA);
 
 /** Wajib header Idempotency-Key (PRD 7.2) */
-export const POST = withAuth(async (req, user) => {
+const createBookingHandler = withAuth(async (req, user) => {
   const key = req.headers.get("idempotency-key");
   if (!key) throw new AppError(ErrorCode.VALIDATION_ERROR, "Header Idempotency-Key wajib disertakan.");
 
@@ -24,3 +25,5 @@ export const POST = withAuth(async (req, user) => {
   await pusherService.notifySlotUpdated(input.fieldId, { bookingId: booking.id, status: booking.status });
   return ok(req, booking, undefined, 201);
 }, PENYEWA);
+
+export const POST = bookingRateLimit(createBookingHandler);

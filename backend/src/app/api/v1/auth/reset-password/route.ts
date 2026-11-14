@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AppError, ErrorCode } from "@futsal/shared";
 import { ok, parseBody, publicRoute } from "@/lib/http";
 import { handleOptions } from "@/middleware/cors";
+import { authRateLimit } from "@/middleware/rate-limiter";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const OPTIONS = handleOptions;
@@ -10,7 +11,7 @@ const Schema = z.object({
   password: z.string().min(8, "Password minimal 8 karakter"),
 });
 
-export const POST = publicRoute(async (req) => {
+const handler = publicRoute(async (req) => {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!token) {
     throw new AppError(ErrorCode.UNAUTHENTICATED, "Sesi pemulihan tidak ditemukan.");
@@ -39,3 +40,5 @@ export const POST = publicRoute(async (req) => {
 
   return ok(req, { updated: true, message: "Kata sandi berhasil diperbarui. Silakan masuk kembali." });
 });
+
+export const POST = authRateLimit(handler);

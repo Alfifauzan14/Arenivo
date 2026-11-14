@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import * as Sentry from "@sentry/nextjs";
 import {
   ErrorCode,
   ERROR_HTTP_STATUS_MAP,
@@ -16,8 +17,23 @@ export function handleApiError(error: unknown, req?: Request): NextResponse {
   // Log server errors
   console.error(`[API Error] [${requestId}]:`, error);
 
+  // Capture to Sentry (only for 5xx errors and unexpected errors)
+  const isAppError = error instanceof AppError;
+  const isZodError = error instanceof ZodError;
+  const statusCode = isAppError ? (error as AppError).statusCode : 500;
+
+  if (!isAppError && !isZodError && statusCode >= 500) {
+    Sentry.captureException(error, {
+      extra: {
+        requestId,
+        url: req?.url,
+        method: req?.method,
+      },
+    });
+  }
+
   // 1. AppError (Custom domain errors)
-  if (error instanceof AppError) {
+  if (isAppError) {
     return NextResponse.json(
       errorResponse(error.code, error.message, error.details, requestId),
       {
@@ -28,7 +44,7 @@ export function handleApiError(error: unknown, req?: Request): NextResponse {
   }
 
   // 2. Zod validation errors
-  if (error instanceof ZodError) {
+  if (isZodError) {
     const details: ErrorDetail[] = error.issues.map((issue) => ({
       field: issue.path.join("."),
       issue: issue.message,

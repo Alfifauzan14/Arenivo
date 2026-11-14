@@ -4,6 +4,7 @@ const envSchema = z.object({
   PORT: z.string().default("3000"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
+  CORS_ORIGINS: z.string().optional(),
 
   // Supabase
   SUPABASE_URL: z.string().url().optional(),
@@ -38,6 +39,15 @@ const envSchema = z.object({
   SYSTEM_AI_PROVIDER: z.string().default("gemini"),
   GEMINI_API_KEY: z.string().optional(),
 
+  // Sentry
+  SENTRY_DSN: z.string().optional(),
+  SENTRY_ORG: z.string().optional(),
+  SENTRY_PROJECT: z.string().optional(),
+  SENTRY_AUTH_TOKEN: z.string().optional(),
+
+  // Rate Limiting
+  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(100),
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
 
   // TikTok Login
 

@@ -2,23 +2,20 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  // Backend purely provides REST API routes under /api/v1/
-  async headers() {
-    return [
-      {
-        source: "/api/:path*",
-        headers: [
-          { key: "Access-Control-Allow-Credentials", value: "true" },
-          { key: "Access-Control-Allow-Origin", value: process.env.CORS_ORIGIN || "http://localhost:5173" },
-          { key: "Access-Control-Allow-Methods", value: "GET,OPTIONS,PATCH,DELETE,POST,PUT" },
-          {
-            key: "Access-Control-Allow-Headers",
-            value: "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, Idempotency-Key",
-          },
-        ],
-      },
-    ];
-  },
 };
 
-export default nextConfig;
+async function withSentryConfig(nextConfig) {
+  const { withSentryConfig } = await import("@sentry/nextjs/config");
+  return withSentryConfig(nextConfig, {
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    authToken: process.env.SENTRY_AUTH_TOKEN,
+    silent: !process.env.SENTRY_DSN,
+    widenClientFileUpload: true,
+    reactComponentAnnotation: {
+      enabled: true,
+    },
+  });
+}
+
+export default withSentryConfig(nextConfig);
