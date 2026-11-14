@@ -31,6 +31,12 @@ pnpm-debug.log*
 
 # OpenCode
 .opencode/
+
+# Test artifacts & screenshots
+.playwright-mcp/
+after-fix-*.png
+landing-bottom.png
+landing-faq-check.png
 *.suo
 *.ntvs*
 *.njsproj
