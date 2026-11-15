@@ -166,7 +166,7 @@ export function AuthPage() {
             setIsLoading(false);
             addToast(
               "info",
-              "Pendaftaran berhasil! Silakan cek email Anda dan klik tautan verifikasi untuk mengaktifkan akun.",
+              "Pendaftaran berhasil! Silakan cek email Anda (termasuk folder Spam/Junk di Gmail) dan klik tautan verifikasi untuk mengaktifkan akun.",
               "Verifikasi Email Diperlukan"
             );
             navigate("/login");

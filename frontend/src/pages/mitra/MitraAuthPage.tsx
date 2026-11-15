@@ -274,7 +274,7 @@ export function MitraAuthPage() {
         } else {
           addToast(
             "info",
-            "Pendaftaran berhasil! Silakan cek email Anda dan klik tautan verifikasi untuk melanjutkan pengajuan kemitraan.",
+            "Pendaftaran berhasil! Silakan cek email Anda (termasuk folder Spam/Junk di Gmail) dan klik tautan verifikasi untuk melanjutkan pengajuan kemitraan.",
             "Verifikasi Email Diperlukan"
           );
           navigate("/login");
