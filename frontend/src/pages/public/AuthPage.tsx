@@ -159,11 +159,18 @@ export function AuthPage() {
             localStorage.setItem("sb_access_token", data.session.access_token);
             localStorage.setItem("futsal_logged_in", "true");
             await refreshProfile();
+            setIsLoading(false);
+            addToast("success", "Pendaftaran berhasil! Selamat datang.", "Daftar Berhasil");
+            navigate("/bookings");
+          } else {
+            setIsLoading(false);
+            addToast(
+              "info",
+              "Pendaftaran berhasil! Silakan cek email Anda dan klik tautan verifikasi untuk mengaktifkan akun.",
+              "Verifikasi Email Diperlukan"
+            );
+            navigate("/login");
           }
-
-          setIsLoading(false);
-          addToast("success", "Pendaftaran berhasil! Akun Anda aktif.", "Daftar Berhasil");
-          navigate("/bookings");
         }
       } catch (err: any) {
         setIsLoading(false);

@@ -245,9 +245,12 @@ export function MitraAuthPage() {
       if (data.user) {
         if (data.session) {
           localStorage.setItem("sb_access_token", data.session.access_token);
+          localStorage.setItem("futsal_mitra_authenticated", "true");
+          localStorage.setItem("futsal_mitra_verification_status", "menunggu");
+        } else {
+          // Email confirmation required - don't set authenticated flags yet
+          localStorage.setItem("futsal_mitra_verification_status", "email_pending");
         }
-        localStorage.setItem("futsal_mitra_authenticated", "true");
-        localStorage.setItem("futsal_mitra_verification_status", "menunggu");
 
         try {
           await apiClient.post("/mitra/application", {
@@ -265,8 +268,17 @@ export function MitraAuthPage() {
         }
 
         setIsLoading(false);
-        addToast("success", "Pendaftaran berhasil diajukan! Berkas Anda sedang ditinjau oleh Super Admin.", "Pengajuan Kemitraan Terkirim");
-        navigate("/mitra/application");
+        if (data.session) {
+          addToast("success", "Pendaftaran berhasil! Selamat datang.", "Pengajuan Kemitraan Terkirim");
+          navigate("/mitra/application");
+        } else {
+          addToast(
+            "info",
+            "Pendaftaran berhasil! Silakan cek email Anda dan klik tautan verifikasi untuk melanjutkan pengajuan kemitraan.",
+            "Verifikasi Email Diperlukan"
+          );
+          navigate("/login");
+        }
       }
     } catch (err: any) {
       setIsLoading(false);
