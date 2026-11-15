@@ -445,12 +445,16 @@ export function LandingPage() {
         {/* Baris 1: Gambar 3D Kiri, Teks Kanan */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
           <div className="lg:col-span-5 flex justify-center">
-            <img
-              src="/images/hero-booking-3d.png"
-              alt="Arenivo - Satu Aplikasi, Banyak Arena"
-              loading="lazy"
-              className="w-full max-w-[340px] sm:max-w-[380px] aspect-square object-contain select-none"
-            />
+            <picture>
+              <source srcSet="/images/hero-booking-3d.webp" type="image/webp" />
+              <img
+                src="/images/hero-booking-3d.png"
+                alt="Arenivo - Satu Aplikasi, Banyak Arena"
+                loading="lazy"
+                decoding="async"
+                className="w-full max-w-[340px] sm:max-w-[380px] aspect-square object-contain select-none"
+              />
+            </picture>
           </div>
 
           <div className="lg:col-span-7 space-y-5">
@@ -540,12 +544,16 @@ export function LandingPage() {
           </div>
 
           <div className="lg:col-span-5 flex justify-center order-1 lg:order-2">
-            <img
-              src="/images/hero-promo-3d.png"
-              alt="Promo Sewa Lapangan"
-              loading="lazy"
-              className="w-full max-w-[340px] sm:max-w-[380px] aspect-square object-contain select-none"
-            />
+            <picture>
+              <source srcSet="/images/hero-promo-3d.webp" type="image/webp" />
+              <img
+                src="/images/hero-promo-3d.png"
+                alt="Promo Sewa Lapangan"
+                loading="lazy"
+                decoding="async"
+                className="w-full max-w-[340px] sm:max-w-[380px] aspect-square object-contain select-none"
+              />
+            </picture>
           </div>
         </div>
       </section>
