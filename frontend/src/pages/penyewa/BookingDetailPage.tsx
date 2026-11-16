@@ -129,6 +129,9 @@ export function BookingDetailPage() {
 
   // Review Form State
   const [rating, setRating] = React.useState<number>(5);
+  const [cleanlinessRating, setCleanlinessRating] = React.useState<number>(5);
+  const [fieldRating, setFieldRating] = React.useState<number>(5);
+  const [communicationRating, setCommunicationRating] = React.useState<number>(5);
   const [comment, setComment] = React.useState<string>("");
   const [hasReviewed, setHasReviewed] = React.useState<boolean>(false);
 
@@ -232,6 +235,9 @@ export function BookingDetailPage() {
     try {
       await apiClient.post(`/bookings/${booking.id}/review`, {
         rating,
+        cleanlinessRating,
+        fieldRating,
+        communicationRating,
         comment: comment.trim(),
       });
       setHasReviewed(true);
@@ -632,6 +638,38 @@ export function BookingDetailPage() {
                 ? "Cukup (Bintang 3)"
                 : "Kurang Puas"}
             </span>
+          </div>
+
+          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
+            <span className="text-[11px] font-bold text-slate-700 block">
+              Penilaian Per Aspek
+            </span>
+            {[
+              { label: "Kebersihan", val: cleanlinessRating, set: setCleanlinessRating },
+              { label: "Kondisi Lapangan", val: fieldRating, set: setFieldRating },
+              { label: "Komunikasi", val: communicationRating, set: setCommunicationRating },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center justify-between">
+                <span className="text-slate-600">{item.label}</span>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => item.set(s)}
+                      className="p-0.5 cursor-pointer"
+                    >
+                      <Star
+                        className={cn(
+                          "w-4 h-4",
+                          s <= item.val ? "fill-amber-400 text-amber-400" : "text-slate-300"
+                        )}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="space-y-1">

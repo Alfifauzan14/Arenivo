@@ -94,14 +94,14 @@ export const MOCK_VENUES: Venue[] = [
       {
         id: "p1",
         venueId: "17ab8073-3d37-4c3d-b635-be37aabd35b2",
-        url: "https://images.unsplash.com/photo-1579952363873-27f5b4c4f5b2?auto=format&fit=crop&w=600&q=80",
+        url: "/images/hero-futsal-indoor.webp",
         isCover: true,
         sortOrder: 0,
       },
       {
         id: "p2",
         venueId: "17ab8073-3d37-4c3d-b635-be37aabd35b2",
-        url: "https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=600&q=80",
+        url: "/images/hero-futsal-action.webp",
         isCover: false,
         sortOrder: 1,
       },
@@ -158,7 +158,7 @@ export const MOCK_REVIEWS: Review[] = [
     reply: "Terima kasih banyak! Ditunggu kehadiran timnya di pekan berikutnya ya.",
     repliedAt: "2026-11-13 16:30:00+07:00",
     userName: "alfi fauzan",
-    userAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80",
+    userAvatar: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='32' fill='%23dc2626'/><text x='32' y='40' font-family='Arial' font-size='24' font-weight='bold' fill='white' text-anchor='middle'>A</text></svg>",
     createdAt: "2026-11-13 16:15:00+07:00",
     isVisible: true,
   },
@@ -374,8 +374,7 @@ export const MOCK_BANNERS: Banner[] = [
   {
     id: "b1",
     title: "Diskon 25% Main Malam Futsal & Mini Soccer",
-    imageUrl:
-      "https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "/images/hero-futsal-action.webp",
     linkUrl: "/venues",
     sortOrder: 0,
     isActive: true,
@@ -383,8 +382,7 @@ export const MOCK_BANNERS: Banner[] = [
   {
     id: "b2",
     title: "Spesial Hari Olahraga: Cashback Rp50.000 QRIS",
-    imageUrl:
-      "https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "/images/hero-promo-arena.webp",
     linkUrl: "/venues",
     sortOrder: 1,
     isActive: true,
@@ -392,8 +390,7 @@ export const MOCK_BANNERS: Banner[] = [
   {
     id: "b3",
     title: "Garansi 100% Bebas Double Booking dengan Sistem Real-Time",
-    imageUrl:
-      "https://images.unsplash.com/photo-1612225220822-30ab95978d91?auto=format&fit=crop&w=600&q=80",
+    imageUrl: "/images/hero-minisoccer-turf.webp",
     linkUrl: "/venues",
     sortOrder: 2,
     isActive: true,
@@ -437,7 +434,7 @@ export const MOCK_USERS: (Profile & { bookingsCount: number })[] = [
     fullName: "alfi fauzan",
     email: "alfifauzan897@gmail.com",
     phone: "081234567890",
-    avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80",
+    avatarUrl: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='32' fill='%23dc2626'/><text x='32' y='40' font-family='Arial' font-size='24' font-weight='bold' fill='white' text-anchor='middle'>AF</text></svg>",
     role: UserRole.PENYEWA,
     status: AccountStatus.AKTIF,
     createdAt: "2026-11-13T12:58:01+07:00",

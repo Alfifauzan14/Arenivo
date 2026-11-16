@@ -369,10 +369,14 @@ export function MitraScannerPage() {
           <Select
             value={selectedVenueId}
             onChange={(e) => setSelectedVenueId(e.target.value)}
-            options={venues.map((v) => ({
-              value: v.id,
-              label: `${v.name} (${v.city?.name || "Venue"})`,
-            }))}
+            options={
+              venues.length > 0
+                ? venues.map((v) => ({
+                    value: v.id,
+                    label: `${v.name} (${v.city?.name || "Venue"})`,
+                  }))
+                : [{ value: "", label: "Memuat venue..." }]
+            }
           />
         </div>
       </div>
@@ -666,7 +670,7 @@ export function MitraScannerPage() {
             <div>
               <CardTitle className="text-sm sm:text-base">Riwayat Pemindaian Lapangan</CardTitle>
               <CardDescription className="text-xs mt-0.5">
-                Catatan check-in tiket di {selectedVenue.name}
+                Catatan check-in tiket di {selectedVenue?.name || "Venue Anda"}
               </CardDescription>
             </div>
             <span className="text-[11px] font-mono font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-lg tabular-nums shrink-0">

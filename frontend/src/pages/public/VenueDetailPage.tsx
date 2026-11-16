@@ -107,8 +107,8 @@ export function VenueDetailPage() {
       address: "Jl. TB Simatupang No. 18, Cilandak, Jakarta Selatan",
       city: { id: "cd5f4a02-d0fc-4e18-8571-7624a0029492", name: "Jakarta Selatan" },
       status: "aktif",
-      ratingAvg: 4.8,
-      reviewCount: 24,
+      ratingAvg: 0,
+      reviewCount: 0,
       startingPrice: 150000,
       facilities: [],
       fields: [],
@@ -755,7 +755,7 @@ export function VenueDetailPage() {
                   <div className="flex justify-between gap-2">
                     <span className="text-slate-500">Lapangan</span>
                     <span className="font-semibold text-slate-900 text-right">
-                      {selectedField.name}
+                      {selectedField?.name || selectedField?.fieldType?.name || "Lapangan"}
                     </span>
                   </div>
                   <div className="flex justify-between gap-2">
@@ -1222,7 +1222,15 @@ export function VenueDetailPage() {
 
             <div className="flex items-center gap-1 text-amber-400">
               {Array.from({ length: 5 }).map((_, idx) => (
-                <Star key={idx} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                <Star
+                  key={idx}
+                  className={cn(
+                    "w-4 h-4",
+                    idx < Math.round(venue.ratingAvg || 0)
+                      ? "fill-amber-400 text-amber-400"
+                      : "text-slate-200"
+                  )}
+                />
               ))}
             </div>
 
@@ -1232,27 +1240,38 @@ export function VenueDetailPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-            {[
-              { label: "Kebersihan", score: Math.min(5, +(venue.ratingAvg - 0.05).toFixed(2)) },
-              {
-                label: "Kondisi Lapangan",
-                score: Math.min(5, +(venue.ratingAvg - 0.1).toFixed(2)),
-              },
-              { label: "Komunikasi", score: Math.min(5, +(venue.ratingAvg - 0.15).toFixed(2)) },
-            ].map((stat) => (
-              <div key={stat.label} className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-600 font-medium">{stat.label}</span>
-                  <span className="font-bold text-slate-800 tabular-nums">{stat.score}</span>
+            {(() => {
+              const bd = (venue as any).reviewBreakdown;
+              const fallbackScore = venue.reviewCount > 0 ? Number(venue.ratingAvg || 0) : 0;
+              const items = [
+                {
+                  label: "Kebersihan",
+                  score: venue.reviewCount > 0 ? Number((bd?.cleanliness ?? fallbackScore).toFixed(2)) : 0,
+                },
+                {
+                  label: "Kondisi Lapangan",
+                  score: venue.reviewCount > 0 ? Number((bd?.fieldCondition ?? fallbackScore).toFixed(2)) : 0,
+                },
+                {
+                  label: "Komunikasi",
+                  score: venue.reviewCount > 0 ? Number((bd?.communication ?? fallbackScore).toFixed(2)) : 0,
+                },
+              ];
+              return items.map((stat) => (
+                <div key={stat.label} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-600 font-medium">{stat.label}</span>
+                    <span className="font-bold text-slate-800 tabular-nums">{stat.score}</span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full bg-red-600 rounded-full"
+                      style={{ width: `${Math.max(0, Math.min(100, (stat.score / 5) * 100))}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                  <div
-                    className="h-full bg-red-600 rounded-full"
-                    style={{ width: `${(stat.score / 5) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+              ));
+            })()}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1326,7 +1345,7 @@ export function VenueDetailPage() {
           <div className="min-w-0">
             <span className="text-[11px] text-slate-500 block truncate">
               {selectedSlots.length > 0
-                ? `${selectedSlots.length} Jam • ${selectedField.name}`
+                ? `${selectedSlots.length} Jam • ${selectedField?.name || selectedField?.fieldType?.name || "Lapangan"}`
                 : "Mulai dari"}
             </span>
             <div className="text-base sm:text-lg font-extrabold text-slate-900 tabular-nums">

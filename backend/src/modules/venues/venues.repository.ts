@@ -3,8 +3,8 @@ import { camelize, dbError, orNotFound } from "../../lib/http";
 
 const VENUE_SELECT = `*, city:cities(*), photos:venue_photos(*),
   facilities:venue_facilities(facility:facilities(*)),
-  fields(id, base_price, status, field_type:field_types(*)),
-  reviews(rating, is_visible),
+  fields(id, name, surface, size_description, base_price, status, field_type:field_types(*)),
+  reviews(rating, cleanliness_rating, field_rating, communication_rating, is_visible),
   mitra:mitra_profiles!inner(verification_status)`;
 
 function shape(row: any) {
@@ -21,11 +21,24 @@ function shape(row: any) {
           ).toFixed(1)
         )
       : 0;
+  const calcAspect = (key: "cleanlinessRating" | "fieldRating" | "communicationRating") => {
+    if (reviewCount === 0) return 0;
+    const sum = visibleReviews.reduce(
+      (acc: number, r: any) => acc + Number(r[key] ?? r.rating ?? 0),
+      0
+    );
+    return Number((sum / reviewCount).toFixed(2));
+  };
   return {
     ...v,
     reviews: undefined,
     ratingAvg,
     reviewCount,
+    reviewBreakdown: {
+      cleanliness: calcAspect("cleanlinessRating"),
+      fieldCondition: calcAspect("fieldRating"),
+      communication: calcAspect("communicationRating"),
+    },
     facilities: (v.facilities || []).map((x: any) => x.facility).filter(Boolean),
     photos: (v.photos || []).sort((a: any, b: any) => a.sortOrder - b.sortOrder),
     startingPrice: activeFields.length ? Math.min(...activeFields.map((f: any) => f.basePrice)) : 0,

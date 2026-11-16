@@ -22,7 +22,6 @@ import {
 import { BrandLogoIcon } from "@/components/common/BrandLogo";
 import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
 import { useToast } from "@/components/ui";
-import { MOCK_CITIES } from "@/lib/mock-data";
 import { supabase } from "@/lib/supabase";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -114,13 +113,31 @@ export function MitraAuthPage() {
     setRegisterStep(4);
   };
 
-  // Business & Venue Data
+  // Live Cities from DB & Business Data
+  const [cities, setCities] = React.useState<any[]>([]);
   const [businessName, setBusinessName] = React.useState("");
   const [businessType, setBusinessType] = React.useState<"PT" | "CV" | "Perorangan">("PT");
-  const [cityId, setCityId] = React.useState(MOCK_CITIES[0]?.id || "");
+  const [cityId, setCityId] = React.useState("");
   const [venueAddress, setVenueAddress] = React.useState("");
   const [taxNibNumber, setTaxNibNumber] = React.useState("");
   const [documentFileName, setDocumentFileName] = React.useState<string>("");
+  const [documentFile, setDocumentFile] = React.useState<File | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    apiClient
+      .get<any[]>("/master/cities")
+      .then((res) => {
+        if (active && Array.isArray(res.data) && res.data.length > 0) {
+          setCities(res.data);
+          setCityId((prev) => prev || res.data[0].id);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Bank Account for Payouts
   const [bankName, setBankName] = React.useState("BCA");
@@ -253,19 +270,57 @@ export function MitraAuthPage() {
           localStorage.setItem("futsal_mitra_verification_status", "email_pending");
         }
 
-        try {
-          await apiClient.post("/mitra/application", {
-            businessName: businessName.trim(),
-            businessType,
-            cityId: cityId || undefined,
-            address: venueAddress.trim(),
-            taxNumber: taxNibNumber.trim(),
-            bankName,
-            bankAccountNumber: bankAccountNumber.trim(),
-            bankAccountHolder: bankAccountHolder.trim(),
-          });
-        } catch {
-          // Sinkronisasi profil mitra gagal — pendaftaran tetap dianggap berhasil
+        const selectedCityName = cities.find((c) => c.id === cityId)?.name;
+        const fullBusinessAddress = [venueAddress.trim(), selectedCityName]
+          .filter(Boolean)
+          .join(", ");
+
+        let uploadedDocPath: string | undefined;
+        if (data.session && documentFile) {
+          try {
+            const signRes = await apiClient.post<any>("/uploads/sign", {
+              bucket: "mitra-documents",
+              fileName: documentFile.name,
+              contentType: documentFile.type || "application/pdf",
+            });
+            if (signRes.data?.signedUrl) {
+              await fetch(signRes.data.signedUrl, {
+                method: "PUT",
+                headers: { "Content-Type": documentFile.type || "application/octet-stream" },
+                body: documentFile,
+              });
+              uploadedDocPath = signRes.data.path || signRes.data.publicUrl;
+            }
+          } catch {
+            // fallback without uploaded file
+          }
+        }
+
+        const mitraPayload = {
+          businessName: businessName.trim(),
+          businessAddress: fullBusinessAddress,
+          ...(uploadedDocPath ? { documentUrl: uploadedDocPath } : {}),
+          bankName,
+          bankAccountNumber: bankAccountNumber.trim(),
+          bankAccountHolder: bankAccountHolder.trim(),
+        };
+
+        if (data.session) {
+          try {
+            await apiClient.post("/auth/sync-profile", {
+              role: "mitra",
+              fullName: managerName.trim(),
+              phone: managerPhone.trim(),
+              mitra: mitraPayload,
+            });
+          } catch {
+            // profile might already exist
+          }
+          try {
+            await apiClient.post("/mitra/application", mitraPayload);
+          } catch {
+            // application already synced
+          }
         }
 
         setIsLoading(false);
@@ -677,11 +732,15 @@ export function MitraAuthPage() {
                             onChange={(e) => setCityId(e.target.value)}
                             className="w-full rounded-lg bg-white border border-slate-900 px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 shadow-xs cursor-pointer"
                           >
-                            {MOCK_CITIES.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))}
+                            {cities.length === 0 ? (
+                              <option value="">Memuat daftar kota...</option>
+                            ) : (
+                              cities.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))
+                            )}
                           </select>
                         </div>
                       </div>
@@ -768,7 +827,10 @@ export function MitraAuthPage() {
                               className="hidden"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
-                                if (file) setDocumentFileName(file.name);
+                                if (file) {
+                                  setDocumentFileName(file.name);
+                                  setDocumentFile(file);
+                                }
                               }}
                             />
                           </label>

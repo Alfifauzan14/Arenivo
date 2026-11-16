@@ -522,7 +522,7 @@ export function CheckoutPage() {
                   <img
                     src={
                       venue.photos?.[0]?.url ||
-                      "https://images.unsplash.com/photo-1575361204480-aadea25e6e68?auto=format&fit=crop&w=300&q=80"
+                      "/images/hero-futsal-indoor.webp"
                     }
                     alt={venue.name}
                     className="w-20 h-20 rounded-lg object-cover shrink-0 border border-slate-200"

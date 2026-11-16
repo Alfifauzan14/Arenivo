@@ -50,7 +50,7 @@ export type UpdateProfileInput = z.infer<typeof UpdateProfileInputSchema>;
 export const RegisterMitraInputSchema = z.object({
   businessName: z.string().min(3, "Nama usaha minimal 3 karakter"),
   businessAddress: z.string().min(5, "Alamat usaha minimal 5 karakter"),
-  documentUrl: z.string().url("Unggah dokumen izin/KTP terlebih dahulu"),
+  documentUrl: z.string().min(1).optional(),
   bankName: z.string().min(2, "Pilih atau isi nama bank"),
   bankAccountNumber: z.string().min(5, "Nomor rekening minimal 5 digit"),
   bankAccountHolder: z.string().min(2, "Nama pemilik rekening wajib diisi"),

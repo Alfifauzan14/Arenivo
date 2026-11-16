@@ -347,7 +347,7 @@ export function PublicLayout() {
                     className="flex items-center gap-1.5 p-1 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
                   >
                     <img
-                      src={user?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=75"}
+                      src={user?.avatarUrl || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='32' fill='%23dc2626'/><circle cx='32' cy='24' r='11' fill='white'/><path d='M14 54c0-10 8-16 18-16s18 6 18 16' fill='white'/></svg>"}
                       alt="Avatar"
                       loading="lazy"
                       decoding="async"
@@ -563,7 +563,7 @@ export function PublicLayout() {
                         <img
                           src={
                             user?.avatarUrl ||
-                            "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=75"
+                            "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='32' fill='%23dc2626'/><circle cx='32' cy='24' r='11' fill='white'/><path d='M14 54c0-10 8-16 18-16s18 6 18 16' fill='white'/></svg>"
                           }
                           alt="Avatar"
                           loading="lazy"

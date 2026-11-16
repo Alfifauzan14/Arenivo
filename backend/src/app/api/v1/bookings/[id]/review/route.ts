@@ -10,6 +10,9 @@ export const OPTIONS = handleOptions;
 
 const schema = z.object({
   rating: z.number().int().min(1).max(5),
+  cleanlinessRating: z.number().int().min(1).max(5).optional(),
+  fieldRating: z.number().int().min(1).max(5).optional(),
+  communicationRating: z.number().int().min(1).max(5).optional(),
   comment: z.string().max(1000).optional()
 });
 
@@ -45,6 +48,9 @@ export const POST = withAuth(async (req, user, ctx) => {
       user_id: user.id,
       venue_id: booking.venueId,
       rating: body.rating,
+      cleanliness_rating: body.cleanlinessRating ?? body.rating,
+      field_rating: body.fieldRating ?? body.rating,
+      communication_rating: body.communicationRating ?? body.rating,
       comment: body.comment ?? null,
       is_visible: true
     })
