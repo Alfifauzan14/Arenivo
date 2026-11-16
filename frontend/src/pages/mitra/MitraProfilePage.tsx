@@ -6,6 +6,7 @@ import {
   Save,
   ShieldCheck,
   User,
+  Loader2,
 } from "lucide-react";
 import {
   Button,
@@ -18,28 +19,92 @@ import {
   Select,
   useToast,
 } from "@/components/ui";
+import { apiClient } from "@/lib/api-client";
+import { supabase } from "@/lib/supabase";
 
 export function MitraProfilePage() {
   const { addToast } = useToast();
 
   // Profile state
-  const [businessName, setBusinessName] = React.useState("PT Spartan Olahraga Sejahtera");
-  const [picName, setPicName] = React.useState("Bambang Hermawan");
-  const [phone, setPhone] = React.useState("081122334455");
-  const [email, setEmail] = React.useState("mitra.spartan@gmail.com");
+  const [businessName, setBusinessName] = React.useState("Champion Arena Group");
+  const [picName, setPicName] = React.useState("Mitra Arenivo");
+  const [phone, setPhone] = React.useState("081234567890");
+  const [email, setEmail] = React.useState("mitra@arenivo.id");
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [isFetching, setIsFetching] = React.useState(true);
 
   // Bank account state
   const [bankName, setBankName] = React.useState("BCA");
   const [accountNumber, setAccountNumber] = React.useState("8830128491");
-  const [accountHolder, setAccountHolder] = React.useState("PT Spartan Olahraga Sejahtera");
+  const [accountHolder, setAccountHolder] = React.useState("Champion Arena Group");
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  // Muat data profil mitra langsung dari Database Supabase
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient
+      .get<any>("/mitra/profile")
+      .then((res) => {
+        if (isMounted && res.data) {
+          const { profile, mitraProfile } = res.data;
+          if (profile) {
+            if (profile.fullName) setPicName(profile.fullName);
+            if (profile.phone) setPhone(profile.phone);
+            if (profile.email) setEmail(profile.email);
+          }
+          if (mitraProfile) {
+            if (mitraProfile.businessName) setBusinessName(mitraProfile.businessName);
+            if (mitraProfile.bankName) setBankName(mitraProfile.bankName);
+            if (mitraProfile.bankAccountNumber) setAccountNumber(mitraProfile.bankAccountNumber);
+            if (mitraProfile.bankAccountHolder) setAccountHolder(mitraProfile.bankAccountHolder);
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) setIsFetching(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    addToast(
-      "success",
-      "Profil pengelola dan data rekening bank pencairan berhasil diperbarui.",
-      "Data Tersimpan"
-    );
+    setIsLoading(true);
+
+    try {
+      await apiClient.patch("/mitra/profile", {
+        fullName: picName.trim(),
+        phone: phone.trim(),
+        businessName: businessName.trim(),
+        bankName: bankName.trim(),
+        bankAccountNumber: accountNumber.trim(),
+        bankAccountHolder: accountHolder.trim(),
+      });
+
+      if (email.trim()) {
+        try {
+          await supabase.auth.updateUser({
+            email: email.trim().toLowerCase(),
+            data: {
+              full_name: picName.trim(),
+              phone: phone.trim(),
+            },
+          });
+        } catch {}
+      }
+
+      addToast(
+        "success",
+        "Profil pengelola dan data rekening bank pencairan berhasil diperbarui di database.",
+        "Data Tersimpan"
+      );
+    } catch (err: any) {
+      addToast("error", err?.message || "Gagal menyimpan perubahan profil mitra.", "Gagal");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -90,7 +155,7 @@ export function MitraProfilePage() {
               </div>
 
               <Input
-                label="Email Bisnis Mitra"
+                label="Email Bisnis Mitra (Gmail)"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -153,10 +218,20 @@ export function MitraProfilePage() {
             type="submit"
             variant="primary"
             size="md"
+            disabled={isLoading || isFetching}
             className="w-full sm:w-auto justify-center text-xs gap-1.5"
           >
-            <Save className="w-4 h-4" />
-            Simpan Perubahan
+            {isLoading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Menyimpan...</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                <span>Simpan Perubahan</span>
+              </>
+            )}
           </Button>
         </div>
       </form>
