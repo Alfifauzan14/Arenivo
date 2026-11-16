@@ -77,9 +77,10 @@ export function AdminUsersPage() {
   };
 
   const filteredUsers = users.filter((u) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.fullName || "").toLowerCase().includes(q) ||
+      (u.email || "").toLowerCase().includes(q) ||
       (u.phone && u.phone.includes(searchQuery));
 
     const matchesStatus = filterStatus === "all" || u.status === filterStatus;

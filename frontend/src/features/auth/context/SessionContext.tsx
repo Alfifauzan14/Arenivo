@@ -45,14 +45,24 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         });
         setIsLoggedIn(true);
 
-        // Load favorites dari API (bukan localStorage)
+        // Load favorites dari API dengan fallback Supabase langsung
         try {
           const favRes = await apiClient.get<any[]>("/me/favorites");
           if (favRes.data && Array.isArray(favRes.data)) {
-            setFavorites(favRes.data.map((v: any) => v.id));
+            setFavorites(favRes.data.filter(Boolean).map((v: any) => v.id));
           }
         } catch {
-          // Favorit API butuh auth — abaikan jika belum login
+          try {
+            const { data: favRows } = await supabase
+              .from("favorites")
+              .select("venue_id")
+              .eq("user_id", userId);
+            if (favRows) {
+              setFavorites(favRows.map((r: any) => r.venue_id));
+            }
+          } catch {
+            // abaikan
+          }
         }
         return;
       }
@@ -161,12 +171,25 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         await apiClient.put("/me/favorites", { venueId });
       }
     } catch {
-      // Revert on error
-      setFavorites((prev) =>
-        prev.includes(venueId) ? prev.filter((id) => id !== venueId) : [...prev, venueId]
-      );
+      // Fallback langsung ke Supabase (RLS own_favorites mengizinkan user_id = auth.uid())
+      try {
+        const uid = currentUser?.id;
+        if (!uid) throw new Error("Unauthenticated");
+        if (isFav) {
+          const { error } = await supabase.from("favorites").delete().eq("user_id", uid).eq("venue_id", venueId);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from("favorites").upsert({ user_id: uid, venue_id: venueId });
+          if (error) throw error;
+        }
+      } catch {
+        // Revert on error only if both API and Supabase failed
+        setFavorites((prev) =>
+          prev.includes(venueId) ? prev.filter((id) => id !== venueId) : [...prev, venueId]
+        );
+      }
     }
-  }, [favorites]);
+  }, [favorites, currentUser?.id]);
 
   const isFavorite = React.useCallback(
     (venueId: string) => favorites.includes(venueId),

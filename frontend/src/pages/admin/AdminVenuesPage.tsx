@@ -56,10 +56,11 @@ export function AdminVenuesPage() {
   };
 
   const filteredVenues = venues.filter((v) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (v.city?.name && v.city.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      (v.name || "").toLowerCase().includes(q) ||
+      (v.address || "").toLowerCase().includes(q) ||
+      (v.city?.name && v.city.name.toLowerCase().includes(q));
 
     const matchesStatus = filterStatus === "all" || v.status === filterStatus;
 
@@ -71,7 +72,7 @@ export function AdminVenuesPage() {
     currentPage * pageSize
   );
 
-  const handleConfirmStatusChange = () => {
+  const handleConfirmStatusChange = async () => {
     if (!actionVenue) return;
     const { venue, targetStatus } = actionVenue;
 
@@ -81,6 +82,12 @@ export function AdminVenuesPage() {
 
     if (selectedVenue?.id === venue.id) {
       setSelectedVenue((prev) => (prev ? { ...prev, status: targetStatus } : null));
+    }
+
+    try {
+      await apiClient.patch(`/admin/venues/${venue.id}/status`, { status: targetStatus });
+    } catch {
+      // ignore if backend fails
     }
 
     showToast(

@@ -27,13 +27,13 @@ export function NotificationsPage() {
     let isMounted = true;
     apiClient.get<any[]>("/me/notifications").then((res) => {
       if (!isMounted) return;
-      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.data && Array.isArray(res.data)) {
         setNotifications(res.data);
       } else {
-        setNotifications(MOCK_NOTIFICATIONS);
+        setNotifications([]);
       }
     }).catch(() => {
-      if (isMounted) setNotifications(MOCK_NOTIFICATIONS);
+      if (isMounted) setNotifications([]);
     });
     return () => { isMounted = false; };
   }, []);
@@ -42,10 +42,15 @@ export function NotificationsPage() {
 
   const handleMarkAllRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    window.dispatchEvent(new Event("arenivo:notifications-read"));
     try {
-      await apiClient.patch("/me/notifications", {});
+      await apiClient.patch("/me/notifications/read-all", {});
     } catch {
-      // Silent fail — UI already updated optimistically
+      try {
+        await apiClient.patch("/me/notifications", {});
+      } catch {
+        // Silent fail — UI already updated optimistically
+      }
     }
     addToast("success", "Semua notifikasi telah ditandai sebagai dibaca.", "Notifikasi Dibaca");
   };

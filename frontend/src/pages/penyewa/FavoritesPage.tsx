@@ -8,13 +8,13 @@ import { VenueCard } from "@/features/venue/components/VenueCard";
 import type { Venue } from "@futsal/shared";
 
 export function FavoritesPage() {
-  const { favorites } = useSession();
+  const { favorites, isLoggedIn } = useSession();
   const [venues, setVenues] = React.useState<Venue[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     let isMounted = true;
-    if (favorites.length === 0) {
+    if (!isLoggedIn) {
       setVenues([]);
       setLoading(false);
       return;
@@ -25,11 +25,16 @@ export function FavoritesPage() {
     apiClient.get<any[]>("/me/favorites")
       .then((res) => {
         if (!isMounted) return;
-        setVenues((Array.isArray(res.data) ? res.data : []) as Venue[]);
+        const list = (Array.isArray(res.data) ? res.data : []).filter(Boolean) as Venue[];
+        setVenues(list);
       })
       .catch(() => {
         // Fallback: fetch semua venue lalu filter
         if (!isMounted) return;
+        if (favorites.length === 0) {
+          setVenues([]);
+          return;
+        }
         apiClient.get<any[]>("/venues", { limit: 50 })
           .then((r) => {
             if (!isMounted) return;
@@ -42,7 +47,7 @@ export function FavoritesPage() {
         if (isMounted) setLoading(false);
       });
     return () => { isMounted = false; };
-  }, [favorites]);
+  }, [favorites, isLoggedIn]);
 
   return (
     <div className="min-h-screen">

@@ -52,10 +52,10 @@ export const authRepository = {
   async favorites(userId: string) {
     const { data, error } = await supabaseAdmin
       .from("favorites")
-      .select("venue:venues(*, city:cities(*))")
+      .select("venue:venues(*, city:cities(*), photos:venue_photos(*))")
       .eq("user_id", userId);
     dbError(error);
-    return camelize<any[]>((data || []).map((r: any) => r.venue));
+    return camelize<any[]>((data || []).map((r: any) => r.venue).filter(Boolean));
   },
   async addFavorite(userId: string, venueId: string) {
     const { error } = await supabaseAdmin.from("favorites").upsert({ user_id: userId, venue_id: venueId });

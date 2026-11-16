@@ -100,16 +100,17 @@ export function AdminMitraPage() {
 
   // Filtered List
   const filteredMitra = mitraList.filter((m) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      m.businessName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.bankAccountNumber.includes(searchQuery);
+      (m.businessName || "").toLowerCase().includes(q) ||
+      (m.email || "").toLowerCase().includes(q) ||
+      (m.bankAccountNumber || "").includes(searchQuery);
 
     const matchesVerification =
       filterVerification === "all" || m.verificationStatus === filterVerification;
 
     const matchesAccount =
-      filterAccount === "all" || m.accountStatus === filterAccount;
+      filterAccount === "all" || (m.accountStatus || "aktif") === filterAccount;
 
     return matchesSearch && matchesVerification && matchesAccount;
   });

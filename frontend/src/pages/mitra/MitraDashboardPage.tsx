@@ -63,6 +63,12 @@ export function MitraDashboardPage() {
       }
     }).catch(() => {});
 
+    apiClient.get<any>("/mitra/balance").then((res) => {
+      if (isMounted && res.data) {
+        setBalance((prev: any) => prev && prev.saldoTotal > 0 ? prev : res.data);
+      }
+    }).catch(() => {});
+
     apiClient.get<any[]>("/mitra/venues").then((res) => {
       if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
         setVenues(res.data);

@@ -32,7 +32,7 @@ export const mitraRepository = {
     // Get slot reservations for today (stored as UTC in DB)
     const { data: reservations } = await supabaseAdmin
       .from("slot_reservations")
-      .select("field_id, slot_start, type, booking_id, booking:bookings!inner(status, expires_at)")
+      .select("field_id, slot_start, type, booking_id, booking:bookings(status, expires_at)")
       .in("field_id", fieldIds)
       .eq("is_active", true)
       .gte("slot_start", `${dateStr}T00:00:00+07:00`)

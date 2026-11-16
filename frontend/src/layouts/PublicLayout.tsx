@@ -68,14 +68,26 @@ export function PublicLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  React.useEffect(() => {
+    const onAllRead = () => {
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    };
+    window.addEventListener("arenivo:notifications-read", onAllRead);
+    return () => window.removeEventListener("arenivo:notifications-read", onAllRead);
+  }, []);
+
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const markAllAsRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     try {
-      await apiClient.patch("/me/notifications", {});
+      await apiClient.patch("/me/notifications/read-all", {});
     } catch {
-      // Silent fail — UI already updated
+      try {
+        await apiClient.patch("/me/notifications", {});
+      } catch {
+        // Silent fail — UI already updated
+      }
     }
   };
 

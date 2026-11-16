@@ -5,10 +5,12 @@ import { BrandLogoIcon } from "@/components/common/BrandLogo";
 import { useToast } from "@/components/ui";
 import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
 import { supabase } from "@/lib/supabase";
+import { useSession } from "@/features/auth/context/SessionContext";
 
 export function AdminLoginPage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { refreshProfile } = useSession();
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -51,6 +53,7 @@ export function AdminLoginPage() {
 
         localStorage.setItem("sb_access_token", data.session.access_token);
         localStorage.setItem("futsal_admin_authenticated", "true");
+        await refreshProfile();
         setIsLoading(false);
         addToast(
           "success",

@@ -10,16 +10,19 @@ export const adminRepository = {
 
   async mitraList(p: { verification?: string; q?: string; from: number; to: number }) {
     let q = supabaseAdmin
-      .from("mitra_profiles").select("*, profile:profiles!user_id(email, phone, status, full_name)", { count: "exact" })
+      .from("mitra_profiles").select("*, profile:profiles!mitra_profiles_user_id_fkey(email, phone, status, full_name)", { count: "exact" })
       .order("created_at", { ascending: false }).range(p.from, p.to);
     if (p.verification) q = q.eq("verification_status", p.verification);
     if (p.q) q = q.ilike("business_name", `%${p.q}%`);
     const { data, error, count } = await q;
     dbError(error);
-    // Merge mitra_profiles.phone with profiles.phone for display
+    // Merge mitra_profiles with profiles fields for display
     const rows = camelize<any[]>(data || []).map((r: any) => ({
       ...r,
-      phone: r.phone || r.profile?.phone || null
+      email: r.email || r.profile?.email || "",
+      phone: r.phone || r.profile?.phone || "",
+      accountStatus: r.profile?.status || "aktif",
+      ownerName: r.profile?.fullName || "",
     }));
     return { rows, total: count || 0 };
   },
@@ -61,13 +64,17 @@ export const adminRepository = {
   },
 
   async users(p: { q?: string; status?: string; from: number; to: number }) {
-    let q = supabaseAdmin.from("profiles").select("*", { count: "exact" }).eq("role", "penyewa")
+    let q = supabaseAdmin.from("profiles").select("*, bookings:bookings!bookings_user_id_fkey(count)", { count: "exact" }).eq("role", "penyewa")
       .order("created_at", { ascending: false }).range(p.from, p.to);
     if (p.status) q = q.eq("status", p.status);
     if (p.q) q = q.or(`full_name.ilike.%${p.q}%,email.ilike.%${p.q}%`);
     const { data, error, count } = await q;
     dbError(error);
-    return { rows: camelize<any[]>(data || []), total: count || 0 };
+    const rows = camelize<any[]>(data || []).map((u: any) => ({
+      ...u,
+      bookingsCount: Array.isArray(u.bookings) ? (u.bookings[0]?.count ?? 0) : 0,
+    }));
+    return { rows, total: count || 0 };
   },
 
   async payouts(status: string | undefined, from: number, to: number) {
@@ -163,16 +170,29 @@ export const adminRepository = {
       const { count: c } = await q;
       return c || 0;
     };
-    const [users, mitra, venues, bookings, { data: paid }] = await Promise.all([
+    const [users, mitra, pendingMitra, pendingRefunds, pendingPayouts, venues, bookings, { data: paid }] = await Promise.all([
       count("profiles", (q) => q.eq("role", "penyewa")),
       count("mitra_profiles"),
+      count("mitra_profiles", (q) => q.eq("verification_status", "menunggu")),
+      count("refunds", (q) => q.eq("status", "diajukan")),
+      count("payouts", (q) => q.eq("status", "menunggu")),
       count("venues"),
       count("bookings", (q) => q.in("status", ["dikonfirmasi", "digunakan", "selesai"])),
       supabaseAdmin.from("bookings").select("total_price, platform_commission").in("status", ["dikonfirmasi", "digunakan", "selesai"]).eq("source", "online"),
     ]);
     const gmv = (paid || []).reduce((s: number, r: any) => s + r.total_price, 0);
     const commission = (paid || []).reduce((s: number, r: any) => s + r.platform_commission, 0);
-    return { totalUsers: users, totalMitra: mitra, totalVenues: venues, totalBookings: bookings, gmv, platformCommission: commission };
+    return {
+      totalUsers: users,
+      totalMitra: mitra,
+      pendingMitraCount: pendingMitra,
+      pendingRefundsCount: pendingRefunds,
+      pendingPayoutsCount: pendingPayouts,
+      totalVenues: venues,
+      totalBookings: bookings,
+      gmv,
+      platformCommission: commission,
+    };
   },
 
   async auditLogs(from: number, to: number) {

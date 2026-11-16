@@ -23,6 +23,7 @@ import {
 import { BrandLogoIcon } from "@/components/common/BrandLogo";
 import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
 import { cn } from "@/lib/utils";
+import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/features/auth/context/SessionContext";
 
 export function AdminLayout() {
@@ -31,20 +32,45 @@ export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [authorized, setAuthorized] = React.useState(false);
+  const [badges, setBadges] = React.useState({
+    pendingMitra: 0,
+    pendingRefunds: 0,
+    pendingPayouts: 0,
+  });
 
   // Protect admin routes - only allow admin role
   React.useEffect(() => {
-    const checkAuth = async () => {
-      const adminFlag = localStorage.getItem("futsal_admin_authenticated");
-      if (!isLoggedIn || !adminFlag || user?.role !== "admin") {
+    const adminFlag = localStorage.getItem("futsal_admin_authenticated");
+    const token = localStorage.getItem("sb_access_token");
+    if (!adminFlag || !token) {
+      localStorage.removeItem("futsal_admin_authenticated");
+      navigate("/admin/login", { replace: true });
+      return;
+    }
+    if (isLoggedIn && user) {
+      if (user.role !== "admin") {
         localStorage.removeItem("futsal_admin_authenticated");
         navigate("/admin/login", { replace: true });
       } else {
         setAuthorized(true);
       }
-    };
-    checkAuth();
+    }
   }, [isLoggedIn, user, navigate]);
+
+  React.useEffect(() => {
+    if (!authorized) return;
+    let isMounted = true;
+    apiClient.get<any>("/admin/dashboard").then((res) => {
+      if (isMounted && res.data) {
+        setBadges({
+          pendingMitra: res.data.pendingMitraCount ?? 0,
+          pendingRefunds: res.data.pendingRefundsCount ?? 0,
+          pendingPayouts: res.data.pendingPayoutsCount ?? 0,
+        });
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, [authorized]);
 
   // Show loader while checking auth
   if (!authorized) {
@@ -88,7 +114,7 @@ export function AdminLayout() {
           path: "/admin/mitra",
           label: "Verifikasi Mitra",
           icon: <CheckSquare className="w-4 h-4" />,
-          badge: "1",
+          badge: badges.pendingMitra > 0 ? String(badges.pendingMitra) : undefined,
         },
         { path: "/admin/users", label: "Pengguna Penyewa", icon: <Users className="w-4 h-4" /> },
       ],
@@ -108,13 +134,13 @@ export function AdminLayout() {
           path: "/admin/refunds",
           label: "Penanganan Refund",
           icon: <RotateCcw className="w-4 h-4" />,
-          badge: "1",
+          badge: badges.pendingRefunds > 0 ? String(badges.pendingRefunds) : undefined,
         },
         {
           path: "/admin/payouts",
           label: "Pencairan Mitra",
           icon: <Wallet className="w-4 h-4" />,
-          badge: "1",
+          badge: badges.pendingPayouts > 0 ? String(badges.pendingPayouts) : undefined,
         },
       ],
     },

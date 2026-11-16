@@ -17,6 +17,8 @@ export const PUT = withAuth(async (req, user) => {
   return ok(req, { venueId, favorite: true });
 });
 
+export const POST = PUT;
+
 export const DELETE = withAuth(async (req, user) => {
   const venueId = new URL(req.url).searchParams.get("venueId");
   if (!venueId) throw new AppError(ErrorCode.VALIDATION_ERROR, "venueId wajib diisi.");
