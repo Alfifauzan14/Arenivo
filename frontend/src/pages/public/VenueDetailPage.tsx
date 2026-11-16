@@ -113,8 +113,8 @@ export function VenueDetailPage() {
       facilities: [],
       fields: [],
       photos: [
-        { id: "p1", url: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80", isCover: true },
-        { id: "p2", url: "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?auto=format&fit=crop&w=1200&q=80", isCover: false }
+        { id: "p1", url: "/images/hero-futsal-indoor.jpg", isCover: true },
+        { id: "p2", url: "/images/hero-futsal-action.jpg", isCover: false }
       ],
     } as any;
   }, [slug]);
@@ -146,10 +146,10 @@ export function VenueDetailPage() {
       return venue.photos.map((p) => p.url);
     }
     return [
-      "https://images.unsplash.com/photo-1575361204480-aadea25e6e68?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80",
+      "/images/hero-futsal-indoor.jpg",
+      "/images/hero-futsal-action.jpg",
+      "/images/hero-minisoccer-turf.jpg",
+      "/images/hero-promo-arena.jpg",
     ];
   }, [venue.photos]);
 

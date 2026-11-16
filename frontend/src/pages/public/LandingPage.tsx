@@ -27,28 +27,28 @@ import { cn } from "@/lib/utils";
 const HERO_SLIDES = [
   {
     id: 1,
-    imageUrl: "https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=1600&q=80",
+    imageUrl: "/images/hero-futsal-indoor.jpg",
     alt: "Lapangan Futsal Indoor dengan Lampu Sorot",
     title: "Sewa Lapangan Futsal\n& Mini Soccer Cepat",
     subtitle: "Platform all-in-one untuk sewa lapangan futsal dan mini soccer. Ketersediaan slot real-time, bebas double booking, konfirmasi bayar otomatis via QRIS.",
   },
   {
     id: 2,
-    imageUrl: "https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1600&q=80",
+    imageUrl: "/images/hero-futsal-action.jpg",
     alt: "Pemain Futsal Beraksi di Lapangan Indoor",
     title: "Main Futsal\nBebas Ribet",
     subtitle: "Pesan lapangan futsal favorit tim Anda dalam hitungan menit. E-Tiket instan, pembayaran QRIS, dan jaminan slot terkunci.",
   },
   {
     id: 3,
-    imageUrl: "https://images.unsplash.com/photo-1612225220822-30ab95978d91?auto=format&fit=crop&w=1600&q=80",
+    imageUrl: "/images/hero-minisoccer-turf.jpg",
     alt: "Lapangan Mini Soccer Rumput Sintetis",
     title: "Mini Soccer\nBerkualitas",
     subtitle: "Jelajahi venue mini soccer terbaik di berbagai kota. Fasilitas shower, tribun penonton, ruang ganti, dan parkir luas.",
   },
   {
     id: 4,
-    imageUrl: "https://images.unsplash.com/photo-1579952363873-27f5b4c4f5b2?auto=format&fit=crop&w=1600&q=80",
+    imageUrl: "/images/hero-promo-arena.jpg",
     alt: "Tim Futsal Bermain di Lapangan Indoor",
     title: "Kupon Diskon Spesial\nHemat Setiap Pekan",
     subtitle: "Nikmati voucher potongan harga eksklusif saat checkout agar patungan sewa lapangan favorit tim makin hemat.",
