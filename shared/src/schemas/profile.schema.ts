@@ -40,9 +40,9 @@ export const MitraProfileSchema = z.object({
 export type MitraProfile = z.infer<typeof MitraProfileSchema>;
 
 export const UpdateProfileInputSchema = z.object({
-  fullName: z.string().min(2, "Nama lengkap minimal 2 karakter").optional(),
-  phone: z.string().min(9, "Nomor telepon minimal 9 digit").optional(),
-  avatarUrl: z.string().url("URL avatar tidak valid").optional(),
+  fullName: z.string().min(1, "Nama lengkap tidak boleh kosong").optional(),
+  phone: z.string().optional().nullable(),
+  avatarUrl: z.string().optional().nullable(),
 });
 
 export type UpdateProfileInput = z.infer<typeof UpdateProfileInputSchema>;

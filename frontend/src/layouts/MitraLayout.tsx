@@ -44,14 +44,36 @@ export function MitraLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem("futsal_mitra_authenticated");
-    navigate("/jadi-mitra");
+    localStorage.removeItem("futsal_logged_in");
+    localStorage.removeItem("sb_access_token");
+    localStorage.removeItem("futsal_mitra_verification_status");
+    await supabase.auth.signOut().catch(() => {});
+    window.location.href = "/";
   };
 
-  const [verificationStatus] = React.useState<MitraVerificationStatus>(
-    MitraVerificationStatus.MENUNGGU
-  );
+  const [verificationStatus, setVerificationStatus] = React.useState<MitraVerificationStatus>(() => {
+    const saved = localStorage.getItem("futsal_mitra_verification_status");
+    if (saved === MitraVerificationStatus.MENUNGGU) return MitraVerificationStatus.MENUNGGU;
+    if (saved === MitraVerificationStatus.DITOLAK) return MitraVerificationStatus.DITOLAK;
+    if (saved === MitraVerificationStatus.DISETUJUI) return MitraVerificationStatus.DISETUJUI;
+    return MitraVerificationStatus.DISETUJUI;
+  });
+
+  React.useEffect(() => {
+    let isMounted = true;
+    apiClient.get<any>("/mitra/profile").then((res) => {
+      if (isMounted && res.data?.mitraProfile?.verificationStatus) {
+        const st = res.data.mitraProfile.verificationStatus as MitraVerificationStatus;
+        setVerificationStatus(st);
+        localStorage.setItem("futsal_mitra_verification_status", st);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const selectedVenue: any = venues.find((v: any) => v.id === selectedVenueId) || venues[0] || { name: "Champion Futsal Arena Cilandak", id: "" };
 

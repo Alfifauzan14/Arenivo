@@ -39,14 +39,14 @@ export const authRepository = {
     dbError(error);
   },
 
-  async updateProfile(id: string, patch: { fullName?: string; phone?: string; avatarUrl?: string }) {
+  async updateProfile(id: string, patch: { fullName?: string; phone?: string | null; avatarUrl?: string | null }) {
     const row: Record<string, unknown> = {};
     if (patch.fullName !== undefined) row.full_name = patch.fullName;
-    if (patch.phone !== undefined) row.phone = patch.phone;
-    if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl;
-    const { data, error } = await supabaseAdmin.from("profiles").update(row).eq("id", id).select("*").single();
+    if (patch.phone !== undefined) row.phone = patch.phone || null;
+    if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl || null;
+    const { data, error } = await supabaseAdmin.from("profiles").update(row).eq("id", id).select("*").maybeSingle();
     dbError(error);
-    return camelize<any>(data);
+    return camelize<any>(data || {});
   },
 
   async favorites(userId: string) {

@@ -105,6 +105,19 @@ export function ProfilePage() {
       const trimmedEmail = email.trim().toLowerCase();
       const isEmailChanged = user?.email && trimmedEmail !== user.email.toLowerCase();
 
+      // Simpan langsung ke cache lokal agar tidak pernah revert
+      if (user?.id) {
+        localStorage.setItem(`futsal_name_${user.id}`, trimmedName);
+        if (trimmedPhone) {
+          localStorage.setItem(`futsal_phone_${user.id}`, trimmedPhone);
+        } else {
+          localStorage.removeItem(`futsal_phone_${user.id}`);
+        }
+        if (avatarUrl) {
+          localStorage.setItem(`futsal_avatar_${user.id}`, avatarUrl);
+        }
+      }
+
       // 1. Update Supabase Auth user metadata & email (jika berubah)
       const authPayload: any = {
         data: {
@@ -127,7 +140,7 @@ export function ProfilePage() {
       try {
         await apiClient.patch("/me", {
           fullName: trimmedName,
-          phone: trimmedPhone,
+          phone: trimmedPhone || undefined,
           avatarUrl: avatarUrl || undefined,
         });
       } catch {
@@ -137,8 +150,8 @@ export function ProfilePage() {
             .from("profiles")
             .update({
               full_name: trimmedName,
-              phone: trimmedPhone,
-              avatar_url: avatarUrl,
+              phone: trimmedPhone || null,
+              avatar_url: avatarUrl || null,
               ...(isEmailChanged ? { email: trimmedEmail } : {}),
               updated_at: new Date().toISOString(),
             })
@@ -148,6 +161,7 @@ export function ProfilePage() {
 
       // 3. Update Session Context seketika agar langsung terlihat di seluruh halaman
       login({
+        id: user?.id,
         fullName: trimmedName,
         phone: trimmedPhone,
         email: trimmedEmail,

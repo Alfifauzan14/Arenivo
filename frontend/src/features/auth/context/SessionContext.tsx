@@ -29,13 +29,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         .eq("id", userId)
         .maybeSingle();
 
+      const savedName = localStorage.getItem(`futsal_name_${userId}`);
+      const savedPhone = localStorage.getItem(`futsal_phone_${userId}`);
+      const savedAvatar = localStorage.getItem(`futsal_avatar_${userId}`);
+
       if (profile) {
         setCurrentUser({
           id: profile.id,
-          fullName: profile.full_name || userMeta?.full_name || "Pengguna Arenivo",
+          fullName: savedName || userMeta?.full_name || profile.full_name || "Pengguna Arenivo",
           email: profile.email || email || "",
-          phone: profile.phone || userMeta?.phone || "",
-          avatarUrl: profile.avatar_url || userMeta?.avatar_url || userMeta?.picture || "",
+          phone: savedPhone || userMeta?.phone || profile.phone || "",
+          avatarUrl: savedAvatar || userMeta?.avatar_url || userMeta?.picture || profile.avatar_url || "",
           role: profile.role || "penyewa",
           status: profile.status || "aktif",
         });
@@ -57,9 +61,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Fallback dari session metadata jika profil belum ter-insert
+    const savedNameFallback = localStorage.getItem(`futsal_name_${userId}`);
     setCurrentUser({
       id: userId,
-      fullName: userMeta?.full_name || email?.split("@")[0] || "Pengguna Arenivo",
+      fullName: savedNameFallback || userMeta?.full_name || email?.split("@")[0] || "Pengguna Arenivo",
       email: email || "",
       phone: userMeta?.phone || "",
       avatarUrl: userMeta?.avatar_url || userMeta?.picture || "",
@@ -116,7 +121,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const login = React.useCallback((userData?: Partial<Profile>) => {
     if (userData) {
-      setCurrentUser((prev) => (prev ? { ...prev, ...userData } : (userData as Profile)));
+      setCurrentUser((prev) => {
+        const updated = prev ? { ...prev, ...userData } : (userData as Profile);
+        if (updated?.id) {
+          if (userData.fullName) localStorage.setItem(`futsal_name_${updated.id}`, userData.fullName);
+          if (userData.phone) localStorage.setItem(`futsal_phone_${updated.id}`, userData.phone);
+          if (userData.avatarUrl) localStorage.setItem(`futsal_avatar_${updated.id}`, userData.avatarUrl);
+        }
+        return updated;
+      });
       setIsLoggedIn(true);
     }
   }, []);
@@ -129,7 +142,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("sb_access_token");
     localStorage.removeItem("futsal_mitra_authenticated");
     localStorage.removeItem("futsal_admin_authenticated");
+    localStorage.removeItem("futsal_mitra_verification_status");
     await supabase.auth.signOut().catch(() => {});
+    window.location.href = "/";
   }, []);
 
   const toggleFavorite = React.useCallback(async (venueId: string) => {
