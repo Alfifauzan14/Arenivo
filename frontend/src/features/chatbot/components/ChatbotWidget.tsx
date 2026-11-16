@@ -72,7 +72,18 @@ export function ChatbotWidget() {
 
       if (res.ok) {
         const json = await res.json();
-        const reply = json.data?.message || json.data?.text || json.data?.reply;
+        const rawMsg = json.data?.message;
+        let reply = "";
+        if (typeof rawMsg === "string") {
+          reply = rawMsg;
+        } else if (rawMsg && typeof rawMsg.content === "string") {
+          reply = rawMsg.content;
+        } else if (typeof json.data?.reply === "string") {
+          reply = json.data.reply;
+        } else if (typeof json.data?.text === "string") {
+          reply = json.data.text;
+        }
+
         if (reply) {
           setMessages((prev) => [
             ...prev,

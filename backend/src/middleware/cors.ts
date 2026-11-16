@@ -23,7 +23,16 @@ function getAllowedOrigins(): string[] {
 function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return false;
   const allowed = getAllowedOrigins();
-  return allowed.includes(origin);
+  if (allowed.includes(origin)) return true;
+
+  try {
+    const parsed = new URL(origin);
+    if (parsed.hostname.endsWith(".vercel.app") && parsed.hostname.includes("arenivo")) {
+      return true;
+    }
+  } catch {}
+
+  return false;
 }
 
 export function getCorsHeaders(origin?: string | null) {
