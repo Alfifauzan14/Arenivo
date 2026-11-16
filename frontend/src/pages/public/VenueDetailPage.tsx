@@ -289,10 +289,80 @@ export function VenueDetailPage() {
     );
   };
 
-  // Slots untuk lapangan yang sedang dipilih
+  const [fieldSlotsCache, setFieldSlotsCache] = React.useState<Record<string, SlotItem[]>>({});
+  const [loadingFieldId, setLoadingFieldId] = React.useState<string | null>(null);
+
+  // Ambil data slot live dari Backend API saat lapangan atau tanggal dipilih
+  React.useEffect(() => {
+    if (!selectedField?.id || !selectedDate) return;
+    const cacheKey = `${selectedField.id}_${selectedDate}`;
+
+    let isMounted = true;
+    setLoadingFieldId(selectedField.id);
+
+    apiClient
+      .get<any[]>(`/fields/${selectedField.id}/availability?date=${selectedDate}`)
+      .then((res) => {
+        if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+          const transformed: SlotItem[] = res.data.map((s: any) => ({
+            slotStart: s.slotStart || `${selectedDate}T${String(s.hour).padStart(2, "0")}:00:00+07:00`,
+            slotEnd: s.slotEnd || `${selectedDate}T${String((s.hour + 1) % 24).padStart(2, "0")}:00:00+07:00`,
+            timeLabel: s.timeLabel || `${String(s.hour).padStart(2, "0")}.00 - ${String((s.hour + 1) % 24).padStart(2, "0")}.00`,
+            hour: s.hour,
+            status: s.status as SlotStatus,
+            price: s.price,
+            lockExpiresAt: s.lockExpiresAt || undefined,
+            reason: s.reason || undefined,
+          }));
+          setFieldSlotsCache((prev) => ({ ...prev, [cacheKey]: transformed }));
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) setLoadingFieldId(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedField?.id, selectedDate]);
+
+  // Muat live slot untuk semua lapangan yang sedang terbuka (expanded)
+  React.useEffect(() => {
+    expandedFieldIds.forEach((fId) => {
+      if (!fId || !selectedDate) return;
+      const key = `${fId}_${selectedDate}`;
+      if (fieldSlotsCache[key]) return;
+
+      apiClient
+        .get<any[]>(`/fields/${fId}/availability?date=${selectedDate}`)
+        .then((res) => {
+          if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+            const transformed: SlotItem[] = res.data.map((s: any) => ({
+              slotStart: s.slotStart || `${selectedDate}T${String(s.hour).padStart(2, "0")}:00:00+07:00`,
+              slotEnd: s.slotEnd || `${selectedDate}T${String((s.hour + 1) % 24).padStart(2, "0")}:00:00+07:00`,
+              timeLabel: s.timeLabel || `${String(s.hour).padStart(2, "0")}.00 - ${String((s.hour + 1) % 24).padStart(2, "0")}.00`,
+              hour: s.hour,
+              status: s.status as SlotStatus,
+              price: s.price,
+              lockExpiresAt: s.lockExpiresAt || undefined,
+              reason: s.reason || undefined,
+            }));
+            setFieldSlotsCache((prev) => ({ ...prev, [key]: transformed }));
+          }
+        })
+        .catch(() => {});
+    });
+  }, [expandedFieldIds, selectedDate]);
+
+  // Slots untuk lapangan yang sedang dipilih (utamakan data live backend)
   const activeFieldSlots = React.useMemo(() => {
+    const cacheKey = `${selectedField.id}_${selectedDate}`;
+    if (fieldSlotsCache[cacheKey]) {
+      return fieldSlotsCache[cacheKey];
+    }
     return generateMockSlots(selectedField.id, selectedDate);
-  }, [selectedField.id, selectedDate]);
+  }, [selectedField.id, selectedDate, fieldSlotsCache]);
 
   const selectedSlots = React.useMemo(() => {
     return activeFieldSlots.filter((s) => selectedHours.includes(s.hour));
@@ -946,7 +1016,7 @@ export function VenueDetailPage() {
           {/* Daftar Lapangan (Court Cards + Expandable Slot Grid) */}
           <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs divide-y divide-slate-200">
             {filteredFields.map((field, fIdx) => {
-              const rawSlots = generateMockSlots(field.id, selectedDate);
+              const rawSlots = fieldSlotsCache[`${field.id}_${selectedDate}`] || generateMockSlots(field.id, selectedDate);
               const displaySlots = rawSlots.filter((s) => {
                 if (timePeriodFilter === "pagi") return s.hour >= 8 && s.hour < 12;
                 if (timePeriodFilter === "siang") return s.hour >= 12 && s.hour < 17;

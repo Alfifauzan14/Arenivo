@@ -155,8 +155,8 @@ class ApiClient {
     // GET /bookings
     if (path === "/bookings" || path === "bookings") {
       return {
-        data: MOCK_BOOKINGS as unknown as T,
-        meta: { page: 1, limit: 10, total: MOCK_BOOKINGS.length, totalPages: 1 },
+        data: [] as unknown as T,
+        meta: { page: 1, limit: 10, total: 0, totalPages: 1 },
       };
     }
 

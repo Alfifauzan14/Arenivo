@@ -213,42 +213,62 @@ export const MOCK_NOTIFICATIONS: InAppNotification[] = [
 export function generateMockSlots(fieldId: string, dateStr: string): SlotItem[] {
   const isVinyl = fieldId === "370b8fb7-e526-4b38-989f-7e7012592d86";
   const basePrice = isVinyl ? 150000 : 175000;
-  const hours = [
-    { hour: 8, status: SlotStatus.LEWAT },
-    { hour: 9, status: SlotStatus.LEWAT },
-    { hour: 10, status: SlotStatus.TERSEDIA },
-    { hour: 11, status: SlotStatus.TERSEDIA },
-    { hour: 12, status: SlotStatus.DIBLOKIR, reason: "Maintenance lapangan siang" },
-    { hour: 13, status: SlotStatus.TERSEDIA },
-    { hour: 14, status: SlotStatus.TERSEDIA },
-    { hour: 15, status: SlotStatus.TERSEDIA },
-    { hour: 16, status: SlotStatus.TERISI },
-    { hour: 17, status: SlotStatus.TERISI },
-    { hour: 18, status: SlotStatus.DIKUNCI, lockExpiresAt: new Date(Date.now() + 10 * 60000).toISOString() },
-    { hour: 19, status: SlotStatus.TERSEDIA },
-    { hour: 20, status: SlotStatus.TERSEDIA },
-    { hour: 21, status: SlotStatus.TERSEDIA },
-    { hour: 22, status: SlotStatus.TERSEDIA },
-    { hour: 23, status: SlotStatus.TERSEDIA },
-  ];
 
-  return hours.map((item) => {
-    const padHour = String(item.hour).padStart(2, "0");
-    const padNext = String(item.hour + 1).padStart(2, "0");
-    const isMalam = item.hour >= 18;
+  // Cek apakah tanggal adalah hari ini, masa lalu, atau masa depan
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const currentHour = now.getHours();
+  const isToday = dateStr === todayStr;
+  const isPast = dateStr < todayStr;
+
+  // Hash deterministik dari tanggal agar setiap tanggal memiliki ketersediaan unik
+  let seed = 0;
+  for (let i = 0; i < dateStr.length; i++) {
+    seed = (seed * 31 + dateStr.charCodeAt(i)) % 1000;
+  }
+
+  const hours: SlotItem[] = [];
+  for (let h = 7; h <= 23; h++) {
+    let status: SlotStatus = SlotStatus.TERSEDIA;
+    let lockExpiresAt: string | undefined = undefined;
+    let reason: string | undefined = undefined;
+
+    if (isPast) {
+      status = SlotStatus.LEWAT;
+    } else if (isToday && h <= currentHour) {
+      status = SlotStatus.LEWAT;
+    } else {
+      // Pola ketersediaan dinamis per tanggal
+      const slotHash = (seed + h * 13) % 12;
+      if (slotHash === 1 && h >= 18) {
+        status = SlotStatus.TERISI;
+      } else if (slotHash === 2 && h === 12) {
+        status = SlotStatus.DIBLOKIR;
+        reason = "Maintenance lapangan";
+      } else if (slotHash === 3 && h === 20 && isToday) {
+        status = SlotStatus.DIKUNCI;
+        lockExpiresAt = new Date(Date.now() + 12 * 60000).toISOString();
+      }
+    }
+
+    const padHour = String(h).padStart(2, "0");
+    const padNext = String((h + 1) % 24).padStart(2, "0");
+    const isMalam = h >= 18;
     const finalPrice = isMalam ? basePrice + 35000 : basePrice;
 
-    return {
+    hours.push({
       slotStart: `${dateStr}T${padHour}:00:00+07:00`,
       slotEnd: `${dateStr}T${padNext}:00:00+07:00`,
       timeLabel: `${padHour}.00 - ${padNext}.00`,
-      hour: item.hour,
-      status: item.status,
+      hour: h,
+      status,
       price: finalPrice,
-      lockExpiresAt: item.lockExpiresAt,
-      reason: item.reason,
-    };
-  });
+      lockExpiresAt,
+      reason,
+    });
+  }
+
+  return hours;
 }
 
 // -----------------------------------------------------------------------------
