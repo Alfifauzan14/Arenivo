@@ -228,6 +228,7 @@ export function MitraAuthPage() {
         email: registerEmail.trim(),
         password: registerPassword,
         options: {
+          emailRedirectTo: `${window.location.origin}/mitra/application`,
           data: {
             full_name: managerName.trim(),
             phone: managerPhone.trim(),
