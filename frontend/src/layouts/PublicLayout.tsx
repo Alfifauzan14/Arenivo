@@ -340,6 +340,15 @@ export function PublicLayout() {
                           <p className="font-bold text-slate-900 truncate">{user?.fullName}</p>
                           <p className="text-slate-400 text-[10px] truncate font-mono">{user?.email}</p>
                         </div>
+                        {user?.role === "admin" && (
+                          <Link
+                            to="/admin"
+                            onClick={() => setUserDropdownOpen(false)}
+                            className="block px-3 py-2 rounded-lg bg-red-50 text-red-600 font-bold hover:bg-red-100 border border-red-200"
+                          >
+                            🛡️ Masuk Portal Admin
+                          </Link>
+                        )}
                         <Link
                           to="/profile"
                           onClick={() => setUserDropdownOpen(false)}
@@ -539,6 +548,15 @@ export function PublicLayout() {
                         </div>
                       </Link>
                     </div>
+                    {user?.role === "admin" && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block text-center py-2.5 px-4 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
+                      >
+                        🛡️ Masuk Portal Admin
+                      </Link>
+                    )}
                     <button
                       onClick={() => {
                         setMobileMenuOpen(false);

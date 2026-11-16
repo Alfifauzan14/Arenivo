@@ -23,11 +23,23 @@ export function AuthPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const { isLoggedIn, refreshProfile } = useSession();
+  const { isLoggedIn, user, logout, refreshProfile } = useSession();
 
   // Mode: "login" | "register"
   const isRegisterParam = location.pathname === "/register" || searchParams.get("mode") === "register";
   const [mode, setMode] = React.useState<"login" | "register">(isRegisterParam ? "register" : "login");
+
+  // Jika akun admin sedang login dan membuka halaman login penyewa, putuskan sesi
+  React.useEffect(() => {
+    if (isLoggedIn && user?.role === "admin") {
+      logout();
+      addToast(
+        "error",
+        "Akun Administrator tidak diizinkan berada di sesi penyewa. Silakan masuk melalui Portal Admin (/admin/login).",
+        "Akses Ditolak"
+      );
+    }
+  }, [isLoggedIn, user]);
 
   // Keep mode in sync if user directly visits /register or /login
   React.useEffect(() => {
@@ -113,6 +125,46 @@ export function AuthPage() {
         }
 
         if (data.session) {
+          // Validasi Keamanan Role: Akun Admin DILARANG masuk melalui portal login penyewa
+          let userRole: string | undefined;
+
+          // 1. Cek role dari profiles di database
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", data.session.user.id)
+            .maybeSingle();
+
+          userRole = profile?.role;
+
+          // 2. Fallback cek dari backend /me jika profiles select dibatasi
+          if (!userRole) {
+            try {
+              const meRes = await apiClient.get<any>("/me");
+              userRole = meRes.data?.role;
+            } catch {
+              // ignore
+            }
+          }
+
+          if (
+            userRole === "admin" ||
+            data.session.user.app_metadata?.role === "admin" ||
+            data.session.user.user_metadata?.role === "admin"
+          ) {
+            await supabase.auth.signOut();
+            localStorage.removeItem("sb_access_token");
+            localStorage.removeItem("futsal_logged_in");
+            localStorage.removeItem("futsal_admin_authenticated");
+            setIsLoading(false);
+            addToast(
+              "error",
+              "Akses Ditolak: Akun Administrator tidak diizinkan masuk melalui login penyewa. Silakan masuk melalui Portal Admin (/admin/login).",
+              "Akses Ditolak"
+            );
+            return;
+          }
+
           localStorage.setItem("sb_access_token", data.session.access_token);
           localStorage.setItem("futsal_logged_in", "true");
           await refreshProfile();
