@@ -113,8 +113,8 @@ export function VenueDetailPage() {
       facilities: [],
       fields: [],
       photos: [
-        { id: "p1", url: "/images/hero-futsal-indoor.jpg", isCover: true },
-        { id: "p2", url: "/images/hero-futsal-action.jpg", isCover: false }
+        { id: "p1", url: "/images/hero-futsal-indoor.webp", isCover: true },
+        { id: "p2", url: "/images/hero-futsal-action.webp", isCover: false }
       ],
     } as any;
   }, [slug]);
@@ -146,10 +146,10 @@ export function VenueDetailPage() {
       return venue.photos.map((p) => p.url);
     }
     return [
-      "/images/hero-futsal-indoor.jpg",
-      "/images/hero-futsal-action.jpg",
-      "/images/hero-minisoccer-turf.jpg",
-      "/images/hero-promo-arena.jpg",
+      "/images/hero-futsal-indoor.webp",
+      "/images/hero-futsal-action.webp",
+      "/images/hero-minisoccer-turf.webp",
+      "/images/hero-promo-arena.webp",
     ];
   }, [venue.photos]);
 

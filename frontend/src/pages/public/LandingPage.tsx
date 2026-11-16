@@ -27,28 +27,28 @@ import { cn } from "@/lib/utils";
 const HERO_SLIDES = [
   {
     id: 1,
-    imageUrl: "/images/hero-futsal-indoor.jpg",
+    imageUrl: "/images/hero-futsal-indoor.webp",
     alt: "Lapangan Futsal Indoor dengan Lampu Sorot",
     title: "Sewa Lapangan Futsal\n& Mini Soccer Cepat",
     subtitle: "Platform all-in-one untuk sewa lapangan futsal dan mini soccer. Ketersediaan slot real-time, bebas double booking, konfirmasi bayar otomatis via QRIS.",
   },
   {
     id: 2,
-    imageUrl: "/images/hero-futsal-action.jpg",
+    imageUrl: "/images/hero-futsal-action.webp",
     alt: "Pemain Futsal Beraksi di Lapangan Indoor",
     title: "Main Futsal\nBebas Ribet",
     subtitle: "Pesan lapangan futsal favorit tim Anda dalam hitungan menit. E-Tiket instan, pembayaran QRIS, dan jaminan slot terkunci.",
   },
   {
     id: 3,
-    imageUrl: "/images/hero-minisoccer-turf.jpg",
+    imageUrl: "/images/hero-minisoccer-turf.webp",
     alt: "Lapangan Mini Soccer Rumput Sintetis",
     title: "Mini Soccer\nBerkualitas",
     subtitle: "Jelajahi venue mini soccer terbaik di berbagai kota. Fasilitas shower, tribun penonton, ruang ganti, dan parkir luas.",
   },
   {
     id: 4,
-    imageUrl: "/images/hero-promo-arena.jpg",
+    imageUrl: "/images/hero-promo-arena.webp",
     alt: "Tim Futsal Bermain di Lapangan Indoor",
     title: "Kupon Diskon Spesial\nHemat Setiap Pekan",
     subtitle: "Nikmati voucher potongan harga eksklusif saat checkout agar patungan sewa lapangan favorit tim makin hemat.",
@@ -445,16 +445,13 @@ export function LandingPage() {
         {/* Baris 1: Gambar 3D Kiri, Teks Kanan */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
           <div className="lg:col-span-5 flex justify-center">
-            <picture>
-              <source srcSet="/images/hero-booking-3d.webp" type="image/webp" />
-              <img
-                src="/images/hero-booking-3d.png"
-                alt="Arenivo - Satu Aplikasi, Banyak Arena"
-                loading="lazy"
-                decoding="async"
-                className="w-full max-w-[340px] sm:max-w-[380px] aspect-square object-contain select-none"
-              />
-            </picture>
+            <img
+              src="/images/hero-booking-3d.webp"
+              alt="Arenivo - Satu Aplikasi, Banyak Arena"
+              loading="lazy"
+              decoding="async"
+              className="w-full max-w-[340px] sm:max-w-[380px] aspect-square object-contain select-none"
+            />
           </div>
 
           <div className="lg:col-span-7 space-y-5">
@@ -544,16 +541,13 @@ export function LandingPage() {
           </div>
 
           <div className="lg:col-span-5 flex justify-center order-1 lg:order-2">
-            <picture>
-              <source srcSet="/images/hero-promo-3d.webp" type="image/webp" />
-              <img
-                src="/images/hero-promo-3d.png"
-                alt="Promo Sewa Lapangan"
-                loading="lazy"
-                decoding="async"
-                className="w-full max-w-[340px] sm:max-w-[380px] aspect-square object-contain select-none"
-              />
-            </picture>
+            <img
+              src="/images/hero-promo-3d.webp"
+              alt="Promo Sewa Lapangan"
+              loading="lazy"
+              decoding="async"
+              className="w-full max-w-[340px] sm:max-w-[380px] aspect-square object-contain select-none"
+            />
           </div>
         </div>
       </section>
