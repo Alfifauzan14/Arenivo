@@ -2,7 +2,7 @@ import { z } from "zod";
 import { UserRole } from "@futsal/shared";
 import { withAuth } from "@/middleware/auth";
 import { handleOptions } from "@/middleware/cors";
-import { idParam, ok, parseBody } from "@/lib/http";
+import { idParam, ok, parseBody, reqIp } from "@/lib/http";
 import { adminRepository } from "@/modules/admin/admin.repository";
 
 export const OPTIONS = handleOptions;
@@ -24,7 +24,8 @@ export const PATCH = withAuth(
       `user.${normalizedStatus}`,
       "profiles",
       id,
-      body.reason ?? `Status diubah menjadi ${normalizedStatus}`
+      body.reason ?? `Status diubah menjadi ${normalizedStatus}`,
+      reqIp(req)
     );
     return ok(req, updated);
   },

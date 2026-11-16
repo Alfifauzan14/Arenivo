@@ -102,3 +102,9 @@ export function dbError(error: { message: string } | null) {
 export async function idParam(ctx: { params: Promise<Record<string, string>> }, key = "id") {
   return (await ctx.params)[key];
 }
+
+export function reqIp(req: Request): string | null {
+  const fwd = req.headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0]?.trim() || null;
+  return req.headers.get("x-real-ip") || req.headers.get("cf-connecting-ip") || null;
+}

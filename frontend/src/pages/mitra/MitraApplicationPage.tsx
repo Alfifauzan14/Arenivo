@@ -1,14 +1,13 @@
 import * as React from "react";
-import { Link } from "react-router-dom";
 import {
   Building2,
   CheckCircle2,
   Clock,
   AlertTriangle,
-  Upload,
   ArrowRight,
   FileCheck,
-  RefreshCw,
+  Loader2,
+  ExternalLink,
 } from "lucide-react";
 import {
   Button,
@@ -20,78 +19,99 @@ import {
   Input,
   useToast,
 } from "@/components/ui";
+import { apiClient } from "@/lib/api-client";
 import { MitraVerificationStatus } from "@futsal/shared";
-import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
 
 export function MitraApplicationPage() {
   const { addToast } = useToast();
 
-  // Verification status state
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
   const [status, setStatus] = React.useState<MitraVerificationStatus>(
     MitraVerificationStatus.MENUNGGU
   );
 
-  const [businessName, setBusinessName] = React.useState("PT Spartan Olahraga Sejahtera");
-  const [businessAddress, setBusinessAddress] = React.useState(
-    "Jl. TB Simatupang No. 45, Cilandak Barat, Jakarta Selatan"
-  );
-  const [npwpNumber, setNpwpNumber] = React.useState("01.234.567.8-901.000");
-  const [nibNumber, setNibNumber] = React.useState("1234567890123");
-  const [uploadedFile] = React.useState<string>("NIB_SIUP_Spartan.pdf");
-  const [rejectionReason] = React.useState<string>(
-    "Foto dokumen NIB/SIUP terpotong dan alamat usaha pada dokumen tidak cocok dengan alamat arena lapangan yang diajukan. Mohon unggah scan dokumen resmi yang jelas."
-  );
+  const [businessName, setBusinessName] = React.useState("");
+  const [businessAddress, setBusinessAddress] = React.useState("");
+  const [documentUrl, setDocumentUrl] = React.useState("");
+  const [rejectionReason, setRejectionReason] = React.useState<string | null>(null);
+  const [bankInfo, setBankInfo] = React.useState<{
+    bankName?: string;
+    bankAccountNumber?: string;
+    bankAccountHolder?: string;
+  }>({});
 
-  const handleResubmit = (e: React.FormEvent) => {
+  const loadProfile = React.useCallback(async () => {
+    try {
+      const res = await apiClient.get<any>("/mitra/profile");
+      const mp = res.data?.mitraProfile;
+      if (mp) {
+        setStatus((mp.verificationStatus as MitraVerificationStatus) || MitraVerificationStatus.MENUNGGU);
+        setBusinessName(mp.businessName || "");
+        setBusinessAddress(mp.businessAddress || "");
+        setDocumentUrl(mp.documentUrl || "");
+        setRejectionReason(mp.rejectionReason || null);
+        setBankInfo({
+          bankName: mp.bankName,
+          bankAccountNumber: mp.bankAccountNumber,
+          bankAccountHolder: mp.bankAccountHolder,
+        });
+      }
+    } catch {
+      addToast("error", "Gagal memuat data verifikasi usaha mitra.", "Gagal Memuat");
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  React.useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  const handleResubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!businessName || !businessAddress) {
-      addToast("warning", "Mohon lengkapi seluruh kolom formulir.", "Data Belum Lengkap");
+    if (!businessName.trim() || !businessAddress.trim()) {
+      addToast("warning", "Nama usaha dan alamat wajib diisi.", "Data Belum Lengkap");
       return;
     }
 
-    setStatus(MitraVerificationStatus.MENUNGGU);
-    addToast(
-      "success",
-      "Berkas verifikasi usaha berhasil dikirim ulang. Tim Admin akan meninjau dalam 1x24 jam.",
-      "Pengajuan Terkirim"
-    );
+    setSaving(true);
+    try {
+      await apiClient.patch("/mitra/profile", {
+        businessName: businessName.trim(),
+      });
+      addToast(
+        "success",
+        "Data usaha berhasil diperbarui dan disimpan.",
+        "Tersimpan"
+      );
+      await loadProfile();
+    } catch (err: any) {
+      addToast("error", err?.error?.message || "Gagal memperbarui data usaha.", "Gagal");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12 text-slate-500 text-xs gap-2">
+        <Loader2 className="w-4 h-4 animate-spin text-red-600" />
+        <span>Memuat status verifikasi usaha...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      {/* Page Header & Status Simulator Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
-        <div>
-          <h1 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">
-            Verifikasi Usaha Mitra
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-            Kelola berkas legalitas usaha dan pantau status peninjauan oleh Admin Platform.
-          </p>
-        </div>
-
-        {/* Status Preview Switcher */}
-        <div className="grid grid-cols-3 sm:flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 shadow-xs w-full sm:w-auto">
-          {[
-            { id: MitraVerificationStatus.MENUNGGU, label: "Menunggu" },
-            { id: MitraVerificationStatus.DISETUJUI, label: "Disetujui" },
-            { id: MitraVerificationStatus.DITOLAK, label: "Ditolak" },
-          ].map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setStatus(item.id)}
-              className={cn(
-                "px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer text-center",
-                status === item.id
-                  ? "bg-red-600 text-white"
-                  : "text-slate-600 hover:bg-slate-50"
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+      <div>
+        <h1 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">
+          Verifikasi Usaha Mitra
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+          Data legalitas usaha riil dan status peninjauan oleh Admin Platform.
+        </p>
       </div>
 
       {/* 1. Status Indicator Banner */}
@@ -107,7 +127,7 @@ export function MitraApplicationPage() {
             </span>
           </div>
           <p className="text-xs text-amber-800 leading-relaxed">
-            Data usaha Anda sedang diverifikasi oleh tim kepatuhan platform (estimasi 1x24 jam kerja). Anda tetap dapat mengatur jadwal dan spesifikasi lapangan sambil menunggu persetujuan.
+            Data usaha Anda sedang diverifikasi oleh tim kepatuhan platform.
           </p>
         </div>
       )}
@@ -120,11 +140,11 @@ export function MitraApplicationPage() {
               <span>Akun Mitra Resmi Terverifikasi</span>
             </div>
             <span className="bg-emerald-100 text-emerald-800 text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-md border border-emerald-300 shrink-0">
-              Terverifikasi
+              Disetujui
             </span>
           </div>
           <p className="text-xs text-emerald-800 leading-relaxed">
-            Usaha lapangan Anda telah terverifikasi. Seluruh venue Anda kini aktif menerima reservasi online dan pembayaran otomatis.
+            Usaha lapangan Anda ({businessName}) telah terverifikasi. Seluruh venue Anda aktif menerima reservasi online dan pencairan saldo.
           </p>
           <div>
             <Link to="/mitra/venues">
@@ -149,54 +169,36 @@ export function MitraApplicationPage() {
             </span>
           </div>
 
-          <div className="p-3 bg-white rounded-lg border border-rose-200 text-xs text-slate-800 space-y-1">
-            <span className="font-semibold text-rose-700 block text-[11px]">
-              Catatan Penolakan dari Admin:
-            </span>
-            <p className="leading-relaxed text-slate-700">"{rejectionReason}"</p>
-          </div>
+          {rejectionReason && (
+            <div className="p-3 bg-white rounded-lg border border-rose-200 text-xs text-slate-800 space-y-1">
+              <span className="font-semibold text-rose-700 block text-[11px]">
+                Catatan Penolakan dari Admin:
+              </span>
+              <p className="leading-relaxed text-slate-700">"{rejectionReason}"</p>
+            </div>
+          )}
         </div>
       )}
 
-      {/* 2. Formulir Data & Dokumen Usaha */}
+      {/* 2. Informasi Usaha Riil */}
       <Card className="bg-white border-slate-200">
         <CardHeader className="p-4 sm:p-5 border-b border-slate-100">
           <CardTitle className="text-sm sm:text-base flex items-center gap-2">
             <Building2 className="w-4 h-4 text-red-600" />
-            Data Legalitas & Dokumen Usaha
+            Data Legalitas & Rekening Usaha
           </CardTitle>
           <CardDescription className="text-xs mt-0.5">
-            Lengkapi informasi badan usaha dan unggah dokumen izin operasional resmi
+            Informasi resmi mitra yang tercatat di database platform
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 sm:p-5 pt-4">
           <form onSubmit={handleResubmit} className="space-y-4 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Nama Perusahaan / Badan Usaha"
-                placeholder="Contoh: PT Spartan Olahraga Sejahtera"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                disabled={status === MitraVerificationStatus.DISETUJUI}
-              />
-
-              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
-                <Input
-                  label="Nomor NPWP"
-                  value={npwpNumber}
-                  onChange={(e) => setNpwpNumber(e.target.value)}
-                  disabled={status === MitraVerificationStatus.DISETUJUI}
-                  className="font-mono"
-                />
-                <Input
-                  label="Nomor NIB / SIUP"
-                  value={nibNumber}
-                  onChange={(e) => setNibNumber(e.target.value)}
-                  disabled={status === MitraVerificationStatus.DISETUJUI}
-                  className="font-mono"
-                />
-              </div>
-            </div>
+            <Input
+              label="Nama Perusahaan / Badan Usaha"
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              disabled={status === MitraVerificationStatus.DISETUJUI}
+            />
 
             <div className="space-y-1.5">
               <label className="font-semibold text-slate-700 block text-xs">
@@ -206,43 +208,54 @@ export function MitraApplicationPage() {
                 rows={2}
                 value={businessAddress}
                 onChange={(e) => setBusinessAddress(e.target.value)}
-                disabled={status === MitraVerificationStatus.DISETUJUI}
-                className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 disabled:bg-slate-100 disabled:text-slate-500"
+                disabled
+                className="w-full p-2.5 rounded-lg border border-slate-300 bg-slate-100 text-xs text-slate-600"
               />
             </div>
 
-            {/* Document Upload */}
-            <div className="space-y-2 pt-1">
-              <label className="font-semibold text-slate-700 block text-xs">
-                Dokumen Pendukung (KTP Pemilik / NIB / SIUP)
-              </label>
-              <div className="p-4 sm:p-5 rounded-xl border border-dashed border-slate-300 bg-white flex flex-col items-center justify-center text-center space-y-2">
-                <Upload className="w-6 h-6 text-slate-400" />
-                <div className="text-xs text-slate-600">
-                  <span className="font-semibold text-red-600">Klik untuk unggah berkas</span> atau tarik dokumen ke area ini
-                </div>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  PDF, JPG, PNG (Maks. 5MB)
-                </span>
-                {uploadedFile && (
-                  <div className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg border border-emerald-200 text-xs font-mono text-emerald-800 max-w-full truncate">
-                    <FileCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span className="truncate">{uploadedFile}</span>
-                  </div>
-                )}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <div>
+                <span className="text-[11px] text-slate-500 block">Bank Pencairan</span>
+                <span className="font-bold text-slate-900">{bankInfo.bankName || "-"}</span>
               </div>
+              <div>
+                <span className="text-[11px] text-slate-500 block">Nomor Rekening</span>
+                <span className="font-mono font-bold text-slate-900">{bankInfo.bankAccountNumber || "-"}</span>
+              </div>
+              <div>
+                <span className="text-[11px] text-slate-500 block">Atas Nama</span>
+                <span className="font-bold text-slate-900">{bankInfo.bankAccountHolder || "-"}</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-semibold text-slate-700 block text-xs">
+                Berkas Dokumen Legalitas
+              </label>
+              {documentUrl ? (
+                <div className="flex items-center justify-between gap-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-900">
+                  <div className="flex items-center gap-2 truncate">
+                    <FileCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="font-mono truncate">{documentUrl}</span>
+                  </div>
+                  <a
+                    href={documentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-emerald-700 font-bold hover:underline shrink-0"
+                  >
+                    Lihat <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              ) : (
+                <p className="text-slate-400">Belum ada dokumen diunggah.</p>
+              )}
             </div>
 
             {status !== MitraVerificationStatus.DISETUJUI && (
               <div className="flex justify-end pt-3 border-t border-slate-100">
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="md"
-                  className="w-full sm:w-auto justify-center text-xs gap-1.5"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Kirim Ulang Berkas
+                <Button type="submit" variant="primary" size="md" disabled={saving} className="text-xs">
+                  {saving ? "Menyimpan..." : "Simpan Perubahan"}
                 </Button>
               </div>
             )}

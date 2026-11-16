@@ -11,19 +11,23 @@ import {
 } from "lucide-react";
 import { Button, Card, Select, useToast } from "@/components/ui";
 import { apiClient } from "@/lib/api-client";
-import {
-  MOCK_NOTIFICATIONS,
-  type InAppNotification,
-} from "@/lib/mock-data";
+import { useSession } from "@/features/auth/context/SessionContext";
+import { type InAppNotification } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 export function NotificationsPage() {
   const { addToast } = useToast();
+  const { isLoggedIn, authReady } = useSession();
   const [activeTab, setActiveTab] = React.useState<string>("semua");
   const [searchQuery, setSearchQuery] = React.useState<string>("");
   const [notifications, setNotifications] = React.useState<InAppNotification[]>([]);
 
   React.useEffect(() => {
+    if (!authReady) return;
+    if (!isLoggedIn) {
+      setNotifications([]);
+      return;
+    }
     let isMounted = true;
     apiClient.get<any[]>("/me/notifications").then((res) => {
       if (!isMounted) return;
@@ -36,7 +40,7 @@ export function NotificationsPage() {
       if (isMounted) setNotifications([]);
     });
     return () => { isMounted = false; };
-  }, []);
+  }, [authReady, isLoggedIn]);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -59,6 +63,7 @@ export function NotificationsPage() {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
     );
+    window.dispatchEvent(new CustomEvent("arenivo:notification-item-read", { detail: { id } }));
     try {
       await apiClient.patch("/me/notifications", { ids: [id] });
     } catch {

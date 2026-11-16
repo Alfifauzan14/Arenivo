@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Plus, Search, X, Trash2 } from "lucide-react";
+import { Plus, Search, X, Trash2, Loader2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -17,13 +17,16 @@ import {
   TablePagination,
   useToast,
 } from "@/components/ui";
-import { MOCK_PROMOS } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import { formatRupiah, type Promo } from "@futsal/shared";
-import { cn } from "@/lib/utils";
 
 export function MitraPromosPage() {
   const { addToast } = useToast();
-  const [promos, setPromos] = React.useState<Promo[]>(MOCK_PROMOS);
+  const [promos, setPromos] = React.useState<Promo[]>([]);
+  const [venues, setVenues] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState("semua");
@@ -31,17 +34,40 @@ export function MitraPromosPage() {
   const pageSize = 5;
 
   // Form Promo State
+  const [selectedVenueId, setSelectedVenueId] = React.useState("");
   const [code, setCode] = React.useState("");
   const [discountType, setDiscountType] = React.useState<"fixed" | "percent">("fixed");
   const [discountValue, setDiscountValue] = React.useState<number>(20000);
-  const [minSpend, setMinSpend] = React.useState<number>(150000);
+  const [minSpend, setMinSpend] = React.useState<number>(100000);
   const [quota, setQuota] = React.useState<number>(50);
+
+  const loadData = React.useCallback(async () => {
+    try {
+      const [pRes, vRes] = await Promise.all([
+        apiClient.get<any[]>("/mitra/promos"),
+        apiClient.get<any[]>("/mitra/venues"),
+      ]);
+      if (Array.isArray(pRes.data)) setPromos(pRes.data);
+      if (Array.isArray(vRes.data)) {
+        setVenues(vRes.data);
+        setSelectedVenueId((prev) => prev || vRes.data[0]?.id || "");
+      }
+    } catch {
+      // biarkan state kosong
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const filteredPromos = React.useMemo(() => {
     return promos.filter((p) => {
       if (typeFilter !== "semua" && p.discountType !== typeFilter) return false;
       if (searchQuery.trim()) {
-        return p.code.toLowerCase().includes(searchQuery.toLowerCase());
+        return (p.code || "").toLowerCase().includes(searchQuery.toLowerCase());
       }
       return true;
     });
@@ -56,62 +82,67 @@ export function MitraPromosPage() {
     return filteredPromos.slice(start, start + pageSize);
   }, [filteredPromos, currentPage]);
 
-  const handleCreatePromo = (e: React.FormEvent) => {
+  const handleCreatePromo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code.trim()) {
-      addToast("warning", "Kode promo wajib diisi.", "Validasi");
+    if (!code.trim() || code.trim().length < 3) {
+      addToast("warning", "Kode promo wajib diisi minimal 3 karakter.", "Validasi");
+      return;
+    }
+    const vId = selectedVenueId || venues[0]?.id;
+    if (!vId) {
+      addToast("error", "Venue mitra belum ditemukan.", "Validasi");
       return;
     }
 
-    const newPromo: Promo = {
-      id: `pr-${Date.now()}`,
-      code: code.trim().toUpperCase(),
-      discountType,
-      discountValue,
-      minSpend,
-      quota,
-      usedCount: 0,
-      startDate: new Date().toISOString(),
-      endDate: new Date(Date.now() + 30 * 86400000).toISOString(),
-      isActive: true,
-    };
+    setSaving(true);
+    try {
+      await apiClient.post("/mitra/promos", {
+        venueId: vId,
+        code: code.trim().toUpperCase(),
+        discountType,
+        discountValue: Math.max(1, Math.round(discountValue)),
+        minSpend: Math.max(0, Math.round(minSpend)),
+        quota: Math.max(0, Math.round(quota)),
+        endDate: new Date(Date.now() + 30 * 86400000).toISOString(),
+      });
 
-    setPromos((prev) => [newPromo, ...prev]);
-    setIsModalOpen(false);
-    setCode("");
-    setCurrentPage(1);
-    addToast(
-      "success",
-      `Kode promo ${newPromo.code} berhasil dibuat dan aktif untuk penyewa.`,
-      "Promo Dibuat"
-    );
+      setIsModalOpen(false);
+      setCode("");
+      setCurrentPage(1);
+      addToast("success", `Kode promo ${code.trim().toUpperCase()} berhasil disimpan ke database.`, "Promo Dibuat");
+      await loadData();
+    } catch (err: any) {
+      addToast("error", err?.error?.message || "Gagal menyimpan promo.", "Gagal");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleTogglePromoActive = (promoId: string) => {
-    setPromos((prev) =>
-      prev.map((p) => {
-        if (p.id === promoId) {
-          const nextActive = !p.isActive;
-          addToast(
-            "success",
-            `Kode promo ${p.code} berhasil di${nextActive ? "aktifkan" : "nonaktifkan"}.`,
-            "Status Promo"
-          );
-          return { ...p, isActive: nextActive };
-        }
-        return p;
-      })
-    );
+  const handleTogglePromoActive = async (promo: Promo) => {
+    const nextActive = !promo.isActive;
+    try {
+      await apiClient.patch("/mitra/promos", { id: promo.id, isActive: nextActive });
+      setPromos((prev) =>
+        prev.map((p) => (p.id === promo.id ? { ...p, isActive: nextActive } : p))
+      );
+      addToast(
+        "success",
+        `Kode promo ${promo.code} berhasil di${nextActive ? "aktifkan" : "nonaktifkan"}.`,
+        "Status Promo"
+      );
+    } catch (err: any) {
+      addToast("error", err?.error?.message || "Gagal mengubah status promo.", "Gagal");
+    }
   };
 
-  const handleDeletePromo = (promoId: string) => {
-    const target = promos.find((p) => p.id === promoId);
-    setPromos((prev) => prev.filter((p) => p.id !== promoId));
-    addToast(
-      "success",
-      `Kode promo ${target?.code || ""} berhasil dihapus.`,
-      "Promo Dihapus"
-    );
+  const handleDeletePromo = async (promo: Promo) => {
+    try {
+      await apiClient.delete(`/mitra/promos?id=${promo.id}`);
+      setPromos((prev) => prev.filter((p) => p.id !== promo.id));
+      addToast("success", `Kode promo ${promo.code} berhasil dihapus.`, "Promo Dihapus");
+    } catch (err: any) {
+      addToast("error", err?.error?.message || "Gagal menghapus promo.", "Gagal");
+    }
   };
 
   return (
@@ -123,7 +154,7 @@ export function MitraPromosPage() {
             Promo Venue
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-            Kelola kode voucher diskon untuk meningkatkan okupansi lapangan pada jam sepi.
+            Kelola kode voucher diskon riil untuk meningkatkan okupansi lapangan pada jam sepi.
           </p>
         </div>
 
@@ -139,203 +170,127 @@ export function MitraPromosPage() {
         </Button>
       </div>
 
-      {/* Promos Card (Unified Modern Table + Wide Search & Select) */}
-      <Card className="bg-white border-slate-200">
-        {/* Filter Header */}
-        <div className="p-3.5 sm:p-4 bg-white rounded-t-xl">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-            <div className="relative flex-1 min-w-0">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Cari kode voucher promo..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-10 w-full pl-9 pr-8 py-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 shadow-xs"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            <div className="w-full sm:w-48 shrink-0">
-              <Select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                options={[
-                  { value: "semua", label: `Semua Tipe (${promos.length})` },
-                  { value: "fixed", label: "Nominal Tetap (Rp)" },
-                  { value: "percent", label: "Persentase (%)" },
-                ]}
-              />
-            </div>
-          </div>
-        </div>
-
-        <CardContent className="p-0 overflow-hidden rounded-b-xl">
-          {/* 1. Tampilan Android / HP: Urut Kebawah 1 per 1 */}
-          <div className="md:hidden divide-y divide-slate-200 border-t border-slate-200">
-            {paginatedPromos.length > 0 ? (
-              paginatedPromos.map((p, idx) => {
-                const rowNo = (currentPage - 1) * pageSize + idx + 1;
-                return (
-                  <div
-                    key={p.id}
-                    className={cn(
-                      "px-4 py-3.5 space-y-2 text-xs",
-                      idx % 2 === 0 ? "bg-white" : "bg-slate-50/90"
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded bg-red-50 text-red-700 border border-red-100 font-mono text-[10px] font-bold flex items-center justify-center tabular-nums shrink-0">
-                          {rowNo}
-                        </span>
-                        <span className="font-mono font-bold text-red-600 tabular-nums">
-                          {p.code}
-                        </span>
-                      </div>
-                      <Badge variant={p.isActive ? "success" : "default"}>
-                        {p.isActive ? "AKTIF" : "NONAKTIF"}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="grid grid-cols-[84px_1fr] items-center gap-2">
-                        <span className="text-slate-500">Diskon</span>
-                        <span className="font-mono font-bold text-slate-900 tabular-nums">
-                          {p.discountType === "fixed"
-                            ? formatRupiah(p.discountValue)
-                            : `${p.discountValue}%`}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-[84px_1fr] items-center gap-2">
-                        <span className="text-slate-500">Min. Sewa</span>
-                        <span className="font-mono text-slate-700 tabular-nums">
-                          {formatRupiah(p.minSpend || 0)}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-[84px_1fr] items-center gap-2">
-                        <span className="text-slate-500">Kuota</span>
-                        <span className="font-medium text-slate-800 tabular-nums">
-                          <strong>{p.usedCount}</strong> / {p.quota} klaim
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Action buttons mobile */}
-                    <div className="pt-2 flex items-center gap-2 border-t border-slate-100">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleTogglePromoActive(p.id)}
-                        className="flex-1 h-7 text-xs justify-center"
-                      >
-                        {p.isActive ? "Nonaktifkan" : "Aktifkan"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="danger"
-                        size="sm"
-                        onClick={() => handleDeletePromo(p.id)}
-                        className="h-7 px-2 text-xs justify-center"
-                        title="Hapus Promo"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="py-8 px-4 text-center text-slate-500 text-xs">
-                Tidak ada kode promo yang sesuai dengan pencarian.
-              </div>
+      {/* Filter Toolbar */}
+      <Card className="p-3.5 sm:p-4 bg-white border-slate-200">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          <div className="relative flex-1 min-w-0">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Cari kode promo..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-10 w-full pl-9 pr-8 py-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 shadow-xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
 
-          {/* 2. Tampilan Web / Desktop: Tabel Modern Header Merah Soft */}
-          <div className="hidden md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12 text-center text-xs">No</TableHead>
-                  <TableHead className="text-xs">Kode Promo</TableHead>
-                  <TableHead className="text-xs">Nilai Diskon</TableHead>
-                  <TableHead className="text-xs">Min. Transaksi</TableHead>
-                  <TableHead className="text-xs">Kuota</TableHead>
-                  <TableHead className="text-xs text-center">Status</TableHead>
-                  <TableHead className="text-xs text-right">Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedPromos.length > 0 ? (
-                  paginatedPromos.map((p, idx) => {
-                    const rowNo = (currentPage - 1) * pageSize + idx + 1;
-                    return (
-                      <TableRow key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                        <TableCell className="text-center font-mono text-slate-500 font-bold tabular-nums">
-                          {rowNo}
-                        </TableCell>
-                        <TableCell className="font-mono font-bold text-red-600 tabular-nums whitespace-nowrap">
-                          {p.code}
-                        </TableCell>
-                        <TableCell className="font-mono font-bold text-slate-900 tabular-nums whitespace-nowrap">
-                          {p.discountType === "fixed"
-                            ? formatRupiah(p.discountValue)
-                            : `${p.discountValue}%`}
-                        </TableCell>
-                        <TableCell className="font-mono text-slate-600 tabular-nums whitespace-nowrap">
-                          {formatRupiah(p.minSpend || 0)}
-                        </TableCell>
-                        <TableCell className="font-mono tabular-nums whitespace-nowrap">
-                          <span className="font-bold text-slate-900">{p.usedCount}</span>
-                          <span className="text-slate-400"> / {p.quota} klaim</span>
-                        </TableCell>
-                        <TableCell className="text-center whitespace-nowrap">
-                          <Badge variant={p.isActive ? "success" : "default"}>
-                            {p.isActive ? "AKTIF" : "NONAKTIF"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap space-x-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleTogglePromoActive(p.id)}
-                            className="h-7 text-xs px-2.5"
-                          >
-                            {p.isActive ? "Nonaktifkan" : "Aktifkan"}
-                          </Button>
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleDeletePromo(p.id)}
-                            className="h-7 text-xs px-2"
-                            title="Hapus Promo"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-slate-500 text-xs">
-                      Tidak ada kode promo yang sesuai dengan pencarian.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+          <div className="w-full sm:w-48 shrink-0">
+            <Select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              options={[
+                { value: "semua", label: `Semua Tipe (${promos.length})` },
+                { value: "fixed", label: "Potongan Nominal (Rp)" },
+                { value: "percent", label: "Potongan Persen (%)" },
+              ]}
+            />
           </div>
+        </div>
+      </Card>
+
+      {/* Promos Table */}
+      <Card className="bg-white border-slate-200 shadow-xs overflow-hidden">
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex items-center justify-center py-10 text-slate-500 text-xs gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-red-600" />
+              <span>Memuat daftar promo...</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12 text-center text-xs">No</TableHead>
+                    <TableHead className="text-xs">Kode Promo</TableHead>
+                    <TableHead className="text-xs">Nilai Diskon</TableHead>
+                    <TableHead className="text-xs">Min. Belanja</TableHead>
+                    <TableHead className="text-xs">Kuota Terpakai</TableHead>
+                    <TableHead className="text-center text-xs">Status</TableHead>
+                    <TableHead className="text-right text-xs">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedPromos.length > 0 ? (
+                    paginatedPromos.map((p, idx) => {
+                      const rowNo = (currentPage - 1) * pageSize + idx + 1;
+                      return (
+                        <TableRow key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                          <TableCell className="text-center font-mono text-slate-500 font-bold tabular-nums">
+                            {rowNo}
+                          </TableCell>
+                          <TableCell className="font-mono font-bold text-red-600 tabular-nums whitespace-nowrap">
+                            {p.code}
+                          </TableCell>
+                          <TableCell className="font-mono font-bold text-slate-900 tabular-nums whitespace-nowrap">
+                            {p.discountType === "fixed"
+                              ? formatRupiah(p.discountValue)
+                              : `${p.discountValue}%`}
+                          </TableCell>
+                          <TableCell className="font-mono text-slate-600 tabular-nums whitespace-nowrap">
+                            {formatRupiah(p.minSpend || 0)}
+                          </TableCell>
+                          <TableCell className="font-mono tabular-nums whitespace-nowrap">
+                            <span className="font-bold text-slate-900">{p.usedCount || 0}</span>
+                            <span className="text-slate-400"> / {p.quota || "∞"} klaim</span>
+                          </TableCell>
+                          <TableCell className="text-center whitespace-nowrap">
+                            <Badge variant={p.isActive ? "success" : "default"}>
+                              {p.isActive ? "AKTIF" : "NONAKTIF"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right whitespace-nowrap space-x-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleTogglePromoActive(p)}
+                              className="h-7 text-xs px-2.5"
+                            >
+                              {p.isActive ? "Nonaktifkan" : "Aktifkan"}
+                            </Button>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleDeletePromo(p)}
+                              className="h-7 text-xs px-2"
+                              title="Hapus Promo"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-8 text-center text-slate-500 text-xs">
+                        Belum ada kode promo terdaftar untuk venue Anda.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
 
           <TablePagination
             currentPage={currentPage}
@@ -353,12 +308,22 @@ export function MitraPromosPage() {
         title="Buat Kode Promo Baru"
       >
         <form onSubmit={handleCreatePromo} className="space-y-4 text-xs">
+          {venues.length > 1 && (
+            <Select
+              label="Venue Target"
+              value={selectedVenueId}
+              onChange={(e) => setSelectedVenueId(e.target.value)}
+              options={venues.map((v) => ({ value: v.id, label: v.name }))}
+            />
+          )}
+
           <Input
             label="Kode Voucher (Huruf Kapital)"
             placeholder="Contoh: MAINSIANG20"
             value={code}
             onChange={(e) => setCode(e.target.value)}
             className="uppercase font-mono"
+            required
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -375,8 +340,10 @@ export function MitraPromosPage() {
             <Input
               label={discountType === "fixed" ? "Nominal Diskon (Rp)" : "Persentase (%)"}
               type="number"
+              min={1}
               value={discountValue}
               onChange={(e) => setDiscountValue(parseInt(e.target.value, 10) || 0)}
+              required
             />
           </div>
 
@@ -384,12 +351,14 @@ export function MitraPromosPage() {
             <Input
               label="Minimum Transaksi (Rp)"
               type="number"
+              min={0}
               value={minSpend}
               onChange={(e) => setMinSpend(parseInt(e.target.value, 10) || 0)}
             />
             <Input
               label="Kuota Klaim"
               type="number"
+              min={0}
               value={quota}
               onChange={(e) => setQuota(parseInt(e.target.value, 10) || 0)}
             />
@@ -402,11 +371,12 @@ export function MitraPromosPage() {
               size="md"
               onClick={() => setIsModalOpen(false)}
               className="flex-1 text-xs"
+              disabled={saving}
             >
               Batal
             </Button>
-            <Button type="submit" variant="primary" size="md" className="flex-1 text-xs">
-              Aktifkan Promo
+            <Button type="submit" variant="primary" size="md" className="flex-1 text-xs" disabled={saving}>
+              {saving ? "Menyimpan..." : "Aktifkan Promo"}
             </Button>
           </div>
         </form>

@@ -21,10 +21,12 @@ export const GET = withAuth(
     const { data, error } = await q;
     dbError(error);
     const rows = camelize<any[]>(data ?? []).map((v: any) => {
-      const prices = Array.isArray(v.fields) ? v.fields.map((f: any) => Number(f.basePrice || 0)).filter((p: number) => p > 0) : [];
+      const prices = Array.isArray(v.fields)
+        ? v.fields.map((f: any) => Number(f.basePrice || 0)).filter((p: number) => p > 0)
+        : [];
       return {
         ...v,
-        startingPrice: v.startingPrice ?? (prices.length > 0 ? Math.min(...prices) : 0),
+        startingPrice: prices.length > 0 ? Math.min(...prices) : (v.startingPrice || 0),
       };
     });
     return ok(req, rows);

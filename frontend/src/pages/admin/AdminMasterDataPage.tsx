@@ -28,7 +28,7 @@ import {
   Modal,
   TablePagination,
 } from "@/components/ui";
-import { MOCK_CITIES, MOCK_FACILITIES, MOCK_FIELD_TYPES } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import type { City, Facility, FieldType } from "@futsal/shared";
 
 export function AdminMasterDataPage() {
@@ -38,9 +38,32 @@ export function AdminMasterDataPage() {
   const pageSize = 8;
 
   // States for data collections
-  const [cities, setCities] = React.useState<City[]>(MOCK_CITIES);
-  const [fieldTypes, setFieldTypes] = React.useState<FieldType[]>(MOCK_FIELD_TYPES);
-  const [facilities, setFacilities] = React.useState<Facility[]>(MOCK_FACILITIES);
+  const [cities, setCities] = React.useState<City[]>([]);
+  const [fieldTypes, setFieldTypes] = React.useState<FieldType[]>([]);
+  const [facilities, setFacilities] = React.useState<Facility[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+
+  const loadMasterData = React.useCallback(async () => {
+    try {
+      const [cRes, tRes, fRes] = await Promise.all([
+        apiClient.get<City[]>("/master/cities"),
+        apiClient.get<FieldType[]>("/master/field-types"),
+        apiClient.get<Facility[]>("/master/facilities"),
+      ]);
+      if (Array.isArray(cRes.data)) setCities(cRes.data);
+      if (Array.isArray(tRes.data)) setFieldTypes(tRes.data);
+      if (Array.isArray(fRes.data)) setFacilities(fRes.data);
+    } catch {
+      // keep existing state on error
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadMasterData();
+  }, [loadMasterData]);
 
   // Form modal state
   const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -132,77 +155,69 @@ export function AdminMasterDataPage() {
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    const kind =
+      activeTab === "cities"
+        ? "cities"
+        : activeTab === "field_types"
+        ? "field-types"
+        : "facilities";
+
+    let body: Record<string, unknown> | null = null;
     if (activeTab === "cities") {
       if (!cityName.trim() || !cityProvince.trim()) return;
-      if (editingItem) {
-        setCities((prev) =>
-          prev.map((c) =>
-            c.id === editingItem.id ? { ...c, name: cityName.trim(), province: cityProvince.trim() } : c
-          )
-        );
-        showToast(`Kota "${cityName}" berhasil diperbarui.`);
-      } else {
-        const newCity: City = {
-          id: `city-${Date.now()}`,
-          name: cityName.trim(),
-          province: cityProvince.trim(),
-        };
-        setCities((prev) => [...prev, newCity]);
-        showToast(`Kota "${cityName}" berhasil ditambahkan.`);
-      }
+      body = { name: cityName.trim(), province: cityProvince.trim() };
     } else if (activeTab === "field_types") {
       if (!fieldCode.trim() || !fieldName.trim()) return;
-      if (editingItem) {
-        setFieldTypes((prev) =>
-          prev.map((f) =>
-            f.id === editingItem.id ? { ...f, code: fieldCode.trim(), name: fieldName.trim() } : f
-          )
-        );
-        showToast(`Jenis lapangan "${fieldName}" berhasil diperbarui.`);
-      } else {
-        const newType: FieldType = {
-          id: `type-${Date.now()}`,
-          code: fieldCode.trim().toLowerCase().replace(/\s+/g, "_"),
-          name: fieldName.trim(),
-        };
-        setFieldTypes((prev) => [...prev, newType]);
-        showToast(`Jenis lapangan "${fieldName}" berhasil ditambahkan.`);
-      }
+      body = {
+        code: fieldCode.trim().toLowerCase().replace(/\s+/g, "_"),
+        name: fieldName.trim(),
+      };
     } else if (activeTab === "facilities") {
       if (!facilityName.trim()) return;
-      if (editingItem) {
-        setFacilities((prev) =>
-          prev.map((f) =>
-            f.id === editingItem.id
-              ? { ...f, name: facilityName.trim(), icon: facilityIcon.trim() || "check" }
-              : f
-          )
-        );
-        showToast(`Fasilitas "${facilityName}" berhasil diperbarui.`);
-      } else {
-        const newFacility: Facility = {
-          id: `fac-${Date.now()}`,
-          name: facilityName.trim(),
-          icon: facilityIcon.trim() || "check",
-        };
-        setFacilities((prev) => [...prev, newFacility]);
-        showToast(`Fasilitas "${facilityName}" berhasil ditambahkan.`);
-      }
+      body = {
+        name: facilityName.trim(),
+        icon: facilityIcon.trim() || "sparkles",
+      };
     }
+    if (!body) return;
 
-    setIsModalOpen(false);
+    setSaving(true);
+    try {
+      if (editingItem) {
+        await apiClient.patch(`/admin/master/${kind}`, {
+          id: editingItem.id,
+          ...body,
+        });
+        showToast(`Data "${body.name}" berhasil diperbarui di database.`);
+      } else {
+        await apiClient.post(`/admin/master/${kind}`, body);
+        showToast(`Data "${body.name}" berhasil ditambahkan ke database.`);
+      }
+      setIsModalOpen(false);
+      await loadMasterData();
+    } catch (err: any) {
+      showToast(err?.data?.error?.message || err?.message || "Gagal menyimpan data master.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (activeTab === "cities") {
-      setCities((prev) => prev.filter((c) => c.id !== id));
-    } else if (activeTab === "field_types") {
-      setFieldTypes((prev) => prev.filter((f) => f.id !== id));
-    } else if (activeTab === "facilities") {
-      setFacilities((prev) => prev.filter((f) => f.id !== id));
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Hapus master data "${name}" secara permanen?`)) return;
+    const kind =
+      activeTab === "cities"
+        ? "cities"
+        : activeTab === "field_types"
+        ? "field-types"
+        : "facilities";
+    try {
+      await apiClient.delete(`/admin/master/${kind}?id=${encodeURIComponent(id)}`);
+      showToast(`Data "${name}" berhasil dihapus dari database.`);
+      await loadMasterData();
+    } catch (err: any) {
+      showToast(err?.data?.error?.message || err?.message || `Gagal menghapus "${name}".`);
     }
-    showToast(`Data "${name}" berhasil dihapus.`);
   };
 
   return (
@@ -573,9 +588,10 @@ export function AdminMasterDataPage() {
               <Button
                 size="sm"
                 onClick={handleSave}
+                disabled={saving}
                 className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
               >
-                Simpan Data
+                {saving ? "Menyimpan..." : "Simpan Data"}
               </Button>
             </div>
           </div>

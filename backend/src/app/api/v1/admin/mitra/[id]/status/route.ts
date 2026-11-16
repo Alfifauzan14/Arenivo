@@ -2,7 +2,7 @@ import { z } from "zod";
 import { UserRole } from "@futsal/shared";
 import { withAuth } from "@/middleware/auth";
 import { handleOptions } from "@/middleware/cors";
-import { idParam, ok, parseBody } from "@/lib/http";
+import { idParam, ok, parseBody, reqIp } from "@/lib/http";
 import { adminRepository } from "@/modules/admin/admin.repository";
 
 export const OPTIONS = handleOptions;
@@ -24,7 +24,8 @@ export const PATCH = withAuth(
       `mitra.${normalizedStatus}`,
       "mitra_profiles",
       id,
-      body.reason ?? `Status akun mitra diubah menjadi ${normalizedStatus}`
+      body.reason ?? `Status akun mitra diubah menjadi ${normalizedStatus}`,
+      reqIp(req)
     );
     return ok(req, updated);
   },

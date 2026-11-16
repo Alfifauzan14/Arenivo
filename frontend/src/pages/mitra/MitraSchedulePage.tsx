@@ -6,6 +6,7 @@ import {
   User,
   Phone,
   ShieldCheck,
+  Loader2,
 } from "lucide-react";
 import {
   Card,
@@ -20,7 +21,7 @@ import {
   Select,
   useToast,
 } from "@/components/ui";
-import { MOCK_FIELDS, generateMockSlots } from "@/lib/mock-data";
+import { apiClient } from "@/lib/api-client";
 import {
   SlotStatus,
   formatRupiah,
@@ -32,15 +33,21 @@ import { cn } from "@/lib/utils";
 interface ExtendedSlotItem extends SlotItem {
   customerName?: string;
   isWalkIn?: boolean;
+  blockId?: string;
 }
 
 export function MitraSchedulePage() {
   const { addToast } = useToast();
-  const [fields, setFields] = React.useState<any[]>(MOCK_FIELDS);
-  const [selectedFieldId, setSelectedFieldId] = React.useState(MOCK_FIELDS[0].id);
-  const [selectedDate, setSelectedDate] = React.useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [fields, setFields] = React.useState<any[]>([]);
+  const [selectedFieldId, setSelectedFieldId] = React.useState("");
+  const [selectedDate, setSelectedDate] = React.useState(() => {
+    const now = new Date(Date.now() + 7 * 60 * 60000);
+    return now.toISOString().split("T")[0];
+  });
+  const [slots, setSlots] = React.useState<ExtendedSlotItem[]>([]);
+  const [loadingFields, setLoadingFields] = React.useState(true);
+  const [loadingSlots, setLoadingSlots] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
 
   // Modals state
   const [isBlockModalOpen, setIsBlockModalOpen] = React.useState(false);
@@ -48,106 +55,170 @@ export function MitraSchedulePage() {
 
   // Form Blokir Slot
   const [blockHour, setBlockHour] = React.useState<number>(12);
-  const [blockReason, setBlockReason] = React.useState<string>(
-    "Perawatan & Pembersihan Lantai"
-  );
+  const [blockReason, setBlockReason] = React.useState<string>("Perawatan & Pembersihan Lantai");
 
   // Form Walk-in Booking
-  const [walkInName, setWalkInName] = React.useState<string>("Pak Hendra (Komunitas RT)");
-  const [walkInPhone, setWalkInPhone] = React.useState<string>("081399887766");
+  const [walkInName, setWalkInName] = React.useState<string>("");
+  const [walkInPhone, setWalkInPhone] = React.useState<string>("");
   const [walkInStartHour, setWalkInStartHour] = React.useState<number>(14);
-  const [walkInDuration, setWalkInDuration] = React.useState<number>(2);
+  const [walkInDuration, setWalkInDuration] = React.useState<number>(1);
 
-  // Active Field Object
-  const currentField =
-    MOCK_FIELDS.find((f) => f.id === selectedFieldId) || MOCK_FIELDS[0];
+  React.useEffect(() => {
+    let active = true;
+    apiClient
+      .get<any[]>("/mitra/fields")
+      .then((res) => {
+        if (active && Array.isArray(res.data)) {
+          const activeFields = res.data.filter((f) => f.status === "aktif");
+          const list = activeFields.length > 0 ? activeFields : res.data;
+          setFields(list);
+          if (list.length > 0) setSelectedFieldId(list[0].id);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoadingFields(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  // Base slots generated from mock
-  const [customSlots, setCustomSlots] = React.useState<Record<string, ExtendedSlotItem[]>>({});
+  const currentField = fields.find((f) => f.id === selectedFieldId) || fields[0] || { name: "-", basePrice: 0 };
 
-  const dateKey = `${selectedFieldId}-${selectedDate}`;
+  const loadSchedule = React.useCallback(async () => {
+    if (!selectedFieldId || !selectedDate) return;
+    setLoadingSlots(true);
+    try {
+      const [availRes, blocksRes, bookingsRes] = await Promise.all([
+        apiClient.get<any[]>(`/fields/${selectedFieldId}/availability`, { date: selectedDate }),
+        apiClient.get<any[]>("/mitra/blocks", { fieldId: selectedFieldId, date: selectedDate }),
+        apiClient.get<any[]>("/mitra/bookings", { date: selectedDate, limit: 100 }),
+      ]);
 
-  const slots: ExtendedSlotItem[] = React.useMemo(() => {
-    if (customSlots[dateKey]) {
-      return customSlots[dateKey];
+      const rawSlots = Array.isArray(availRes.data) ? availRes.data : [];
+      const blockRows = Array.isArray(blocksRes.data) ? blocksRes.data : [];
+      const bookingRows = (Array.isArray(bookingsRes.data) ? bookingsRes.data : []).filter(
+        (b: any) => b.fieldId === selectedFieldId && b.status !== "dibatalkan" && b.status !== "kedaluwarsa"
+      );
+
+      const blockByHour = new Map<number, any>();
+      for (const blk of blockRows) {
+        const wib = new Date(new Date(blk.slotStart).getTime() + 7 * 60 * 60000);
+        blockByHour.set(wib.getUTCHours(), blk);
+      }
+
+      const bookingByHour = new Map<number, any>();
+      for (const b of bookingRows) {
+        const startH = new Date(new Date(b.playStart).getTime() + 7 * 60 * 60000).getUTCHours();
+        const endH = new Date(new Date(b.playEnd).getTime() + 7 * 60 * 60000).getUTCHours();
+        for (let h = startH; h < (endH > startH ? endH : startH + (b.totalHours || 1)); h++) {
+          bookingByHour.set(h, b);
+        }
+      }
+
+      const merged: ExtendedSlotItem[] = rawSlots.map((s: any) => {
+        const hour = Number(s.hour ?? (s.slotStart ? new Date(new Date(s.slotStart).getTime() + 7 * 60 * 60000).getUTCHours() : 0));
+        const blk = blockByHour.get(hour);
+        const bk = bookingByHour.get(hour);
+        return {
+          hour,
+          timeLabel: s.timeLabel || `${String(hour).padStart(2, "0")}:00 - ${String(hour + 1).padStart(2, "0")}:00`,
+          slotStart: s.slotStart || `${selectedDate}T${String(hour).padStart(2, "0")}:00:00+07:00`,
+          slotEnd: s.slotEnd || `${selectedDate}T${String(hour + 1).padStart(2, "0")}:00:00+07:00`,
+          price: Number(s.price ?? currentField.basePrice ?? 0),
+          status: s.status as SlotStatus,
+          reason: blk?.reason || s.reason,
+          blockId: blk?.id,
+          customerName: bk?.customerName,
+          isWalkIn: bk?.source === "manual",
+        };
+      });
+
+      setSlots(merged);
+    } catch {
+      setSlots([]);
+    } finally {
+      setLoadingSlots(false);
     }
-    const base = generateMockSlots(selectedFieldId, selectedDate);
-    return base.map((s) => {
-      if (s.hour === 16 || s.hour === 17) {
-        return { ...s, customerName: "Futsal Squad UI (Online)" };
-      }
-      if (s.hour === 18) {
-        return { ...s, customerName: "Checkout Sedang Berjalan" };
-      }
-      return s;
-    });
-  }, [selectedFieldId, selectedDate, customSlots, dateKey]);
+  }, [selectedFieldId, selectedDate, currentField.basePrice]);
 
-  // Handler: Blokir Slot
-  const handleConfirmBlock = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    loadSchedule();
+  }, [loadSchedule]);
+
+  const handleConfirmBlock = async (e: React.FormEvent) => {
     e.preventDefault();
-    const updated = slots.map((s) =>
-      s.hour === blockHour
-        ? {
-            ...s,
-            status: SlotStatus.DIBLOKIR,
-            reason: blockReason,
-          }
-        : s
-    );
-
-    setCustomSlots((prev) => ({ ...prev, [dateKey]: updated }));
-    setIsBlockModalOpen(false);
-    addToast(
-      "success",
-      `Slot jam ${blockHour}:00 berhasil diblokir (${blockReason}).`,
-      "Slot Diblokir"
-    );
+    if (!selectedFieldId) return;
+    setSubmitting(true);
+    try {
+      const slotStart = `${selectedDate}T${String(blockHour).padStart(2, "0")}:00:00+07:00`;
+      await apiClient.post("/mitra/blocks", {
+        fieldId: selectedFieldId,
+        slotStart,
+        reason: blockReason.trim() || "Perawatan Lapangan",
+      });
+      setIsBlockModalOpen(false);
+      addToast("success", `Slot jam ${blockHour}:00 berhasil diblokir di database.`, "Slot Diblokir");
+      await loadSchedule();
+    } catch (err: any) {
+      addToast("error", err?.error?.message || "Gagal memblokir slot.", "Gagal Blokir");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // Handler: Walk-in Booking
-  const handleConfirmWalkIn = (e: React.FormEvent) => {
+  const handleUnblockSlot = async (slot: ExtendedSlotItem) => {
+    if (!slot.blockId) return;
+    setSubmitting(true);
+    try {
+      await apiClient.delete(`/mitra/blocks/${slot.blockId}`);
+      addToast("info", `Slot jam ${slot.hour}:00 dibuka kembali untuk publik.`, "Slot Dibuka");
+      await loadSchedule();
+    } catch (err: any) {
+      addToast("error", err?.error?.message || "Gagal membuka blokir slot.", "Gagal");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleConfirmWalkIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!walkInName.trim()) {
-      addToast("warning", "Nama pelanggan walk-in wajib diisi.", "Validasi");
+    if (!walkInName.trim() || !walkInPhone.trim()) {
+      addToast("warning", "Nama dan nomor WhatsApp penyewa wajib diisi.", "Validasi");
       return;
     }
+    if (!selectedFieldId) return;
 
-    const endHour = walkInStartHour + walkInDuration;
-    const updated = slots.map((s) => {
-      if (s.hour >= walkInStartHour && s.hour < endHour) {
-        return {
-          ...s,
-          status: SlotStatus.TERISI,
-          customerName: `${walkInName} (Walk-in)`,
-          isWalkIn: true,
-        };
+    setSubmitting(true);
+    try {
+      const slotStarts: string[] = [];
+      for (let i = 0; i < walkInDuration; i++) {
+        const h = walkInStartHour + i;
+        slotStarts.push(`${selectedDate}T${String(h).padStart(2, "0")}:00:00+07:00`);
       }
-      return s;
-    });
 
-    setCustomSlots((prev) => ({ ...prev, [dateKey]: updated }));
-    setIsWalkInModalOpen(false);
-    addToast(
-      "success",
-      `Booking walk-in atas nama ${walkInName} (${walkInDuration} jam) berhasil disimpan tanpa komisi platform.`,
-      "Walk-in Tercatat"
-    );
-  };
+      await apiClient.post("/mitra/bookings", {
+        fieldId: selectedFieldId,
+        slotStarts,
+        customerName: walkInName.trim(),
+        customerPhone: walkInPhone.trim(),
+      });
 
-  // Handler: Buka Blokir
-  const handleUnblockSlot = (hour: number) => {
-    const updated = slots.map((s) =>
-      s.hour === hour
-        ? {
-            ...s,
-            status: SlotStatus.TERSEDIA,
-            reason: undefined,
-          }
-        : s
-    );
-    setCustomSlots((prev) => ({ ...prev, [dateKey]: updated }));
-    addToast("info", `Slot jam ${hour}:00 dibuka kembali untuk publik.`, "Slot Dibuka");
+      setIsWalkInModalOpen(false);
+      setWalkInName("");
+      setWalkInPhone("");
+      addToast(
+        "success",
+        `Booking walk-in atas nama ${walkInName.trim()} (${walkInDuration} jam) berhasil disimpan ke database.`,
+        "Walk-in Tercatat"
+      );
+      await loadSchedule();
+    } catch (err: any) {
+      addToast("error", err?.error?.message || "Gagal mencatat booking walk-in.", "Gagal Walk-in");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -159,7 +230,7 @@ export function MitraSchedulePage() {
             Jadwal & Manajemen Slot
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-            Atur ketersediaan lapangan, blokir jam perawatan, atau catat reservasi walk-in.
+            Atur ketersediaan lapangan, blokir jam perawatan, atau catat reservasi walk-in secara live.
           </p>
         </div>
 
@@ -169,6 +240,7 @@ export function MitraSchedulePage() {
             variant="outline"
             size="sm"
             onClick={() => setIsBlockModalOpen(true)}
+            disabled={!selectedFieldId}
             className="w-full sm:w-auto justify-center gap-1.5 text-xs"
           >
             <Ban className="w-4 h-4 text-slate-600 shrink-0" />
@@ -180,6 +252,7 @@ export function MitraSchedulePage() {
             variant="primary"
             size="sm"
             onClick={() => setIsWalkInModalOpen(true)}
+            disabled={!selectedFieldId}
             className="w-full sm:w-auto justify-center gap-1.5 text-xs"
           >
             <Plus className="w-4 h-4 shrink-0" />
@@ -188,7 +261,7 @@ export function MitraSchedulePage() {
         </div>
       </div>
 
-      {/* Simple 2-Column Filter Bar */}
+      {/* Filter Bar */}
       <Card className="p-3.5 sm:p-4 bg-white border-slate-200">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 items-end">
           <Select
@@ -233,7 +306,6 @@ export function MitraSchedulePage() {
             </CardDescription>
           </div>
 
-          {/* Status Legend */}
           <div className="flex flex-wrap items-center gap-3 text-[11px] sm:text-xs text-slate-600">
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-sm bg-white border border-slate-300" /> Tersedia
@@ -251,94 +323,102 @@ export function MitraSchedulePage() {
         </CardHeader>
 
         <CardContent className="p-3.5 sm:p-5 pt-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
-            {slots.map((s) => {
-              const isAvailable = s.status === SlotStatus.TERSEDIA;
-              const isFilled = s.status === SlotStatus.TERISI;
-              const isLocked = s.status === SlotStatus.DIKUNCI;
-              const isBlocked = s.status === SlotStatus.DIBLOKIR;
-              const isPassed = s.status === SlotStatus.LEWAT;
+          {loadingFields || loadingSlots ? (
+            <div className="flex items-center justify-center py-10 text-slate-500 text-xs gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-red-600" />
+              <span>Memuat jadwal real-time...</span>
+            </div>
+          ) : slots.length === 0 ? (
+            <p className="text-center py-8 text-xs text-slate-500">
+              Tidak ada slot tersedia untuk tanggal atau lapangan ini.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
+              {slots.map((s) => {
+                const isAvailable = s.status === SlotStatus.TERSEDIA;
+                const isFilled = s.status === SlotStatus.TERISI;
+                const isLocked = s.status === SlotStatus.DIKUNCI;
+                const isBlocked = s.status === SlotStatus.DIBLOKIR;
+                const isPassed = s.status === SlotStatus.LEWAT;
 
-              return (
-                <div
-                  key={s.hour}
-                  className={cn(
-                    "p-3 sm:p-3.5 rounded-xl border flex flex-col justify-between transition-colors space-y-2",
-                    isAvailable &&
-                      "bg-white border-slate-200 text-slate-900 hover:border-red-600",
-                    isFilled &&
-                      "bg-emerald-50 border-emerald-200 text-emerald-950",
-                    isLocked &&
-                      "bg-amber-50 border-amber-300 text-amber-900",
-                    isBlocked &&
-                      "bg-slate-100 border-slate-200 text-slate-600",
-                    isPassed &&
-                      "bg-slate-100 border-slate-200 text-slate-400"
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="font-mono font-bold text-[11px] sm:text-xs tabular-nums">
-                      {s.timeLabel}
-                    </span>
-                    <SlotStatusBadge status={s.status} className="px-2 py-0.5 text-[10px]" />
-                  </div>
+                return (
+                  <div
+                    key={s.hour}
+                    className={cn(
+                      "p-3 sm:p-3.5 rounded-xl border flex flex-col justify-between transition-colors space-y-2",
+                      isAvailable && "bg-white border-slate-200 text-slate-900 hover:border-red-600",
+                      isFilled && "bg-emerald-50 border-emerald-200 text-emerald-950",
+                      isLocked && "bg-amber-50 border-amber-300 text-amber-900",
+                      isBlocked && "bg-slate-100 border-slate-200 text-slate-600",
+                      isPassed && "bg-slate-100 border-slate-200 text-slate-400"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-mono font-bold text-[11px] sm:text-xs tabular-nums">
+                        {s.timeLabel}
+                      </span>
+                      <SlotStatusBadge status={s.status} className="px-2 py-0.5 text-[10px]" />
+                    </div>
 
-                  {/* Slot Details */}
-                  <div className="text-xs">
-                    {isFilled && (
-                      <div className="space-y-0.5">
-                        <span className="font-semibold block truncate text-slate-900 text-[11px] sm:text-xs">
-                          {s.customerName || "Penyewa"}
-                        </span>
-                        <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-mono text-emerald-800 tabular-nums">
-                          <span>{formatRupiah(s.price)}</span>
-                          <span>{s.isWalkIn ? "Walk-in" : "Online"}</span>
+                    <div className="text-xs">
+                      {isFilled && (
+                        <div className="space-y-0.5">
+                          <span className="font-semibold block truncate text-slate-900 text-[11px] sm:text-xs">
+                            {s.customerName || "Penyewa"}
+                          </span>
+                          <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-mono text-emerald-800 tabular-nums">
+                            <span>{formatRupiah(s.price)}</span>
+                            <span>{s.isWalkIn ? "Walk-in" : "Online"}</span>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {isLocked && (
-                      <span className="text-[10px] sm:text-[11px] text-amber-800 block truncate">
-                        Checkout (15 mnt)
-                      </span>
-                    )}
-
-                    {isBlocked && (
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-[10px] sm:text-[11px] text-slate-600 truncate">
-                          {s.reason || "Perawatan"}
+                      {isLocked && (
+                        <span className="text-[10px] sm:text-[11px] text-amber-800 block truncate">
+                          Checkout Berlangsung
                         </span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleUnblockSlot(s.hour)}
-                          className="h-5 px-1.5 text-[10px]"
-                        >
-                          Buka
-                        </Button>
-                      </div>
-                    )}
+                      )}
 
-                    {isAvailable && (
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-slate-900 text-[11px] sm:text-xs tabular-nums">
-                          {formatRupiah(s.price)}
+                      {isBlocked && (
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[10px] sm:text-[11px] text-slate-600 truncate">
+                            {s.reason || "Perawatan"}
+                          </span>
+                          {s.blockId && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={submitting}
+                              onClick={() => handleUnblockSlot(s)}
+                              className="h-5 px-1.5 text-[10px]"
+                            >
+                              Buka
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
+                      {isAvailable && (
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-bold text-slate-900 text-[11px] sm:text-xs tabular-nums">
+                            {formatRupiah(s.price)}
+                          </span>
+                          <span className="text-[10px] text-slate-400 hidden sm:inline">Kosong</span>
+                        </div>
+                      )}
+
+                      {isPassed && (
+                        <span className="text-[10px] sm:text-[11px] text-slate-400 font-mono">
+                          Lewat
                         </span>
-                        <span className="text-[10px] text-slate-400 hidden sm:inline">Kosong</span>
-                      </div>
-                    )}
-
-                    {isPassed && (
-                      <span className="text-[10px] sm:text-[11px] text-slate-400 font-mono">
-                        Selesai
-                      </span>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -357,12 +437,10 @@ export function MitraSchedulePage() {
             label="Pilih Jam yang Diblokir"
             value={String(blockHour)}
             onChange={(e) => setBlockHour(parseInt(e.target.value, 10))}
-            options={[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].map(
-              (h) => ({
-                value: String(h),
-                label: `${String(h).padStart(2, "0")}:00 – ${String(h + 1).padStart(2, "0")}:00 WIB`,
-              })
-            )}
+            options={[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map((h) => ({
+              value: String(h),
+              label: `${String(h).padStart(2, "0")}:00 – ${String(h + 1).padStart(2, "0")}:00 WIB`,
+            }))}
           />
 
           <Input
@@ -370,6 +448,7 @@ export function MitraSchedulePage() {
             placeholder="Contoh: Perawatan rumput sintetis / Turnamen internal"
             value={blockReason}
             onChange={(e) => setBlockReason(e.target.value)}
+            required
           />
 
           <div className="flex gap-2.5 pt-3 border-t border-slate-100">
@@ -379,11 +458,12 @@ export function MitraSchedulePage() {
               size="md"
               onClick={() => setIsBlockModalOpen(false)}
               className="flex-1 text-xs"
+              disabled={submitting}
             >
               Batal
             </Button>
-            <Button type="submit" variant="primary" size="md" className="flex-1 text-xs">
-              Simpan Blokir Slot
+            <Button type="submit" variant="primary" size="md" className="flex-1 text-xs" disabled={submitting}>
+              {submitting ? "Menyimpan..." : "Simpan Blokir Slot"}
             </Button>
           </div>
         </form>
@@ -412,6 +492,7 @@ export function MitraSchedulePage() {
             value={walkInName}
             onChange={(e) => setWalkInName(e.target.value)}
             leftIcon={<User className="w-4 h-4 text-slate-400" />}
+            required
           />
 
           <Input
@@ -420,6 +501,7 @@ export function MitraSchedulePage() {
             value={walkInPhone}
             onChange={(e) => setWalkInPhone(e.target.value)}
             leftIcon={<Phone className="w-4 h-4 text-slate-400" />}
+            required
           />
 
           <div className="grid grid-cols-2 gap-3">
@@ -427,12 +509,10 @@ export function MitraSchedulePage() {
               label="Jam Mulai"
               value={String(walkInStartHour)}
               onChange={(e) => setWalkInStartHour(parseInt(e.target.value, 10))}
-              options={[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map(
-                (h) => ({
-                  value: String(h),
-                  label: `${String(h).padStart(2, "0")}:00 WIB`,
-                })
-              )}
+              options={[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map((h) => ({
+                value: String(h),
+                label: `${String(h).padStart(2, "0")}:00 WIB`,
+              }))}
             />
 
             <Select
@@ -450,7 +530,7 @@ export function MitraSchedulePage() {
           <div className="p-3.5 bg-white rounded-lg border border-slate-200 flex justify-between items-center text-xs">
             <span className="text-slate-600 font-medium">Total Tagihan Tunai:</span>
             <span className="font-mono font-bold text-slate-900 text-sm tabular-nums">
-              {formatRupiah(currentField.basePrice * walkInDuration)}
+              {formatRupiah((currentField.basePrice || 0) * walkInDuration)}
             </span>
           </div>
 
@@ -461,11 +541,12 @@ export function MitraSchedulePage() {
               size="md"
               onClick={() => setIsWalkInModalOpen(false)}
               className="flex-1 text-xs"
+              disabled={submitting}
             >
               Batal
             </Button>
-            <Button type="submit" variant="primary" size="md" className="flex-1 text-xs">
-              Simpan Booking
+            <Button type="submit" variant="primary" size="md" className="flex-1 text-xs" disabled={submitting}>
+              {submitting ? "Menyimpan..." : "Simpan Booking"}
             </Button>
           </div>
         </form>

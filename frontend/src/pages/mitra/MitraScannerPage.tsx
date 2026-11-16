@@ -35,7 +35,6 @@ import {
   TablePagination,
   useToast,
 } from "@/components/ui";
-import { MOCK_VENUES } from "@/lib/mock-data";
 import { apiClient } from "@/lib/api-client";
 import { TicketScanResult } from "@futsal/shared";
 import { cn } from "@/lib/utils";
@@ -54,8 +53,8 @@ interface ValidationResultState {
 export function MitraScannerPage() {
   const { addToast } = useToast();
 
-  const [venues, setVenues] = React.useState<any[]>(MOCK_VENUES);
-  const [selectedVenueId, setSelectedVenueId] = React.useState(MOCK_VENUES[0].id);
+  const [venues, setVenues] = React.useState<any[]>([]);
+  const [selectedVenueId, setSelectedVenueId] = React.useState("");
   const [manualCode, setManualCode] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -289,16 +288,14 @@ export function MitraScannerPage() {
         };
 
         setScanResult(liveState);
-        const newScan = {
-          id: `scn-${Date.now()}`,
-          ticketId: clean,
-          scannedCode: clean,
-          venueId: selectedVenueId,
-          scannedBy: "Operator Gate (Live)",
-          result: liveResult,
-          scannedAt: new Date().toISOString(),
-        };
-        setScansHistory((prev) => [newScan, ...prev]);
+        apiClient
+          .get<any[]>("/mitra/check-ins")
+          .then((histRes) => {
+            if (histRes.data && Array.isArray(histRes.data)) {
+              setScansHistory(histRes.data);
+            }
+          })
+          .catch(() => {});
         setCurrentPage(1);
 
         if (liveResult === TicketScanResult.SAH) {
@@ -324,7 +321,7 @@ export function MitraScannerPage() {
         const q = searchQuery.toLowerCase();
         return (
           s.scannedCode.toLowerCase().includes(q) ||
-          (s.scannedBy || "").toLowerCase().includes(q)
+          (s.scanner?.fullName || s.scanner?.email || s.scannedBy || "").toLowerCase().includes(q)
         );
       }
       return true;
@@ -756,7 +753,9 @@ export function MitraScannerPage() {
                       </div>
                       <div className="grid grid-cols-[84px_1fr] items-center gap-2">
                         <span className="text-slate-500">Petugas</span>
-                        <span className="font-medium text-slate-800">{scan.scannedBy}</span>
+                        <span className="font-medium text-slate-800">
+                          {scan.scanner?.fullName || scan.scanner?.email || scan.scannedBy || "Petugas"}
+                        </span>
                       </div>
                     </div>
 
@@ -819,7 +818,7 @@ export function MitraScannerPage() {
                           WIB
                         </TableCell>
                         <TableCell className="text-slate-600 whitespace-nowrap">
-                          {scan.scannedBy}
+                          {scan.scanner?.fullName || scan.scanner?.email || scan.scannedBy || "Petugas"}
                         </TableCell>
                         <TableCell className="text-center whitespace-nowrap">
                           <TicketScanResultBadge result={scan.result} />

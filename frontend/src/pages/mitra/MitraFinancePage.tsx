@@ -60,24 +60,46 @@ export function MitraFinancePage() {
     entries: [],
   });
   const [payouts, setPayouts] = React.useState<any[]>([]);
+  const [isSubmittingPayout, setIsSubmittingPayout] = React.useState(false);
 
-  // Live Backend Loading for Balance & Payouts
-  React.useEffect(() => {
-    let isMounted = true;
-    apiClient.get<any>("/mitra/balance").then((res) => {
-      if (isMounted && res.data) setBalance(res.data);
-    }).catch(() => {});
-
-    apiClient.get<any[]>("/mitra/payouts").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data)) {
-        setPayouts(res.data);
-      }
-    }).catch(() => {});
-
-    return () => {
-      isMounted = false;
-    };
+  const loadFinanceData = React.useCallback(async () => {
+    await Promise.all([
+      apiClient
+        .get<any>("/mitra/balance")
+        .then((res) => {
+          if (res.data) {
+            setBalance(res.data);
+            const avail = Number(res.data.saldoBisaDicairkan || 0);
+            setPayoutAmount(avail >= 100000 ? Math.min(avail, 100000) : avail);
+          }
+        })
+        .catch(() => {}),
+      apiClient
+        .get<any[]>("/mitra/payouts")
+        .then((res) => {
+          if (res.data && Array.isArray(res.data)) {
+            setPayouts(res.data);
+          }
+        })
+        .catch(() => {}),
+      apiClient
+        .get<any>("/mitra/profile")
+        .then((res) => {
+          const mp = res.data?.mitraProfile;
+          if (mp) {
+            if (mp.bankName) setSelectedBank(mp.bankName);
+            if (mp.bankAccountNumber) setBankAccount(mp.bankAccountNumber);
+            if (mp.bankAccountHolder) setAccountHolder(mp.bankAccountHolder);
+          }
+        })
+        .catch(() => {}),
+    ]);
   }, []);
+
+  // Live Backend Loading for Balance, Payouts & Mitra Profile
+  React.useEffect(() => {
+    void loadFinanceData();
+  }, [loadFinanceData]);
 
   // Filter & Pagination states
   const [ledgerSearch, setLedgerSearch] = React.useState("");
@@ -92,10 +114,10 @@ export function MitraFinancePage() {
   // Modal Payout State
   const [isPayoutModalOpen, setIsPayoutModalOpen] = React.useState(false);
   const [selectedPayoutDetail, setSelectedPayoutDetail] = React.useState<any | null>(null);
-  const [payoutAmount, setPayoutAmount] = React.useState<number>(1000000);
+  const [payoutAmount, setPayoutAmount] = React.useState<number>(100000);
   const [selectedBank, setSelectedBank] = React.useState("BCA");
-  const [bankAccount, setBankAccount] = React.useState("8830128491");
-  const [accountHolder, setAccountHolder] = React.useState("PT Spartan Olahraga Sejahtera");
+  const [bankAccount, setBankAccount] = React.useState("");
+  const [accountHolder, setAccountHolder] = React.useState("");
 
   // Ledger Mutasi Saldo (Realtime dari Database Supabase)
   const ledgerEntries: BalanceEntry[] = React.useMemo(() => {
@@ -104,7 +126,7 @@ export function MitraFinancePage() {
       id: e.id,
       type: (e.amount < 0 ? "out" : "in") as "in" | "out",
       description: e.description || "Pendapatan Booking Online",
-      orderCode: e.bookingId ? e.bookingId.slice(0, 8) : undefined,
+      orderCode: e.bookingCode || e.booking?.bookingCode || undefined,
       amount: Math.abs(e.amount),
       date: formatDateIndo(e.createdAt || new Date()),
     }));
@@ -149,7 +171,7 @@ export function MitraFinancePage() {
     return filteredPayouts.slice(start, start + pageSize);
   }, [filteredPayouts, payoutPage]);
 
-  const handleRequestPayout = (e: React.FormEvent) => {
+  const handleRequestPayout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (payoutAmount < 100000) {
       addToast("warning", "Batas minimum penarikan dana adalah Rp100.000.", "Validasi Payout");
@@ -165,33 +187,27 @@ export function MitraFinancePage() {
       return;
     }
 
-    setBalance((prev) => ({
-      ...prev,
-      saldoTotal: prev.saldoTotal - payoutAmount,
-      saldoBisaDicairkan: prev.saldoBisaDicairkan - payoutAmount,
-    }));
+    setIsSubmittingPayout(true);
+    try {
+      await apiClient.post<any>("/mitra/payouts", { amount: payoutAmount });
+      setIsPayoutModalOpen(false);
+      setPayoutPage(1);
+      await loadFinanceData();
 
-    const newPayout = {
-      id: `po-${Date.now()}`,
-      mitraId: balance.mitraId,
-      amount: payoutAmount,
-      status: "diproses" as const,
-      bankName: selectedBank,
-      bankAccountNumber: bankAccount,
-      bankAccountHolder: accountHolder,
-      createdAt: new Date().toISOString(),
-    };
-
-    setPayouts((prev) => [newPayout, ...prev]);
-    apiClient.post<any>("/mitra/payouts", { amount: payoutAmount }).catch(() => {});
-    setIsPayoutModalOpen(false);
-    setPayoutPage(1);
-
-    addToast(
-      "success",
-      `Permohonan pencairan dana sebesar ${formatRupiah(payoutAmount)} ke rekening ${selectedBank} berhasil diajukan.`,
-      "Pengajuan Payout Berhasil"
-    );
+      addToast(
+        "success",
+        `Permohonan pencairan dana sebesar ${formatRupiah(payoutAmount)} ke rekening ${selectedBank} berhasil diajukan.`,
+        "Pengajuan Payout Berhasil"
+      );
+    } catch (err: any) {
+      const msg =
+        err?.data?.error?.message ||
+        err?.message ||
+        "Gagal mengajukan penarikan dana. Pastikan saldo mencukupi.";
+      addToast("error", msg, "Pengajuan Payout Gagal");
+    } finally {
+      setIsSubmittingPayout(false);
+    }
   };
 
   return (
@@ -203,7 +219,7 @@ export function MitraFinancePage() {
             Keuangan & Payout
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-            Pantau saldo pendapatan bersih (setelah komisi online 10%) dan ajukan penarikan dana.
+            Pantau saldo pendapatan bersih (setelah komisi platform) dan ajukan penarikan dana.
           </p>
         </div>
 
@@ -269,7 +285,7 @@ export function MitraFinancePage() {
               {formatRupiah(balance.saldoTotal)}
             </span>
           </div>
-          <p className="text-[11px] sm:text-xs text-slate-500 mt-1">Pendapatan bersih mitra (90% online)</p>
+          <p className="text-[11px] sm:text-xs text-slate-500 mt-1">Pendapatan bersih setelah komisi platform</p>
         </Card>
       </div>
 
@@ -492,8 +508,10 @@ export function MitraFinancePage() {
                 }}
                 options={[
                   { value: "semua", label: `Semua Status (${payouts.length})` },
-                  { value: "selesai", label: "Ditransfer" },
+                  { value: "menunggu", label: "Menunggu" },
                   { value: "diproses", label: "Diproses" },
+                  { value: "selesai", label: "Ditransfer" },
+                  { value: "ditolak", label: "Ditolak" },
                 ]}
               />
             </div>
@@ -532,7 +550,13 @@ export function MitraFinancePage() {
                             : "warning"
                         }
                       >
-                        {po.status === "selesai" ? "DITRANSFER" : po.status === "ditolak" ? "DITOLAK" : "DIPROSES"}
+                        {po.status === "selesai"
+                          ? "DITRANSFER"
+                          : po.status === "ditolak"
+                          ? "DITOLAK"
+                          : po.status === "menunggu"
+                          ? "MENUNGGU"
+                          : "DIPROSES"}
                       </Badge>
                     </div>
 
@@ -629,7 +653,13 @@ export function MitraFinancePage() {
                                 : "warning"
                             }
                           >
-                            {po.status === "selesai" ? "DITRANSFER" : po.status === "ditolak" ? "DITOLAK" : "DIPROSES"}
+                            {po.status === "selesai"
+                              ? "DITRANSFER"
+                              : po.status === "ditolak"
+                              ? "DITOLAK"
+                              : po.status === "menunggu"
+                              ? "MENUNGGU"
+                              : "DIPROSES"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right whitespace-nowrap">
@@ -691,46 +721,56 @@ export function MitraFinancePage() {
               onChange={(e) => setPayoutAmount(parseInt(e.target.value, 10) || 0)}
             />
             <div className="flex flex-wrap gap-2">
-              {[500000, 1000000, 2000000].map((amt) => (
+              {[100000, 250000, 500000, 1000000, 2000000]
+                .filter((amt) => amt <= balance.saldoBisaDicairkan)
+                .map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setPayoutAmount(amt)}
+                    className="px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:bg-slate-50 text-[11px] font-mono text-slate-700 cursor-pointer tabular-nums"
+                  >
+                    {formatRupiah(amt)}
+                  </button>
+                ))}
+              {balance.saldoBisaDicairkan >= 100000 && (
                 <button
-                  key={amt}
                   type="button"
-                  onClick={() => setPayoutAmount(amt)}
-                  className="px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:bg-slate-50 text-[11px] font-mono text-slate-700 cursor-pointer tabular-nums"
+                  onClick={() => setPayoutAmount(balance.saldoBisaDicairkan)}
+                  className="px-2.5 py-1 rounded-md bg-red-50 border border-red-200 hover:bg-red-100 text-[11px] font-mono font-semibold text-red-700 cursor-pointer tabular-nums"
                 >
-                  {formatRupiah(amt)}
+                  Semua ({formatRupiah(balance.saldoBisaDicairkan)})
                 </button>
-              ))}
+              )}
             </div>
           </div>
 
           <div className="space-y-3 pt-2 border-t border-slate-100">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Select
+              <Input
                 label="Bank Tujuan"
                 value={selectedBank}
-                onChange={(e) => setSelectedBank(e.target.value)}
-                options={[
-                  { value: "BCA", label: "Bank BCA" },
-                  { value: "Mandiri", label: "Bank Mandiri" },
-                  { value: "BNI", label: "Bank BNI" },
-                  { value: "BRI", label: "Bank BRI" },
-                ]}
+                readOnly
+                className="bg-slate-50 text-slate-700"
               />
 
               <Input
                 label="Nomor Rekening"
-                value={bankAccount}
-                onChange={(e) => setBankAccount(e.target.value)}
-                className="font-mono"
+                value={bankAccount || "-"}
+                readOnly
+                className="font-mono bg-slate-50 text-slate-700"
               />
             </div>
 
             <Input
               label="Nama Pemilik Rekening"
-              value={accountHolder}
-              onChange={(e) => setAccountHolder(e.target.value)}
+              value={accountHolder || "-"}
+              readOnly
+              className="bg-slate-50 text-slate-700"
             />
+            <p className="text-[11px] text-slate-500">
+              Dana dicairkan ke rekening bank terverifikasi pada profil usaha Mitra Anda.
+            </p>
           </div>
 
           <div className="flex gap-2.5 pt-3 border-t border-slate-100">
@@ -740,11 +780,18 @@ export function MitraFinancePage() {
               size="md"
               onClick={() => setIsPayoutModalOpen(false)}
               className="flex-1 text-xs"
+              disabled={isSubmittingPayout}
             >
               Batal
             </Button>
-            <Button type="submit" variant="primary" size="md" className="flex-1 text-xs">
-              Ajukan Pencairan
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              className="flex-1 text-xs"
+              disabled={isSubmittingPayout || balance.saldoBisaDicairkan < 100000}
+            >
+              {isSubmittingPayout ? "Mengajukan..." : "Ajukan Pencairan"}
             </Button>
           </div>
         </form>
@@ -780,6 +827,8 @@ export function MitraFinancePage() {
                   ? "DITRANSFER"
                   : selectedPayoutDetail.status === "ditolak"
                   ? "DITOLAK"
+                  : selectedPayoutDetail.status === "menunggu"
+                  ? "MENUNGGU"
                   : "DIPROSES"}
               </Badge>
             </div>

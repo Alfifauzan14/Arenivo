@@ -71,3 +71,16 @@ export const PATCH = withAuth(
   },
   { allowedRoles: [UserRole.ADMIN] }
 );
+
+export const DELETE = withAuth(
+  async (req) => {
+    const id = new URL(req.url).searchParams.get("id");
+    if (!id) {
+      throw new Error("ID banner wajib diisi.");
+    }
+    const { error } = await supabaseAdmin.from("banners").delete().eq("id", id);
+    dbError(error);
+    return ok(req, { id, deleted: true });
+  },
+  { allowedRoles: [UserRole.ADMIN] }
+);

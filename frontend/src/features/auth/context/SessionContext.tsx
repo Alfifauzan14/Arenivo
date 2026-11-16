@@ -6,6 +6,7 @@ import { apiClient } from "@/lib/api-client";
 interface SessionContextType {
   user: Profile | null;
   isLoggedIn: boolean;
+  authReady: boolean;
   login: (userData?: Partial<Profile>) => void;
   logout: () => Promise<void>;
   favorites: string[];
@@ -19,7 +20,9 @@ const SessionContext = React.createContext<SessionContextType | undefined>(undef
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = React.useState<Profile | null>(null);
   const [isLoggedIn, setIsLoggedIn] = React.useState<boolean>(false);
+  const [authReady, setAuthReady] = React.useState<boolean>(false);
   const [favorites, setFavorites] = React.useState<string[]>([]);
+  const loadSeqRef = React.useRef(0);
 
   const loadUserProfile = React.useCallback(async (userId: string, userMeta?: any, email?: string) => {
     try {
@@ -96,22 +99,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   // Sinkronisasi Sesi Realtime Supabase Auth
   React.useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        localStorage.setItem("sb_access_token", session.access_token);
-        localStorage.setItem("futsal_logged_in", "true");
-        loadUserProfile(session.user.id, session.user.user_metadata, session.user.email);
-      } else {
-        localStorage.removeItem("sb_access_token");
-        localStorage.removeItem("futsal_logged_in");
-        setCurrentUser(null);
-        setIsLoggedIn(false);
-      }
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    let active = true;
+    const syncSession = async (session: any) => {
+      const seq = ++loadSeqRef.current;
       if (session?.user) {
         localStorage.setItem("sb_access_token", session.access_token);
         localStorage.setItem("futsal_logged_in", "true");
@@ -119,12 +109,29 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       } else {
         localStorage.removeItem("sb_access_token");
         localStorage.removeItem("futsal_logged_in");
-        setCurrentUser(null);
-        setIsLoggedIn(false);
+        if (active && seq === loadSeqRef.current) {
+          setCurrentUser(null);
+          setIsLoggedIn(false);
+          setFavorites([]);
+        }
       }
+      if (active && seq === loadSeqRef.current) {
+        setAuthReady(true);
+      }
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      void syncSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      await syncSession(session);
     });
 
     return () => {
+      active = false;
       subscription.unsubscribe();
     };
   }, [loadUserProfile]);
@@ -201,6 +208,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       value={{
         user: currentUser,
         isLoggedIn,
+        authReady,
         login,
         logout,
         favorites,

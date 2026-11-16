@@ -13,6 +13,18 @@ const blockSchema = z.object({
   reason: z.string().max(300).optional()
 });
 
+export const GET = withAuth(
+  async (req, user) => {
+    const mitraId = user.mitraProfile?.id ?? user.id;
+    const url = new URL(req.url);
+    const fieldId = url.searchParams.get("fieldId") ?? undefined;
+    const date = url.searchParams.get("date") ?? undefined;
+    const rows = await mitraRepository.blocks(mitraId, fieldId, date);
+    return ok(req, rows);
+  },
+  { allowedRoles: [UserRole.MITRA, UserRole.ADMIN] }
+);
+
 export const POST = withAuth(
   async (req, user) => {
     const mitraId = user.mitraProfile?.id ?? user.id;

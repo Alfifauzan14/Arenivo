@@ -56,11 +56,13 @@ export function AdminAuditLogsPage() {
   }, []);
 
   const filteredLogs = logs.filter((log) => {
+    const q = searchQuery.toLowerCase();
+    const email = (log.adminEmail || (log as any).admin?.email || "").toLowerCase();
+    const ip = (log.ipAddress || "").toLowerCase();
+    const details = (log.details || "").toLowerCase();
+    const target = (log.targetType || "").toLowerCase();
     const matchesSearch =
-      log.details.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.adminEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.targetType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.ipAddress.includes(searchQuery);
+      details.includes(q) || email.includes(q) || target.includes(q) || ip.includes(q);
 
     const matchesAction = filterAction === "all" || log.action === filterAction;
 
@@ -214,7 +216,7 @@ export function AdminAuditLogsPage() {
                     <TableCell>
                       <div className="flex items-center gap-1.5 font-mono text-xs text-slate-800">
                         <User className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{log.adminEmail}</span>
+                        <span>{log.adminEmail || (log as any).admin?.email || "System"}</span>
                       </div>
                     </TableCell>
 
@@ -234,7 +236,7 @@ export function AdminAuditLogsPage() {
                     </TableCell>
 
                     <TableCell className="font-mono text-xs text-slate-500 text-right whitespace-nowrap">
-                      {log.ipAddress}
+                      {log.ipAddress || "-"}
                     </TableCell>
                   </TableRow>
                 ))

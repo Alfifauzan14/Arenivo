@@ -97,3 +97,22 @@ export const PATCH = withAuth(
   },
   { allowedRoles: [UserRole.MITRA, UserRole.ADMIN], requireApprovedMitra: true }
 );
+
+export const DELETE = withAuth(
+  async (req, user) => {
+    const mitraId = user.mitraProfile?.id ?? user.id;
+    const promoId = new URL(req.url).searchParams.get("id");
+    if (!promoId) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, "ID promo wajib diisi.");
+    }
+    const venueIds = await mitraRepository.venueIds(mitraId);
+    const { error } = await supabaseAdmin
+      .from("promos")
+      .delete()
+      .eq("id", promoId)
+      .in("venue_id", venueIds.length ? venueIds : ["00000000-0000-0000-0000-000000000000"]);
+    dbError(error);
+    return ok(req, { id: promoId, deleted: true });
+  },
+  { allowedRoles: [UserRole.MITRA, UserRole.ADMIN], requireApprovedMitra: true }
+);

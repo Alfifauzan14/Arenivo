@@ -120,33 +120,36 @@ export function AdminMitraPage() {
     currentPage * pageSize
   );
 
-  const handleApprove = (mitraId: string) => {
-    setMitraList((prev) =>
-      prev.map((m) =>
-        m.id === mitraId
-          ? {
-              ...m,
-              verificationStatus: MitraVerificationStatus.DISETUJUI,
-              rejectionReason: null,
-              verifiedAt: new Date().toISOString(),
-              verifiedBy: "adm-1",
-            }
-          : m
-      )
-    );
-    if (selectedMitra?.id === mitraId) {
-      setSelectedMitra((prev) =>
-        prev
-          ? {
-              ...prev,
-              verificationStatus: MitraVerificationStatus.DISETUJUI,
-              rejectionReason: null,
-            }
-          : null
-      );
+  const reloadMitra = React.useCallback(async () => {
+    try {
+      const res = await apiClient.get<any[]>("/admin/mitra");
+      if (res.data && Array.isArray(res.data)) {
+        setMitraList(res.data);
+      }
+    } catch {
+      // keep existing
     }
-    apiClient.post(`/admin/mitra/${mitraId}/approve`).catch(() => {});
-    showToast("Mitra berhasil disetujui! Venue mitra sekarang dapat ditayangkan.");
+  }, []);
+
+  const handleApprove = async (mitraId: string) => {
+    try {
+      await apiClient.post(`/admin/mitra/${mitraId}/approve`);
+      await reloadMitra();
+      if (selectedMitra?.id === mitraId) {
+        setSelectedMitra((prev) =>
+          prev
+            ? {
+                ...prev,
+                verificationStatus: MitraVerificationStatus.DISETUJUI,
+                rejectionReason: null,
+              }
+            : null
+        );
+      }
+      showToast("Mitra berhasil disetujui! Venue mitra sekarang dapat ditayangkan.");
+    } catch (err: any) {
+      showToast(err?.data?.error?.message || err?.message || "Gagal menyetujui mitra.");
+    }
   };
 
   const handleOpenReject = (mitra: MitraItem) => {
@@ -155,7 +158,7 @@ export function AdminMitraPage() {
     setRejectError(null);
   };
 
-  const handleConfirmReject = () => {
+  const handleConfirmReject = async () => {
     if (!rejectionReason.trim() || rejectionReason.trim().length < 8) {
       setRejectError("Alasan penolakan wajib diisi minimal 8 karakter.");
       return;
@@ -163,54 +166,47 @@ export function AdminMitraPage() {
 
     if (!rejectingMitra) return;
 
-    setMitraList((prev) =>
-      prev.map((m) =>
-        m.id === rejectingMitra.id
-          ? {
-              ...m,
-              verificationStatus: MitraVerificationStatus.DITOLAK,
-              rejectionReason: rejectionReason.trim(),
-              verifiedAt: new Date().toISOString(),
-              verifiedBy: "adm-1",
-            }
-          : m
-      )
-    );
-
-    if (selectedMitra?.id === rejectingMitra.id) {
-      setSelectedMitra((prev) =>
-        prev
-          ? {
-              ...prev,
-              verificationStatus: MitraVerificationStatus.DITOLAK,
-              rejectionReason: rejectionReason.trim(),
-            }
-          : null
-      );
+    try {
+      await apiClient.post(`/admin/mitra/${rejectingMitra.id}/reject`, {
+        reason: rejectionReason.trim(),
+      });
+      await reloadMitra();
+      if (selectedMitra?.id === rejectingMitra.id) {
+        setSelectedMitra((prev) =>
+          prev
+            ? {
+                ...prev,
+                verificationStatus: MitraVerificationStatus.DITOLAK,
+                rejectionReason: rejectionReason.trim(),
+              }
+            : null
+        );
+      }
+      showToast(`Pengajuan mitra ditolak dengan alasan: "${rejectionReason.trim()}".`);
+      setRejectingMitra(null);
+    } catch (err: any) {
+      setRejectError(err?.data?.error?.message || err?.message || "Gagal menolak pengajuan mitra.");
     }
-
-    showToast(`Pengajuan mitra ditolak dengan alasan: "${rejectionReason.trim()}".`);
-    apiClient.post(`/admin/mitra/${rejectingMitra.id}/reject`, { reason: rejectionReason.trim() }).catch(() => {});
-    setRejectingMitra(null);
   };
 
-  const handleToggleBlock = (mitra: MitraItem) => {
+  const handleToggleBlock = async (mitra: MitraItem) => {
     const newStatus =
       mitra.accountStatus === AccountStatus.DIBLOKIR
         ? AccountStatus.AKTIF
         : AccountStatus.DIBLOKIR;
 
-    setMitraList((prev) =>
-      prev.map((m) => (m.id === mitra.id ? { ...m, accountStatus: newStatus } : m))
-    );
-
-    if (selectedMitra?.id === mitra.id) {
-      setSelectedMitra((prev) => (prev ? { ...prev, accountStatus: newStatus } : null));
+    try {
+      await apiClient.patch(`/admin/mitra/${mitra.id}/status`, { status: newStatus });
+      await reloadMitra();
+      if (selectedMitra?.id === mitra.id) {
+        setSelectedMitra((prev) => (prev ? { ...prev, accountStatus: newStatus } : null));
+      }
+      showToast(
+        `Akun mitra ${mitra.businessName} telah diubah menjadi ${newStatus.toUpperCase()}.`
+      );
+    } catch (err: any) {
+      showToast(err?.data?.error?.message || err?.message || "Gagal mengubah status akun mitra.");
     }
-
-    showToast(
-      `Akun mitra ${mitra.businessName} telah diubah menjadi ${newStatus.toUpperCase()}.`
-    );
   };
 
   if (loading) {

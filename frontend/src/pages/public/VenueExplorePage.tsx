@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import {
   Compass,
   Filter,
@@ -11,24 +11,33 @@ import {
   Star,
   Map as MapIcon,
   List,
+  Tag,
+  Copy,
+  Check,
   X,
 } from "lucide-react";
-import { Button, Input, Select, Card } from "@/components/ui";
+import { Button, Input, Select, Card, useToast } from "@/components/ui";
 import { VenueCard } from "@/features/venue/components/VenueCard";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/features/auth/context/SessionContext";
 import { formatRupiah } from "@futsal/shared";
 import { cn } from "@/lib/utils";
 
+const slugifyCity = (s: string) =>
+  s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
 export function VenueExplorePage() {
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { favorites } = useSession();
+  const { addToast } = useToast();
 
   // Filter States initialized from URL params
   const initialCity = searchParams.get("city") || "all";
   const initialType = searchParams.get("type") || "all";
   const initialQuery = searchParams.get("q") || "";
   const initialFilter = searchParams.get("filter") || "";
+  const isPromoMode = location.pathname === "/promo" || initialFilter === "promo";
 
   const [cityFilter, setCityFilter] = React.useState(initialCity);
   const [typeFilter, setTypeFilter] = React.useState(initialType);
@@ -42,29 +51,43 @@ export function VenueExplorePage() {
   const [nearMeActive, setNearMeActive] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<"list" | "split">("list");
   const [mobileFilterOpen, setMobileFilterOpen] = React.useState(false);
+  const [copiedCode, setCopiedCode] = React.useState<string | null>(null);
 
-  // Live Backend Data States with graceful Mock fallbacks
+  // Live Backend Data States
   const [venues, setVenues] = React.useState<any[]>([]);
   const [cities, setCities] = React.useState<any[]>([]);
   const [facilities, setFacilities] = React.useState<any[]>([]);
+  const [promos, setPromos] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    setCityFilter(searchParams.get("city") || "all");
+    setTypeFilter(searchParams.get("type") || "all");
+    setSearchQuery(searchParams.get("q") || "");
+  }, [searchParams]);
 
   React.useEffect(() => {
     let isMounted = true;
     apiClient.get<any[]>("/venues", { limit: 50 }).then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (isMounted && res.data && Array.isArray(res.data)) {
         setVenues(res.data);
       }
     }).catch(() => {});
 
     apiClient.get<any[]>("/master/cities").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (isMounted && res.data && Array.isArray(res.data)) {
         setCities(res.data);
       }
     }).catch(() => {});
 
     apiClient.get<any[]>("/master/facilities").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (isMounted && res.data && Array.isArray(res.data)) {
         setFacilities(res.data);
+      }
+    }).catch(() => {});
+
+    apiClient.get<any[]>("/promos").then((res) => {
+      if (isMounted && res.data && Array.isArray(res.data)) {
+        setPromos(res.data);
       }
     }).catch(() => {});
 
@@ -72,6 +95,20 @@ export function VenueExplorePage() {
       isMounted = false;
     };
   }, []);
+
+  // Resolve URL slug/nama kota menjadi UUID city yang valid agar dropdown & filter sinkron
+  React.useEffect(() => {
+    if (cityFilter === "all" || cities.length === 0) return;
+    const isUuid = cities.some((c) => c.id === cityFilter);
+    if (isUuid) return;
+    const targetSlug = slugifyCity(cityFilter);
+    const matched = cities.find(
+      (c) => slugifyCity(c.name || "") === targetSlug || (c.name || "").toLowerCase() === cityFilter.toLowerCase()
+    );
+    if (matched) {
+      setCityFilter(matched.id);
+    }
+  }, [cities, cityFilter]);
 
   // Pagination State
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -119,9 +156,22 @@ export function VenueExplorePage() {
         return false;
       }
 
-      // 2. Filter Kota
-      if (cityFilter !== "all" && venue.cityId !== cityFilter) {
-        return false;
+      // 1b. Filter Promo Mode
+      if (isPromoMode && promos.length > 0) {
+        const hasGlobalPromo = promos.some((p) => !p.venueId);
+        const hasVenuePromo = promos.some((p) => p.venueId === venue.id);
+        if (!hasGlobalPromo && !hasVenuePromo) {
+          return false;
+        }
+      }
+
+      // 2. Filter Kota (cocokkan UUID atau slug/nama kota dari URL)
+      if (cityFilter !== "all") {
+        const targetSlug = slugifyCity(cityFilter);
+        const venueCitySlug = venue.city?.name ? slugifyCity(venue.city.name) : "";
+        if (venue.cityId !== cityFilter && (!venueCitySlug || venueCitySlug !== targetSlug)) {
+          return false;
+        }
       }
 
       // 3. Filter Query Nama / Alamat
@@ -171,9 +221,18 @@ export function VenueExplorePage() {
     selectedFacilities,
     sortBy,
     initialFilter,
+    isPromoMode,
+    promos,
     favorites,
     venues,
   ]);
+
+  const handleCopyPromo = (code: string) => {
+    navigator.clipboard?.writeText(code).catch(() => {});
+    setCopiedCode(code);
+    addToast("success", `Kode promo ${code} disalin! Gunakan di halaman checkout.`, "Kode Disalin");
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
 
   // Pagination slice
   const totalPages = Math.ceil(filteredVenues.length / itemsPerPage) || 1;
@@ -191,10 +250,12 @@ export function VenueExplorePage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              Eksplorasi Lapangan Olahraga
+              {isPromoMode ? "Promo & Penawaran Venue Aktif" : "Eksplorasi Lapangan Olahraga"}
             </h1>
             <p className="text-xs sm:text-sm text-red-100 mt-1">
-              Menampilkan {filteredVenues.length} pilihan lapangan futsal, mini soccer & sepak bola
+              {isPromoMode
+                ? `Tersedia ${promos.length} kode promo aktif untuk ${filteredVenues.length} venue pilihan`
+                : `Menampilkan ${filteredVenues.length} pilihan lapangan futsal, mini soccer & sepak bola`}
             </p>
           </div>
 
@@ -252,6 +313,74 @@ export function VenueExplorePage() {
       </section>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-safe space-y-6">
+
+      {/* Active Promos Strip when on /promo or ?filter=promo */}
+      {isPromoMode && (
+        <div className="bg-white rounded-xl border border-red-200 p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+                <Tag className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">Kode Promo Tersedia</h2>
+                <p className="text-[11px] text-slate-500">Salin kode promo dan masukkan pada halaman checkout booking</p>
+              </div>
+            </div>
+            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-md bg-red-50 text-red-700 border border-red-100">
+              {promos.length} Promo Aktif
+            </span>
+          </div>
+
+          {promos.length === 0 ? (
+            <p className="text-xs text-slate-500 py-2">
+              Belum ada kode promo aktif saat ini. Cek kembali nanti!
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {promos.map((p) => (
+                <div
+                  key={p.id}
+                  className="p-3 rounded-lg border border-slate-200 bg-slate-50/70 flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-bold text-xs text-red-700 bg-red-100 px-2 py-0.5 rounded">
+                        {p.code}
+                      </span>
+                      <span className="text-[11px] font-bold text-emerald-700">
+                        {p.discountType === "percent"
+                          ? `Diskon ${p.discountValue}%`
+                          : `Potongan ${formatRupiah(p.discountValue)}`}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 truncate">
+                      {p.venue?.name || "Berlaku di Semua Venue"} • Min. {formatRupiah(p.minSpend || 0)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyPromo(p.code)}
+                    className="shrink-0 px-2.5 py-1.5 rounded-md bg-white border border-slate-200 hover:border-red-500 text-xs font-semibold text-slate-700 flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedCode === p.code ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Disalin</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Salin</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 2. Main Content Grid: Filter Sidebar + Venues Grid (Tablet & Desktop Split) */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8">

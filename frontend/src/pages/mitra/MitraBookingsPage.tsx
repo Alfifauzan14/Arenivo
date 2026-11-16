@@ -38,21 +38,25 @@ import { cn } from "@/lib/utils";
 export function MitraBookingsPage() {
   const { addToast } = useToast();
   const [bookings, setBookings] = React.useState<Booking[]>([]);
+  const [loading, setLoading] = React.useState<boolean>(true);
+  const [isCancelling, setIsCancelling] = React.useState<boolean>(false);
 
-  const loadBookings = React.useCallback(() => {
-    let isMounted = true;
-    apiClient.get<any[]>("/mitra/bookings").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data)) {
+  const loadBookings = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiClient.get<any[]>("/mitra/bookings");
+      if (res.data && Array.isArray(res.data)) {
         setBookings(res.data);
       }
-    }).catch(() => {});
-    return () => {
-      isMounted = false;
-    };
+    } catch {
+      // keep empty on error
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   React.useEffect(() => {
-    loadBookings();
+    void loadBookings();
   }, [loadBookings]);
   const [activeTab, setActiveTab] = React.useState<string>("semua");
   const [dateFilter, setDateFilter] = React.useState<string>("");
@@ -100,30 +104,31 @@ export function MitraBookingsPage() {
     setCancelReason("Perbaikan darurat pada lampu sorot lapangan utama.");
   };
 
-  const handleConfirmCancelByMitra = () => {
+  const handleConfirmCancelByMitra = async () => {
     if (!selectedBookingToCancel) return;
-
-    setBookings((prev) =>
-      prev.map((b) =>
-        b.id === selectedBookingToCancel.id
-          ? {
-              ...b,
-              status: BookingStatus.DIBATALKAN,
-              cancelReason: `Dibatalkan oleh Mitra: ${cancelReason} (Refund 100% penuh + biaya platform)`,
-            }
-          : b
-      )
-    );
-
-    addToast(
-      "success",
-      `Pesanan ${selectedBookingToCancel.bookingCode} dibatalkan. Refund 100% (${formatRupiah(
-        selectedBookingToCancel.totalPrice
-      )}) diproses otomatis ke penyewa.`,
-      "Pembatalan Berhasil"
-    );
-
-    setSelectedBookingToCancel(null);
+    setIsCancelling(true);
+    try {
+      await apiClient.post(`/mitra/bookings/${selectedBookingToCancel.id}/cancel`, {
+        reason: cancelReason.trim() || "Dibatalkan oleh Mitra",
+      });
+      addToast(
+        "success",
+        `Pesanan ${selectedBookingToCancel.bookingCode} dibatalkan. Refund 100% (${formatRupiah(
+          selectedBookingToCancel.totalPrice
+        )}) diproses otomatis ke penyewa.`,
+        "Pembatalan Berhasil"
+      );
+      setSelectedBookingToCancel(null);
+      await loadBookings();
+    } catch (err: any) {
+      addToast(
+        "error",
+        err?.data?.error?.message || err?.message || "Gagal membatalkan pesanan.",
+        "Pembatalan Gagal"
+      );
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   return (
@@ -183,6 +188,10 @@ export function MitraBookingsPage() {
                     {
                       value: BookingStatus.SELESAI,
                       label: `Selesai (${bookings.filter((b) => b.status === BookingStatus.SELESAI).length})`,
+                    },
+                    {
+                      value: BookingStatus.KEDALUWARSA,
+                      label: `Kedaluwarsa (${bookings.filter((b) => b.status === BookingStatus.KEDALUWARSA).length})`,
                     },
                     {
                       value: BookingStatus.DIBATALKAN,
@@ -314,6 +323,10 @@ export function MitraBookingsPage() {
                   </div>
                 );
               })
+            ) : loading ? (
+              <div className="py-10 px-4 text-center text-slate-500 text-xs">
+                Memuat data pesanan...
+              </div>
             ) : (
               <div className="py-10 px-4 text-center text-slate-500 text-xs">
                 Tidak ada pesanan yang sesuai dengan filter pencarian.
@@ -408,6 +421,12 @@ export function MitraBookingsPage() {
                       </TableRow>
                     );
                   })
+                ) : loading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-10 text-center text-slate-500 text-xs">
+                      Memuat data pesanan...
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   <TableRow>
                     <TableCell colSpan={8} className="py-10 text-center text-slate-500 text-xs">
@@ -497,9 +516,10 @@ export function MitraBookingsPage() {
                 variant="danger"
                 size="md"
                 onClick={handleConfirmCancelByMitra}
+                disabled={isCancelling}
                 className="flex-1 text-xs"
               >
-                Batalkan & Refund 100%
+                {isCancelling ? "Memproses..." : "Batalkan & Refund 100%"}
               </Button>
             </div>
           </div>
@@ -559,26 +579,44 @@ export function MitraBookingsPage() {
             </div>
 
             {/* Rincian Finansial */}
-            <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500">Total Transaksi Penyewa</span>
-                <span className="font-mono font-bold text-slate-900">
-                  {formatRupiah(selectedBookingDetail.totalPrice)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-slate-500">
-                <span>Biaya Platform (10%)</span>
-                <span className="font-mono text-red-600">
-                  -{formatRupiah(selectedBookingDetail.platformCommission)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                <span className="font-semibold text-slate-800">Pendapatan Bersih Mitra (90%)</span>
-                <span className="font-mono font-bold text-emerald-700 text-sm">
-                  {formatRupiah(selectedBookingDetail.mitraAmount)}
-                </span>
-              </div>
-            </div>
+            {(() => {
+              const subtotal = Number(selectedBookingDetail.subtotal || selectedBookingDetail.totalPrice || 0);
+              const commission = Number(selectedBookingDetail.platformCommission || 0);
+              const serviceFee = Number(selectedBookingDetail.serviceFee || 0);
+              const commissionPct = subtotal > 0 ? Math.round((commission / subtotal) * 100) : 0;
+              const rawNet = Number(selectedBookingDetail.mitraAmount ?? Math.max(0, subtotal - commission));
+              const safeNet = Math.min(rawNet, Number(selectedBookingDetail.totalPrice || rawNet));
+              return (
+                <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Total Transaksi Penyewa</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {formatRupiah(selectedBookingDetail.totalPrice)}
+                    </span>
+                  </div>
+                  {serviceFee > 0 && (
+                    <div className="flex justify-between items-center text-slate-500">
+                      <span>Biaya Layanan Aplikasi (Platform)</span>
+                      <span className="font-mono text-slate-600">
+                        -{formatRupiah(serviceFee)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-slate-500">
+                    <span>Komisi Platform{commissionPct > 0 ? ` (${commissionPct}%)` : ""}</span>
+                    <span className="font-mono text-red-600">
+                      -{formatRupiah(commission)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                    <span className="font-semibold text-slate-800">Pendapatan Bersih Mitra</span>
+                    <span className="font-mono font-bold text-emerald-700 text-sm">
+                      {formatRupiah(safeNet)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {selectedBookingDetail.cancelReason && (
               <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 text-xs">

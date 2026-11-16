@@ -96,9 +96,17 @@ export function AdminSettingsPage() {
     }
   };
 
-  const handleReset = () => {
-    setConfig(DEFAULT_CONFIG);
-    showToast("Pengaturan dikembalikan ke nilai default. Klik Simpan untuk menerapkan.");
+  const handleReset = async () => {
+    setSaving(true);
+    try {
+      setConfig(DEFAULT_CONFIG);
+      await apiClient.patch("/admin/settings", DEFAULT_CONFIG);
+      showToast("Pengaturan berhasil dikembalikan ke nilai default dan disimpan ke database.");
+    } catch (err: any) {
+      showToast(err?.data?.error?.message || "Gagal mereset konfigurasi ke database.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {

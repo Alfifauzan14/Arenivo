@@ -241,7 +241,7 @@ export function TicketScanResultBadge({
     case TicketScanResult.TIDAK_DITEMUKAN:
       return (
         <Badge variant="danger" className={className}>
-          Tak Ada
+          Tidak Ditemukan
         </Badge>
       );
     default:

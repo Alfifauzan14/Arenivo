@@ -185,6 +185,10 @@ export function ProfilePage() {
   // Ubah Kata Sandi Akun
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentPassword.trim()) {
+      addToast("warning", "Masukkan kata sandi saat ini untuk verifikasi.", "Password Saat Ini Kosong");
+      return;
+    }
     if (newPassword.length < 8) {
       addToast("warning", "Kata sandi baru minimal 8 karakter.", "Password Kurang Panjang");
       return;
@@ -196,6 +200,18 @@ export function ProfilePage() {
 
     setIsChangingPassword(true);
     try {
+      const accountEmail = user?.email || email;
+      if (!accountEmail) {
+        throw new Error("Email akun tidak ditemukan untuk verifikasi kata sandi saat ini.");
+      }
+      const { error: verifyErr } = await supabase.auth.signInWithPassword({
+        email: accountEmail,
+        password: currentPassword,
+      });
+      if (verifyErr) {
+        throw new Error("Kata sandi saat ini tidak sesuai.");
+      }
+
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -474,6 +490,14 @@ export function ProfilePage() {
               </div>
 
               <form onSubmit={handleChangePassword} className="space-y-4">
+                <Input
+                  label="Kata Sandi Saat Ini"
+                  type="password"
+                  placeholder="Masukkan kata sandi saat ini"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  leftIcon={<Lock className="w-4 h-4 text-slate-400" />}
+                />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
                     label="Kata Sandi Baru"

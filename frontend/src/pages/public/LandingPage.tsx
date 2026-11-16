@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Calendar,
   CheckCircle2,
@@ -57,6 +57,13 @@ const HERO_SLIDES = [
 
 export function LandingPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  React.useEffect(() => {
+    if (searchParams.get("city") || searchParams.get("q")) {
+      navigate(`/venues?${searchParams.toString()}`, { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   // Hero Carousel Auto-play State
   const [activeHeroIdx, setActiveHeroIdx] = React.useState(0);
@@ -102,7 +109,7 @@ export function LandingPage() {
   }, []);
 
   // Search Widget State & Defaults for Reset
-  const defaultCity = cities[0]?.id || "jakarta-selatan";
+  const defaultCity = "all";
   const defaultDate = new Date().toISOString().split("T")[0];
 
   const [selectedCity, setSelectedCity] = React.useState(defaultCity);
@@ -167,7 +174,7 @@ export function LandingPage() {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams();
-    if (selectedCity) params.set("city", selectedCity);
+    if (selectedCity && selectedCity !== "all") params.set("city", selectedCity);
     if (searchQuery.trim()) params.set("q", searchQuery.trim());
     if (playDate) params.set("date", playDate);
 
@@ -260,6 +267,7 @@ export function LandingPage() {
                 onChange={(e) => setSelectedCity(e.target.value)}
                 className="text-xs font-medium"
               >
+                <option value="all">Semua Kota</option>
                 {cities.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}

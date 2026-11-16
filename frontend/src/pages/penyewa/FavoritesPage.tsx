@@ -8,46 +8,60 @@ import { VenueCard } from "@/features/venue/components/VenueCard";
 import type { Venue } from "@futsal/shared";
 
 export function FavoritesPage() {
-  const { favorites, isLoggedIn } = useSession();
+  const { favorites, isLoggedIn, authReady } = useSession();
   const [venues, setVenues] = React.useState<Venue[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const reqSeqRef = React.useRef(0);
+  const favKey = favorites.join(",");
 
   React.useEffect(() => {
+    if (!authReady) {
+      setLoading(true);
+      return;
+    }
+
+    const reqId = ++reqSeqRef.current;
     let isMounted = true;
+
     if (!isLoggedIn) {
       setVenues([]);
       setLoading(false);
       return;
     }
 
-    // Fetch favorites langsung dari API /me/favorites (backend sudah join venue data)
     setLoading(true);
-    apiClient.get<any[]>("/me/favorites")
+    apiClient
+      .get<any[]>("/me/favorites")
       .then((res) => {
-        if (!isMounted) return;
+        if (!isMounted || reqId !== reqSeqRef.current) return;
         const list = (Array.isArray(res.data) ? res.data : []).filter(Boolean) as Venue[];
         setVenues(list);
       })
       .catch(() => {
-        // Fallback: fetch semua venue lalu filter
-        if (!isMounted) return;
+        if (!isMounted || reqId !== reqSeqRef.current) return;
         if (favorites.length === 0) {
           setVenues([]);
           return;
         }
-        apiClient.get<any[]>("/venues", { limit: 50 })
+        apiClient
+          .get<any[]>("/venues", { limit: 50 })
           .then((r) => {
-            if (!isMounted) return;
+            if (!isMounted || reqId !== reqSeqRef.current) return;
             const all = Array.isArray(r.data) ? r.data : [];
             setVenues(all.filter((v) => favorites.includes(v.id)) as Venue[]);
           })
           .catch(() => {});
       })
       .finally(() => {
-        if (isMounted) setLoading(false);
+        if (isMounted && reqId === reqSeqRef.current) {
+          setLoading(false);
+        }
       });
-    return () => { isMounted = false; };
-  }, [favorites, isLoggedIn]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authReady, isLoggedIn, favKey]);
 
   return (
     <div className="min-h-screen">
@@ -66,7 +80,7 @@ export function FavoritesPage() {
           </div>
 
           <span className="text-xs font-mono font-bold text-red-700 bg-white px-3 py-1.5 rounded-lg border border-white shadow-xs self-start sm:self-auto">
-            {venues.length} venue tersimpan
+            {loading ? "Memuat..." : `${venues.length} venue tersimpan`}
           </span>
         </div>
       </section>
@@ -74,7 +88,13 @@ export function FavoritesPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
 
         {/* Content: Cards Grid or Empty State */}
-        {venues.length > 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((idx) => (
+              <div key={idx} className="h-72 rounded-xl bg-slate-100 animate-pulse border border-slate-200" />
+            ))}
+          </div>
+        ) : venues.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {venues.map((venue) => (
               <VenueCard key={venue.id} venue={venue} />

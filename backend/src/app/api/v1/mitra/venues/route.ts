@@ -50,12 +50,21 @@ export const GET = withAuth(
     const { data, error } = await supabaseAdmin
       .from("venues")
       .select(
-        "*, cities(*), venue_photos(*), venue_facilities(facility_id, facilities(*)), fields(*, field_types(*))"
+        "*, city:cities(*), photos:venue_photos(*), facilities:venue_facilities(facility_id, facility:facilities(*)), fields(*, field_type:field_types(*))"
       )
       .eq("mitra_id", mitraId)
       .order("created_at", { ascending: false });
     dbError(error);
-    return ok(req, camelize(data ?? []));
+    const rows = camelize<any[]>(data ?? []).map((v: any) => {
+      const prices = (v.fields || []).map((f: any) => Number(f.basePrice || 0)).filter((p: number) => p > 0);
+      return {
+        ...v,
+        facilities: (v.facilities || []).map((x: any) => x.facility).filter(Boolean),
+        photos: (v.photos || []).sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+        startingPrice: prices.length > 0 ? Math.min(...prices) : 0,
+      };
+    });
+    return ok(req, rows);
   },
   { allowedRoles: [UserRole.MITRA, UserRole.ADMIN] }
 );
@@ -133,6 +142,30 @@ export const PATCH = withAuth(
       .select("*")
       .single();
     dbError(error);
+
+    if (body.facilityIds !== undefined) {
+      await supabaseAdmin.from("venue_facilities").delete().eq("venue_id", body.id);
+      if (body.facilityIds.length > 0) {
+        await supabaseAdmin.from("venue_facilities").insert(
+          body.facilityIds.map((fid: string) => ({
+            venue_id: body.id,
+            facility_id: fid
+          }))
+        );
+      }
+    }
+
+    if (body.photos !== undefined && body.photos.length > 0) {
+      await supabaseAdmin.from("venue_photos").delete().eq("venue_id", body.id);
+      await supabaseAdmin.from("venue_photos").insert(
+        body.photos.map((p: { url: string; isCover?: boolean }, idx: number) => ({
+          venue_id: body.id,
+          url: p.url,
+          is_cover: p.isCover ?? idx === 0,
+          sort_order: idx
+        }))
+      );
+    }
 
     return ok(req, camelize(data));
   },

@@ -39,6 +39,7 @@ export function MitraDashboardPage() {
   const [bookings, setBookings] = React.useState<any[]>([]);
   const [venues, setVenues] = React.useState<any[]>([]);
   const [todayOccupancy, setTodayOccupancy] = React.useState<any[]>([]);
+  const [todayBookingsCount, setTodayBookingsCount] = React.useState<number | null>(null);
   const [loading, setLoading] = React.useState(true);
 
   // UI state hooks - MUST be before any early return
@@ -54,6 +55,9 @@ export function MitraDashboardPage() {
     apiClient.get<any>("/mitra/dashboard").then((res) => {
       if (isMounted && res.data) {
         if (res.data.balance) setBalance(res.data.balance);
+        if (typeof res.data.todayBookingsCount === "number") {
+          setTodayBookingsCount(res.data.todayBookingsCount);
+        }
         if (Array.isArray(res.data.recentBookings) && res.data.recentBookings.length > 0) {
           setBookings(res.data.recentBookings);
         }
@@ -171,13 +175,18 @@ export function MitraDashboardPage() {
           </div>
           <div className="mt-2.5 sm:mt-3 flex items-baseline gap-1.5">
             <span className="text-lg sm:text-2xl font-bold font-mono text-slate-900 tabular-nums">
-              {bookings.filter((b) => b.status === BookingStatus.DIKONFIRMASI).length}
+              {todayBookingsCount ??
+                bookings.filter(
+                  (b) =>
+                    b.status === BookingStatus.DIKONFIRMASI ||
+                    b.status === BookingStatus.SELESAI
+                ).length}
             </span>
             <span className="text-[11px] font-medium text-emerald-700">
-              Aktif
+              Hari Ini
             </span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1 truncate">Siap check-in</p>
+          <p className="text-[11px] text-slate-500 mt-1 truncate">Dikonfirmasi & selesai hari ini</p>
         </Card>
 
         <Card className="p-3.5 sm:p-5 bg-white border-slate-200">
@@ -219,7 +228,7 @@ export function MitraDashboardPage() {
               {formatRupiah(currentBalance.saldoTotal)}
             </span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1 truncate">Net komisi 10%</p>
+          <p className="text-[11px] text-slate-500 mt-1 truncate">Pendapatan bersih mitra</p>
         </Card>
 
         <Card className="p-3.5 sm:p-5 bg-white border-slate-200">
@@ -415,7 +424,7 @@ export function MitraDashboardPage() {
                       <div className="grid grid-cols-[84px_1fr] items-start gap-2">
                         <span className="text-slate-500">Lapangan</span>
                         <span className="font-medium text-slate-800">
-                          {b.field?.name}
+                          {b.field?.name || b.fields?.name || b.fieldName || "-"}
                         </span>
                       </div>
                       <div className="grid grid-cols-[84px_1fr] items-center gap-2">
@@ -481,7 +490,7 @@ export function MitraDashboardPage() {
                           {b.customerName}
                         </TableCell>
                         <TableCell className="text-slate-700 font-medium whitespace-nowrap">
-                          {b.field?.name}
+                          {b.field?.name || b.fields?.name || b.fieldName || "-"}
                         </TableCell>
                         <TableCell className="font-mono text-slate-600 tabular-nums whitespace-nowrap">
                           {formatDateIndo(b.playStart.split("T")[0], false)} • {b.totalHours} Jam

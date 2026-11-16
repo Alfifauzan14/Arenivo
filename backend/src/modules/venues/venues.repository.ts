@@ -4,14 +4,29 @@ import { camelize, dbError, orNotFound } from "../../lib/http";
 const VENUE_SELECT = `*, city:cities(*), photos:venue_photos(*),
   facilities:venue_facilities(facility:facilities(*)),
   fields(id, base_price, status, field_type:field_types(*)),
+  reviews(rating, is_visible),
   mitra:mitra_profiles!inner(verification_status)`;
 
 function shape(row: any) {
   const v = camelize<any>(row);
   const activeFields = (v.fields || []).filter((f: any) => f.status === "aktif");
+  const visibleReviews = (v.reviews || []).filter((r: any) => r.isVisible !== false);
+  const reviewCount = visibleReviews.length;
+  const ratingAvg =
+    reviewCount > 0
+      ? Number(
+          (
+            visibleReviews.reduce((acc: number, r: any) => acc + Number(r.rating || 0), 0) /
+            reviewCount
+          ).toFixed(1)
+        )
+      : 0;
   return {
     ...v,
-    facilities: (v.facilities || []).map((x: any) => x.facility),
+    reviews: undefined,
+    ratingAvg,
+    reviewCount,
+    facilities: (v.facilities || []).map((x: any) => x.facility).filter(Boolean),
     photos: (v.photos || []).sort((a: any, b: any) => a.sortOrder - b.sortOrder),
     startingPrice: activeFields.length ? Math.min(...activeFields.map((f: any) => f.basePrice)) : 0,
     fieldTypeCodes: Array.from(new Set(activeFields.map((f: any) => f.fieldType?.code).filter(Boolean))),

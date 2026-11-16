@@ -137,7 +137,25 @@ export const adminRepository = {
   async settings() {
     const { data, error } = await supabaseAdmin.from("system_settings").select("*");
     dbError(error);
-    return Object.fromEntries((data || []).map((r: any) => [r.key, r.value]));
+    const raw: Record<string, unknown> = {};
+    // Utamakan key snake_case agar nilai canonical dari DB tidak tertimpa key camelCase lama
+    for (const r of data || []) {
+      if (!/[A-Z]/.test(r.key)) {
+        raw[r.key] = r.value;
+      } else if (raw[r.key] === undefined) {
+        raw[r.key] = r.value;
+      }
+    }
+    return {
+      ...raw,
+      bookingExpirationMinutes: raw.booking_expiration_minutes ?? raw.bookingExpirationMinutes ?? 15,
+      maxBookingDaysAhead: raw.max_booking_days_ahead ?? raw.maxBookingDaysAhead ?? 30,
+      defaultPlatformCommissionPercent: raw.default_platform_commission_percent ?? raw.defaultPlatformCommissionPercent ?? 10,
+      defaultServiceFeeRupiah: raw.default_service_fee_rupiah ?? raw.defaultServiceFeeRupiah ?? 5000,
+      minPayoutAmountRupiah: raw.min_payout_amount_rupiah ?? raw.minPayoutAmountRupiah ?? 100000,
+      scannerEarlyCheckinMinutes: raw.scanner_early_checkin_minutes ?? raw.scannerEarlyCheckinMinutes ?? 30,
+      primaryAiProvider: raw.primary_ai_provider ?? raw.primaryAiProvider ?? "gemini",
+    };
   },
 
   async reviews(p: { q?: string; from: number; to: number }) {
@@ -155,11 +173,28 @@ export const adminRepository = {
   },
 
   async updateSettings(adminId: string, patch: Record<string, unknown>) {
+    const KEY_MAP: Record<string, string> = {
+      bookingExpirationMinutes: "booking_expiration_minutes",
+      maxBookingDaysAhead: "max_booking_days_ahead",
+      defaultPlatformCommissionPercent: "default_platform_commission_percent",
+      defaultServiceFeeRupiah: "default_service_fee_rupiah",
+      minPayoutAmountRupiah: "min_payout_amount_rupiah",
+      scannerEarlyCheckinMinutes: "scanner_early_checkin_minutes",
+      primaryAiProvider: "primary_ai_provider",
+    };
     const rows = Object.entries(patch).map(([key, value]) => ({
-      key, value, updated_by: adminId, updated_at: new Date().toISOString(),
+      key: KEY_MAP[key] || key,
+      value,
+      updated_by: adminId,
+      updated_at: new Date().toISOString(),
     }));
     const { error } = await supabaseAdmin.from("system_settings").upsert(rows);
     dbError(error);
+    // Hapus baris duplikat camelCase bila ada
+    await supabaseAdmin
+      .from("system_settings")
+      .delete()
+      .in("key", Object.keys(KEY_MAP));
     return this.settings();
   },
 
@@ -197,8 +232,16 @@ export const adminRepository = {
 
   async auditLogs(from: number, to: number) {
     const { data, error, count } = await supabaseAdmin
-      .from("audit_logs").select("*", { count: "exact" }).order("created_at", { ascending: false }).range(from, to);
+      .from("audit_logs")
+      .select("*, admin:profiles(email, full_name)", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
     dbError(error);
-    return { rows: camelize<any[]>(data || []), total: count || 0 };
+    const rows = camelize<any[]>(data || []).map((l: any) => ({
+      ...l,
+      adminEmail: l.admin?.email || l.adminId,
+      adminName: l.admin?.fullName || null,
+    }));
+    return { rows, total: count || 0 };
   },
 };

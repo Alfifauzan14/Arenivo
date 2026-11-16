@@ -121,14 +121,37 @@ export const mitraRepository = {
   async validateTicket(mitraId: string, userId: string, code: string, venueId: string) {
     const ids = await this.venueIds(mitraId);
     if (!ids.includes(venueId)) throw new AppError(ErrorCode.NOT_FOUND, "Venue tidak ditemukan.");
-    return rpc("validate_ticket", { p_code: code, p_venue_id: venueId, p_scanned_by: userId });
+    let resolvedCode = code.trim().toUpperCase();
+    // Jika input berupa kode booking (misal FB-E51AB7), cari ticket_code terkait
+    if (!resolvedCode.startsWith("TKT-")) {
+      const { data: booking } = await supabaseAdmin
+        .from("bookings")
+        .select("id")
+        .eq("booking_code", resolvedCode)
+        .maybeSingle();
+      if (booking?.id) {
+        const { data: ticket } = await supabaseAdmin
+          .from("tickets")
+          .select("ticket_code")
+          .eq("booking_id", booking.id)
+          .maybeSingle();
+        if (ticket?.ticket_code) {
+          resolvedCode = ticket.ticket_code;
+        }
+      }
+    }
+    return rpc("validate_ticket", { p_code: resolvedCode, p_venue_id: venueId, p_scanned_by: userId });
   },
 
   async checkIns(mitraId: string, from: number, to: number) {
     const ids = await this.venueIds(mitraId);
     if (!ids.length) return { rows: [], total: 0 };
     const { data, error, count } = await supabaseAdmin
-      .from("ticket_scans").select("*", { count: "exact" }).in("venue_id", ids).order("scanned_at", { ascending: false }).range(from, to);
+      .from("ticket_scans")
+      .select("*, scanner:profiles(id, full_name, email), ticket:tickets(ticket_code, booking:bookings(booking_code, customer_name))", { count: "exact" })
+      .in("venue_id", ids)
+      .order("scanned_at", { ascending: false })
+      .range(from, to);
     dbError(error);
     return { rows: camelize<any[]>(data || []), total: count || 0 };
   },
@@ -136,11 +159,43 @@ export const mitraRepository = {
   async balance(mitraId: string) {
     const { data: bal } = await supabaseAdmin.from("mitra_balances").select("*").eq("mitra_id", mitraId).maybeSingle();
     const { data: entries } = await supabaseAdmin
-      .from("mitra_balance_entries").select("*").eq("mitra_id", mitraId).order("created_at", { ascending: false }).limit(100);
+      .from("mitra_balance_entries")
+      .select("*, booking:bookings(booking_code)")
+      .eq("mitra_id", mitraId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    const formattedEntries = (entries || []).map((e: any) => ({
+      ...e,
+      booking_code: e.booking?.booking_code || null,
+    }));
     return camelize<any>({
       ...(bal || { saldo_total: 0, saldo_tertahan: 0, saldo_bisa_dicairkan: 0 }),
-      entries: entries || [],
+      entries: formattedEntries,
     });
+  },
+
+  async blocks(mitraId: string, fieldId?: string, date?: string) {
+    const ids = await this.venueIds(mitraId);
+    if (!ids.length) return [];
+    const { data: fieldRows } = await supabaseAdmin
+      .from("fields")
+      .select("id")
+      .in("venue_id", ids);
+    const fIds = (fieldRows || []).map((f: any) => f.id);
+    if (!fIds.length) return [];
+    let q = supabaseAdmin
+      .from("slot_reservations")
+      .select("*")
+      .eq("type", "blokir")
+      .eq("is_active", true)
+      .in("field_id", fieldId && fIds.includes(fieldId) ? [fieldId] : fIds)
+      .order("slot_start", { ascending: true });
+    if (date) {
+      q = q.gte("slot_start", `${date}T00:00:00+07:00`).lt("slot_start", `${date}T23:59:59+07:00`);
+    }
+    const { data, error } = await q;
+    dbError(error);
+    return camelize<any[]>(data || []);
   },
 
   async payouts(mitraId: string) {

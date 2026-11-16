@@ -47,8 +47,8 @@ export function ChatbotWidget() {
   }, [messages, isOpen]);
 
   const handleSendMessage = async (textToSend?: string) => {
-    const text = textToSend || inputValue.trim();
-    if (!text) return;
+    const text = (textToSend ?? inputValue).trim();
+    if (!text || isTyping) return;
 
     const userMsg: ChatMessage = {
       id: `usr-${Date.now()}`,
@@ -257,8 +257,9 @@ Anda dapat langsung klik nama venue untuk mengecek slot kosong jam 19.00 - 22.00
               <button
                 key={i}
                 type="button"
-                onClick={() => handleSendMessage(qr)}
-                className="px-2.5 py-1 bg-red-50 text-red-700 hover:bg-red-100 font-medium rounded-lg whitespace-nowrap transition-colors shrink-0 border border-red-200/70 cursor-pointer"
+                disabled={isTyping}
+                onClick={() => void handleSendMessage(qr)}
+                className="px-2.5 py-1 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50 font-medium rounded-lg whitespace-nowrap transition-colors shrink-0 border border-red-200/70 cursor-pointer"
               >
                 {qr}
               </button>

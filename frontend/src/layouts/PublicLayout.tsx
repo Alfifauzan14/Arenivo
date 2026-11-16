@@ -43,27 +43,35 @@ import { type InAppNotification } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 export function PublicLayout() {
-  const { user, isLoggedIn, logout, favorites } = useSession();
+  const { user, isLoggedIn, authReady, logout, favorites } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = React.useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = React.useState(false);
   const [notifications, setNotifications] = React.useState<InAppNotification[]>([]);
+  const notifReqRef = React.useRef(0);
 
   React.useEffect(() => {
+    if (!authReady) return;
+    const reqId = ++notifReqRef.current;
     if (!isLoggedIn) {
       setNotifications([]);
       return;
     }
     let isMounted = true;
-    apiClient.get<any[]>("/me/notifications").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data)) {
-        setNotifications(res.data);
-      }
-    }).catch(() => {});
+    apiClient
+      .get<any[]>("/me/notifications")
+      .then((res) => {
+        if (isMounted && reqId === notifReqRef.current && res.data && Array.isArray(res.data)) {
+          setNotifications(res.data);
+        }
+      })
+      .catch(() => {
+        if (isMounted && reqId === notifReqRef.current) setNotifications([]);
+      });
     return () => {
       isMounted = false;
     };
-  }, [isLoggedIn]);
+  }, [authReady, isLoggedIn]);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -72,8 +80,18 @@ export function PublicLayout() {
     const onAllRead = () => {
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     };
+    const onItemRead = (ev: Event) => {
+      const id = (ev as CustomEvent<{ id?: string }>).detail?.id;
+      if (id) {
+        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+      }
+    };
     window.addEventListener("arenivo:notifications-read", onAllRead);
-    return () => window.removeEventListener("arenivo:notifications-read", onAllRead);
+    window.addEventListener("arenivo:notification-item-read", onItemRead);
+    return () => {
+      window.removeEventListener("arenivo:notifications-read", onAllRead);
+      window.removeEventListener("arenivo:notification-item-read", onItemRead);
+    };
   }, []);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;

@@ -45,21 +45,34 @@ const patchFieldSchema = z.object({
   sizeDescription: z.string().max(120).optional().nullable(),
   surface: z.string().max(80).optional().nullable(),
   basePrice: z.number().int().min(0).optional(),
-  status: z.enum(["aktif", "nonaktif"]).optional()
+  status: z.enum(["aktif", "nonaktif"]).optional(),
+  operatingHours: z
+    .array(
+      z.object({
+        dayOfWeek: z.number().int().min(0).max(6),
+        openTime: z.string(),
+        closeTime: z.string(),
+        isClosed: z.boolean().optional()
+      })
+    )
+    .optional()
 });
 
 export const GET = withAuth(
   async (req, user) => {
     const mitraId = user.mitraProfile?.id ?? user.id;
+    const url = new URL(req.url);
+    const venueIdFilter = url.searchParams.get("venueId");
     const venueIds = await mitraRepository.venueIds(mitraId);
     if (venueIds.length === 0) return ok(req, []);
+    const targetIds = venueIdFilter && venueIds.includes(venueIdFilter) ? [venueIdFilter] : venueIds;
 
     const { data, error } = await supabaseAdmin
       .from("fields")
       .select(
-        "*, venues(id, name, slug), field_types(*), field_operating_hours(*), field_price_rules(*)"
+        "*, venue:venues(id, name, slug), field_type:field_types(*), field_operating_hours(*), field_price_rules(*)"
       )
-      .in("venue_id", venueIds)
+      .in("venue_id", targetIds)
       .order("created_at", { ascending: false });
     dbError(error);
     return ok(req, camelize(data ?? []));
@@ -146,11 +159,58 @@ export const PATCH = withAuth(
         ...(body.status !== undefined ? { status: body.status } : {})
       })
       .eq("id", body.id)
-      .select("*")
+      .select("*, field_type:field_types(*), field_operating_hours(*)")
       .single();
     dbError(error);
 
+    if (body.operatingHours && body.operatingHours.length > 0) {
+      await supabaseAdmin.from("field_operating_hours").delete().eq("field_id", body.id);
+      await supabaseAdmin.from("field_operating_hours").insert(
+        body.operatingHours.map((h) => ({
+          field_id: body.id,
+          day_of_week: h.dayOfWeek,
+          open_time: h.openTime,
+          close_time: h.closeTime,
+          is_closed: h.isClosed ?? false
+        }))
+      );
+    }
+
     return ok(req, camelize(data));
+  },
+  { allowedRoles: [UserRole.MITRA, UserRole.ADMIN], requireApprovedMitra: true }
+);
+
+export const DELETE = withAuth(
+  async (req, user) => {
+    const mitraId = user.mitraProfile?.id ?? user.id;
+    const fieldId = new URL(req.url).searchParams.get("id");
+    if (!fieldId) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, "ID lapangan wajib diisi.");
+    }
+    await mitraRepository.assertFieldOwned(mitraId, fieldId);
+
+    // Cek apakah sudah pernah memiliki riwayat booking
+    const { count } = await supabaseAdmin
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("field_id", fieldId);
+
+    if ((count ?? 0) > 0) {
+      // Soft-nonaktifkan agar riwayat booking tetap terjaga
+      const { error } = await supabaseAdmin
+        .from("fields")
+        .update({ status: "nonaktif" })
+        .eq("id", fieldId);
+      dbError(error);
+      return ok(req, { id: fieldId, deleted: false, deactivated: true });
+    }
+
+    await supabaseAdmin.from("field_operating_hours").delete().eq("field_id", fieldId);
+    await supabaseAdmin.from("field_price_rules").delete().eq("field_id", fieldId);
+    const { error } = await supabaseAdmin.from("fields").delete().eq("id", fieldId);
+    dbError(error);
+    return ok(req, { id: fieldId, deleted: true });
   },
   { allowedRoles: [UserRole.MITRA, UserRole.ADMIN], requireApprovedMitra: true }
 );

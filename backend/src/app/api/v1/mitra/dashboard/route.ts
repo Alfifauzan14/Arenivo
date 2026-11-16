@@ -26,10 +26,18 @@ export const GET = withAuth(
       });
     }
 
+    const nowUtc = new Date();
+    const wibNow = new Date(nowUtc.getTime() + 7 * 60 * 60000);
+    const yyyy = wibNow.getUTCFullYear();
+    const mm = String(wibNow.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(wibNow.getUTCDate()).padStart(2, "0");
+    const todayDateStr = `${yyyy}-${mm}-${dd}`;
+
     const [
       { count: totalBookings },
       { count: activeBookings },
       { count: completedBookings },
+      { count: todayBookings },
       { data: recentBookings }
     ] = await Promise.all([
       supabaseAdmin
@@ -48,7 +56,14 @@ export const GET = withAuth(
         .eq("status", "selesai"),
       supabaseAdmin
         .from("bookings")
-        .select("*, venues(id, name), fields(id, name), profiles!bookings_user_id_fkey(id, full_name, phone)")
+        .select("id", { count: "exact", head: true })
+        .in("venue_id", venueIds)
+        .in("status", ["dikonfirmasi", "digunakan", "selesai"])
+        .gte("play_start", `${todayDateStr}T00:00:00+07:00`)
+        .lt("play_start", `${todayDateStr}T23:59:59+07:00`),
+      supabaseAdmin
+        .from("bookings")
+        .select("*, venue:venues(id, name), field:fields(id, name), user:profiles!bookings_user_id_fkey(id, full_name, phone)")
         .in("venue_id", venueIds)
         .order("created_at", { ascending: false })
         .limit(8)
@@ -60,6 +75,7 @@ export const GET = withAuth(
       totalBookings: totalBookings ?? 0,
       activeBookings: activeBookings ?? 0,
       completedBookings: completedBookings ?? 0,
+      todayBookingsCount: todayBookings ?? 0,
       recentBookings: camelize(recentBookings ?? []),
       todayOccupancy
     });

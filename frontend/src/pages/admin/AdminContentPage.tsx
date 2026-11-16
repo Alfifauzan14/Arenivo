@@ -233,15 +233,13 @@ export function AdminContentPage() {
   };
 
   const handleDeleteBanner = async (bannerId: string) => {
-    if (!confirm("Hapus banner ini? Tindakan tidak bisa dibatalkan.")) return;
-    setBanners((prev) => prev.filter((b) => b.id !== bannerId));
+    if (!confirm("Hapus banner ini secara permanen? Tindakan tidak bisa dibatalkan.")) return;
     try {
-      // Backend doesn't have DELETE; use PATCH isActive=false
-      await apiClient.patch("/admin/banners", { id: bannerId, isActive: false });
-      showToast("Banner berhasil dinonaktifkan.");
+      await apiClient.delete(`/admin/banners?id=${encodeURIComponent(bannerId)}`);
+      showToast("Banner berhasil dihapus permanen.");
       await fetchBanners();
-    } catch {
-      showToast("Gagal menonaktifkan banner.");
+    } catch (err: any) {
+      showToast(err?.data?.error?.message || "Gagal menghapus banner.");
       await fetchBanners();
     }
   };

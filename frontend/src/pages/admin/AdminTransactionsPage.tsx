@@ -329,7 +329,9 @@ export function AdminTransactionsPage() {
                   </div>
                   <div>
                     <span className="text-slate-400 block">Lapangan</span>
-                    <p className="font-semibold text-slate-800">{selectedBooking.field?.name}</p>
+                    <p className="font-semibold text-slate-800">
+                      {selectedBooking.field?.name || (selectedBooking as any).fields?.name || "-"}
+                    </p>
                   </div>
                   <div>
                     <span className="text-slate-400 block">Waktu Main</span>
@@ -393,7 +395,15 @@ export function AdminTransactionsPage() {
                   </div>
                   <div className="border-t border-slate-200 pt-1.5 text-[11px] space-y-0.5">
                     <div className="flex justify-between text-red-700 font-semibold">
-                      <span>Komisi Platform (10%):</span>
+                      <span>
+                        Komisi Platform (
+                        {selectedBooking.subtotal > 0
+                          ? Math.round(
+                              (selectedBooking.platformCommission / selectedBooking.subtotal) * 100
+                            )
+                          : 0}
+                        %):
+                      </span>
                       <span>{formatRupiah(selectedBooking.platformCommission)}</span>
                     </div>
                     <div className="flex justify-between text-emerald-700 font-semibold">

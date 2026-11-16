@@ -259,7 +259,7 @@ export function AdminUsersPage() {
 
                     <TableCell className="text-center">
                       <span className="font-mono font-semibold text-xs text-slate-800 px-2 py-0.5 rounded-md bg-slate-100">
-                        {user.bookingsCount} booking
+                        {user.bookingsCount ?? 0} booking
                       </span>
                     </TableCell>
 

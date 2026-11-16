@@ -67,10 +67,16 @@ export function BookingDetailPage() {
   } as unknown as Booking);
 
   const [liveTicket, setLiveTicket] = React.useState<any>(null);
+  const [loadingTicket, setLoadingTicket] = React.useState<boolean>(true);
+  const [isSubmittingReview, setIsSubmittingReview] = React.useState<boolean>(false);
 
   React.useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      setLoadingTicket(false);
+      return;
+    }
     let isMounted = true;
+    setLoadingTicket(true);
 
     const loadData = async () => {
       try {
@@ -90,6 +96,8 @@ export function BookingDetailPage() {
         }
       } catch {
         // Tiket mungkin belum tersedia — ditangani oleh state UI lain
+      } finally {
+        if (isMounted) setLoadingTicket(false);
       }
     };
 
@@ -102,7 +110,7 @@ export function BookingDetailPage() {
   const ticket = liveTicket || {
     id: "tkt-" + booking.id,
     bookingId: booking.id,
-    ticketCode: "TKT-" + (booking.bookingCode || "LIVE") + "-01",
+    ticketCode: loadingTicket ? "Memuat kode tiket..." : (booking.bookingCode || "-"),
     status: booking.status === BookingStatus.SELESAI || booking.status === BookingStatus.DIGUNAKAN ? "digunakan" : booking.status === BookingStatus.DIBATALKAN ? "dibatalkan" : "aktif",
     issuedAt: booking.createdAt,
   };
@@ -213,16 +221,31 @@ export function BookingDetailPage() {
     );
   };
 
-  const handleSubmitReview = (e: React.FormEvent) => {
+  const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!comment.trim()) {
       addToast("warning", "Tuliskan sedikit ulasan atau komentar pengalaman Anda.", "Ulasan Kosong");
       return;
     }
 
-    setHasReviewed(true);
-    setIsReviewOpen(false);
-    addToast("success", "Terima kasih! Ulasan dan rating Anda telah berhasil dikirim.", "Ulasan Terkirim");
+    setIsSubmittingReview(true);
+    try {
+      await apiClient.post(`/bookings/${booking.id}/review`, {
+        rating,
+        comment: comment.trim(),
+      });
+      setHasReviewed(true);
+      setIsReviewOpen(false);
+      addToast("success", "Terima kasih! Ulasan dan rating Anda telah tersimpan di database.", "Ulasan Terkirim");
+    } catch (err: any) {
+      addToast(
+        "error",
+        err?.data?.error?.message || err?.message || "Gagal mengirim ulasan.",
+        "Gagal Mengirim Ulasan"
+      );
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   return (
@@ -636,9 +659,10 @@ export function BookingDetailPage() {
               type="submit"
               variant="primary"
               size="md"
+              disabled={isSubmittingReview}
               className="flex-1 text-xs font-bold shadow-xs"
             >
-              Kirim Ulasan
+              {isSubmittingReview ? "Mengirim..." : "Kirim Ulasan"}
             </Button>
           </div>
         </form>

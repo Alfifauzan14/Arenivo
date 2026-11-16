@@ -45,6 +45,17 @@ export function AdminPayoutsPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
 
+  const reloadPayouts = React.useCallback(async () => {
+    try {
+      const res = await apiClient.get<any[]>("/admin/payouts");
+      if (res.data && Array.isArray(res.data)) {
+        setPayouts(res.data);
+      }
+    } catch {
+      // keep existing
+    }
+  }, []);
+
   React.useEffect(() => {
     let isMounted = true;
     setLoading(true);
@@ -86,7 +97,10 @@ export function AdminPayoutsPage() {
       p.bankAccountNumber.includes(searchQuery) ||
       p.bankName.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesStatus = filterStatus === "all" || p.status === filterStatus;
+    const matchesStatus =
+      filterStatus === "all" ||
+      p.status === filterStatus ||
+      (filterStatus === "disetujui" && p.status === "diproses");
 
     return matchesSearch && matchesStatus;
   });
@@ -96,16 +110,19 @@ export function AdminPayoutsPage() {
     currentPage * pageSize
   );
 
-  const handleApprove = (payoutItem: PayoutItem) => {
-    setPayouts((prev) =>
-      prev.map((p) => (p.id === payoutItem.id ? { ...p, status: "diproses" } : p))
-    );
-    if (selectedPayout?.id === payoutItem.id) {
-      setSelectedPayout((prev) => (prev ? { ...prev, status: "diproses" } : null));
+  const handleApprove = async (payoutItem: PayoutItem) => {
+    try {
+      await apiClient.post(`/admin/payouts/${payoutItem.id}/approve`);
+      await reloadPayouts();
+      if (selectedPayout?.id === payoutItem.id) {
+        setSelectedPayout((prev) => (prev ? { ...prev, status: "disetujui" as any } : null));
+      }
+      showToast(
+        `Pengajuan payout ${formatRupiah(payoutItem.amount)} disetujui. Status berubah menjadi DISETUJUI.`
+      );
+    } catch (err: any) {
+      showToast(err?.data?.error?.message || err?.message || "Gagal menyetujui payout.");
     }
-    showToast(
-      `Pengajuan payout ${formatRupiah(payoutItem.amount)} disetujui. Status berubah menjadi DIPROSES.`
-    );
   };
 
   const handleOpenComplete = (payoutItem: PayoutItem) => {
@@ -114,7 +131,7 @@ export function AdminPayoutsPage() {
     setTransferError(null);
   };
 
-  const handleConfirmComplete = () => {
+  const handleConfirmComplete = async () => {
     if (!transferRef.trim() || transferRef.trim().length < 6) {
       setTransferError("Nomor referensi transfer bank wajib diisi minimal 6 karakter.");
       return;
@@ -122,34 +139,33 @@ export function AdminPayoutsPage() {
 
     if (!completingPayout) return;
 
-    setPayouts((prev) =>
-      prev.map((p) =>
-        p.id === completingPayout.id
-          ? {
-              ...p,
-              status: "selesai",
-              transferReference: transferRef.trim(),
-            }
-          : p
-      )
-    );
+    try {
+      await apiClient.post(`/admin/payouts/${completingPayout.id}/complete`, {
+        reference: transferRef.trim(),
+      });
+      await reloadPayouts();
 
-    if (selectedPayout?.id === completingPayout.id) {
-      setSelectedPayout((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: "selesai",
-              transferReference: transferRef.trim(),
-            }
-          : null
+      if (selectedPayout?.id === completingPayout.id) {
+        setSelectedPayout((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: "selesai",
+                transferReference: transferRef.trim(),
+              }
+            : null
+        );
+      }
+
+      showToast(
+        `Pencairan dana ${formatRupiah(completingPayout.amount)} ke ${completingPayout.bankAccountHolder} berhasil ditandai selesai!`
+      );
+      setCompletingPayout(null);
+    } catch (err: any) {
+      setTransferError(
+        err?.data?.error?.message || err?.message || "Gagal menyelesaikan transfer payout."
       );
     }
-
-    showToast(
-      `Pencairan dana ${formatRupiah(completingPayout.amount)} ke ${completingPayout.bankAccountHolder} berhasil ditandai selesai!`
-    );
-    setCompletingPayout(null);
   };
 
   const handleOpenReject = (payoutItem: PayoutItem) => {
@@ -158,7 +174,7 @@ export function AdminPayoutsPage() {
     setRejectError(null);
   };
 
-  const handleConfirmReject = () => {
+  const handleConfirmReject = async () => {
     if (!rejectReason.trim() || rejectReason.trim().length < 8) {
       setRejectError("Alasan penolakan pencairan wajib diisi minimal 8 karakter.");
       return;
@@ -166,16 +182,23 @@ export function AdminPayoutsPage() {
 
     if (!rejectingPayout) return;
 
-    setPayouts((prev) =>
-      prev.map((p) => (p.id === rejectingPayout.id ? { ...p, status: "ditolak" } : p))
-    );
+    try {
+      await apiClient.post(`/admin/payouts/${rejectingPayout.id}/reject`, {
+        reason: rejectReason.trim(),
+      });
+      await reloadPayouts();
 
-    if (selectedPayout?.id === rejectingPayout.id) {
-      setSelectedPayout((prev) => (prev ? { ...prev, status: "ditolak" } : null));
+      if (selectedPayout?.id === rejectingPayout.id) {
+        setSelectedPayout((prev) => (prev ? { ...prev, status: "ditolak" } : null));
+      }
+
+      showToast(`Pengajuan pencairan saldo ${rejectingPayout.bankAccountHolder} ditolak.`);
+      setRejectingPayout(null);
+    } catch (err: any) {
+      setRejectError(
+        err?.data?.error?.message || err?.message || "Gagal menolak pengajuan payout."
+      );
     }
-
-    showToast(`Pengajuan pencairan saldo ${rejectingPayout.bankAccountHolder} ditolak.`);
-    setRejectingPayout(null);
   };
 
   if (loading) {
@@ -254,8 +277,8 @@ export function AdminPayoutsPage() {
                     label: `Menunggu (${payouts.filter((p) => p.status === "menunggu").length})`,
                   },
                   {
-                    value: "diproses",
-                    label: `Diproses (${payouts.filter((p) => p.status === "diproses").length})`,
+                    value: "disetujui",
+                    label: `Disetujui (${payouts.filter((p) => p.status === "disetujui" || p.status === "diproses").length})`,
                   },
                   {
                     value: "selesai",
@@ -353,7 +376,7 @@ export function AdminPayoutsPage() {
                         </Button>
                       )}
 
-                      {(p.status === "menunggu" || p.status === "diproses") && (
+                      {(p.status === "menunggu" || p.status === "disetujui" || p.status === "diproses") && (
                         <>
                           <Button
                             size="sm"
@@ -466,7 +489,7 @@ export function AdminPayoutsPage() {
                 Tutup
               </Button>
 
-              {(selectedPayout.status === "menunggu" || selectedPayout.status === "diproses") && (
+              {(selectedPayout.status === "menunggu" || selectedPayout.status === "disetujui" || selectedPayout.status === "diproses") && (
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
