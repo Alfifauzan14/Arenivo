@@ -128,7 +128,7 @@ export const adminRepository = {
 
   async bookings(from: number, to: number) {
     const { data, error, count } = await supabaseAdmin
-      .from("bookings").select("*, venue:venues(name), payments(*)", { count: "exact" })
+      .from("bookings").select("*, venue:venues(name), field:fields(name), payments(*)", { count: "exact" })
       .order("created_at", { ascending: false }).range(from, to);
     dbError(error);
     return { rows: camelize<any[]>(data || []), total: count || 0 };

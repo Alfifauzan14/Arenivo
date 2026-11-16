@@ -1,4 +1,5 @@
 import type { ApiResponse, ApiErrorResponse } from "@futsal/shared";
+import { supabase } from "./supabase";
 import {
   MOCK_VENUES,
   MOCK_FIELDS,
@@ -66,16 +67,47 @@ class ApiClient {
         headers.set("Content-Type", "application/json");
       }
 
-      // Sisipkan token jika tersimpan di localStorage
-      const token = localStorage.getItem("sb_access_token");
-      if (token && !headers.has("Authorization")) {
-        headers.set("Authorization", `Bearer ${token}`);
+      // Selalu ambil token terbaru dari sesi Supabase agar tidak mengirim token kedaluwarsa
+      if (!headers.has("Authorization")) {
+        let token: string | null = null;
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            token = session.access_token;
+            localStorage.setItem("sb_access_token", token);
+          }
+        } catch {
+          // ignore
+        }
+        if (!token) {
+          token = localStorage.getItem("sb_access_token");
+        }
+        if (token) {
+          headers.set("Authorization", `Bearer ${token}`);
+        }
       }
 
-      const res = await fetch(url, {
+      let res = await fetch(url, {
         ...options,
         headers,
       });
+
+      // Jika token baru saja kedaluwarsa (401), coba refresh sesi sekali dan ulangi
+      if (res.status === 401) {
+        try {
+          const { data: { session } } = await supabase.auth.refreshSession();
+          if (session?.access_token) {
+            localStorage.setItem("sb_access_token", session.access_token);
+            headers.set("Authorization", `Bearer ${session.access_token}`);
+            res = await fetch(url, {
+              ...options,
+              headers,
+            });
+          }
+        } catch {
+          // ignore
+        }
+      }
 
       const json = await res.json().catch(() => ({}));
 

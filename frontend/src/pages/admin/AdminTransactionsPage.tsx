@@ -62,11 +62,12 @@ export function AdminTransactionsPage() {
   }, []);
 
   const filteredBookings = bookings.filter((b) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      b.bookingCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.customerPhone.includes(searchQuery) ||
-      (b.venue?.name && b.venue.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      (b.bookingCode || "").toLowerCase().includes(q) ||
+      (b.customerName || "").toLowerCase().includes(q) ||
+      (b.customerPhone || "").includes(searchQuery) ||
+      (b.venue?.name && b.venue.name.toLowerCase().includes(q));
 
     const matchesStatus = filterStatus === "all" || b.status === filterStatus;
 
@@ -78,8 +79,11 @@ export function AdminTransactionsPage() {
     currentPage * pageSize
   );
 
-  const getPaymentForBooking = (bookingId: string) => {
-    return MOCK_PAYMENTS.find((p) => p.bookingId === bookingId);
+  const getPaymentForBooking = (booking: any) => {
+    if (Array.isArray(booking?.payments) && booking.payments.length > 0) {
+      return booking.payments[0];
+    }
+    return MOCK_PAYMENTS.find((p) => p.bookingId === booking?.id);
   };
 
   if (loading) {
@@ -194,7 +198,7 @@ export function AdminTransactionsPage() {
                 </TableRow>
               ) : (
                 paginatedBookings.map((b) => {
-                  const payment = getPaymentForBooking(b.id);
+                  const payment = getPaymentForBooking(b);
 
                   return (
                     <TableRow key={b.id} className="hover:bg-slate-50/80 transition-colors">
@@ -288,7 +292,7 @@ export function AdminTransactionsPage() {
           title={`Rincian Transaksi: ${selectedBooking.bookingCode}`}
         >
           {(() => {
-            const payment = getPaymentForBooking(selectedBooking.id);
+            const payment = getPaymentForBooking(selectedBooking);
 
             return (
               <div className="space-y-4 text-xs">
