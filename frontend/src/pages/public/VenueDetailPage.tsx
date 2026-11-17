@@ -379,6 +379,10 @@ export function VenueDetailPage() {
         );
       } else if (slot.status === SlotStatus.TERISI) {
         addToast("info", "Slot jam ini sudah terisi (Booked).", "Booked");
+      } else if (slot.status === SlotStatus.DIBLOKIR) {
+        addToast("error", `Slot diblokir pengelola: ${slot.reason || "Perawatan / Event"}`, "Slot Diblokir");
+      } else if (slot.status === SlotStatus.LEWAT) {
+        addToast("warning", "Jam bermain untuk slot ini sudah lewat.", "Waktu Sudah Lewat");
       } else {
         addToast("error", `Slot tidak tersedia: ${slot.reason || "Tutup"}`, "Tidak Tersedia");
       }
@@ -1177,6 +1181,10 @@ export function VenueDetailPage() {
                                   ? formatRupiah(slot.price)
                                   : isLocked
                                   ? "Dikunci 15m"
+                                  : slot.status === SlotStatus.DIBLOKIR
+                                  ? "Diblokir"
+                                  : slot.status === SlotStatus.LEWAT
+                                  ? "Lewat"
                                   : "Booked"}
                               </span>
                             </button>
