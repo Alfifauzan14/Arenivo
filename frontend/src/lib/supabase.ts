@@ -11,4 +11,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
   },
+  global: {
+    fetch: async (input, init) => {
+      const res = await fetch(input, init);
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+      // @supabase/auth-js leaves 204 logout response bodies unread (`noResolveJson: true`),
+      // which Chromium can flag as net::ERR_ABORTED during logout/redirects.
+      if (res.status === 204 && url.includes("/auth/v1/logout")) {
+        await res.arrayBuffer().catch(() => {});
+      }
+      return res;
+    },
+  },
 });

@@ -158,11 +158,14 @@ export function CheckoutPage() {
   }, [isExpired, addToast]);
 
   // 3. Form Data Pemesan
+  const isMockExistingBooking = Boolean(
+    bookingId && !bookingId.startsWith("bk-") && MOCK_BOOKINGS.some((b) => b.id === bookingId)
+  );
   const [customerName, setCustomerName] = React.useState<string>(
-    user?.fullName || existingBooking.customerName || ""
+    user?.fullName || (isMockExistingBooking ? existingBooking.customerName : "") || ""
   );
   const [customerPhone, setCustomerPhone] = React.useState<string>(
-    user?.phone || existingBooking.customerPhone || ""
+    user?.phone || (isMockExistingBooking ? existingBooking.customerPhone : "") || ""
   );
   const [customerEmail, setCustomerEmail] = React.useState<string>(
     user?.email || ""
@@ -174,7 +177,9 @@ export function CheckoutPage() {
     if (user?.phone) setCustomerPhone(user.phone);
     if (user?.email) setCustomerEmail(user.email);
   }, [user]);
-  const [notes, setNotes] = React.useState<string>(existingBooking.notes || "");
+  const [notes, setNotes] = React.useState<string>(
+    isMockExistingBooking ? existingBooking.notes || "" : ""
+  );
 
   // 4. Promo Code Validation
   const [promoInput, setPromoInput] = React.useState<string>("");
