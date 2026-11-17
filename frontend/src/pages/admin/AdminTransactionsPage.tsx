@@ -45,17 +45,31 @@ export function AdminTransactionsPage() {
   const pageSize = 10;
   const [bookings, setBookings] = React.useState<Booking[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [commissionPercent, setCommissionPercent] = React.useState<number>(12);
 
   React.useEffect(() => {
     let isMounted = true;
     setLoading(true);
-    apiClient.get<any[]>("/admin/bookings").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data)) {
-        setBookings(res.data);
-      }
-    }).catch(() => {}).finally(() => {
-      if (isMounted) setLoading(false);
-    });
+    Promise.all([
+      apiClient.get<any[]>("/admin/bookings").then((res) => {
+        if (isMounted && res.data && Array.isArray(res.data)) {
+          setBookings(res.data);
+        }
+      }),
+      apiClient
+        .get<any>("/admin/settings")
+        .then((res) => {
+          const pct = Number(res.data?.defaultPlatformCommissionPercent);
+          if (isMounted && Number.isFinite(pct) && pct > 0) {
+            setCommissionPercent(pct);
+          }
+        })
+        .catch(() => {}),
+    ])
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
     return () => {
       isMounted = false;
     };
@@ -98,7 +112,7 @@ export function AdminTransactionsPage() {
           Seluruh Transaksi & Pembayaran Midtrans
         </h1>
         <p className="text-xs text-slate-500 mt-0.5">
-          Rekapitulasi pesanan nasional, verifikasi pembayaran payment gateway, dan bagi hasil komisi platform 10%
+          Rekapitulasi pesanan nasional, verifikasi pembayaran payment gateway, dan bagi hasil komisi platform {commissionPercent}%
         </p>
       </div>
 
@@ -184,7 +198,7 @@ export function AdminTransactionsPage() {
                 <TableHead className="text-xs">Venue & Lapangan</TableHead>
                 <TableHead className="text-xs">Metode Bayar</TableHead>
                 <TableHead className="text-xs text-right">Total Transaksi</TableHead>
-                <TableHead className="text-xs text-right">Komisi 10%</TableHead>
+                <TableHead className="text-xs text-right">Komisi {commissionPercent}%</TableHead>
                 <TableHead className="text-xs">Status</TableHead>
                 <TableHead className="text-xs text-right">Aksi</TableHead>
               </TableRow>

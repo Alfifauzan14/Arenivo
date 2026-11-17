@@ -32,20 +32,34 @@ export function AdminDashboardPage() {
     gmv: 0,
     platformCommission: 0,
   });
+  const [commissionPercent, setCommissionPercent] = React.useState<number>(12);
 
   React.useEffect(() => {
     let isMounted = true;
     setLoading(true);
-    apiClient.get<any>("/admin/dashboard").then((res) => {
-      if (isMounted && res.data) {
-        setMetrics((prev) => ({
-          ...prev,
-          ...res.data,
-        }));
-      }
-    }).catch(() => {}).finally(() => {
-      if (isMounted) setLoading(false);
-    });
+    Promise.all([
+      apiClient.get<any>("/admin/dashboard").then((res) => {
+        if (isMounted && res.data) {
+          setMetrics((prev) => ({
+            ...prev,
+            ...res.data,
+          }));
+        }
+      }),
+      apiClient
+        .get<any>("/admin/settings")
+        .then((res) => {
+          const pct = Number(res.data?.defaultPlatformCommissionPercent);
+          if (isMounted && Number.isFinite(pct) && pct > 0) {
+            setCommissionPercent(pct);
+          }
+        })
+        .catch(() => {}),
+    ])
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
     return () => {
       isMounted = false;
     };
@@ -142,7 +156,7 @@ export function AdminDashboardPage() {
 
         <Card className="p-4 bg-white border-slate-200 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Komisi Platform (10%)</span>
+            <span className="text-xs font-medium text-slate-500">Komisi Platform ({commissionPercent}%)</span>
             <div className="p-2 bg-red-50 text-red-600 rounded-lg">
               <TrendingUp className="w-4 h-4" />
             </div>

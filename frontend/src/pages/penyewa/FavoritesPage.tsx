@@ -12,7 +12,11 @@ export function FavoritesPage() {
   const [venues, setVenues] = React.useState<Venue[]>([]);
   const [loading, setLoading] = React.useState(true);
   const reqSeqRef = React.useRef(0);
-  const favKey = favorites.join(",");
+
+  const visibleVenues = React.useMemo(
+    () => venues.filter((v) => favorites.includes(v.id)),
+    [venues, favorites]
+  );
 
   React.useEffect(() => {
     if (!authReady) {
@@ -20,14 +24,23 @@ export function FavoritesPage() {
       return;
     }
 
-    const reqId = ++reqSeqRef.current;
-    let isMounted = true;
-
     if (!isLoggedIn) {
       setVenues([]);
       setLoading(false);
       return;
     }
+
+    // Jika semua ID favorit saat ini sudah ada di state venues (misalnya user baru menghapus salah satu),
+    // tidak perlu menembak ulang /me/favorites agar tidak balapan dengan request DELETE yang sedang berjalan.
+    const loadedIds = new Set(venues.map((v) => v.id));
+    const hasMissing = favorites.some((id) => !loadedIds.has(id));
+    if (venues.length > 0 && !hasMissing) {
+      setLoading(false);
+      return;
+    }
+
+    const reqId = ++reqSeqRef.current;
+    let isMounted = true;
 
     setLoading(true);
     apiClient
@@ -61,7 +74,7 @@ export function FavoritesPage() {
     return () => {
       isMounted = false;
     };
-  }, [authReady, isLoggedIn, favKey]);
+  }, [authReady, isLoggedIn, favorites]);
 
   return (
     <div className="min-h-screen">
@@ -80,7 +93,7 @@ export function FavoritesPage() {
           </div>
 
           <span className="text-xs font-mono font-bold text-red-700 bg-white px-3 py-1.5 rounded-lg border border-white shadow-xs self-start sm:self-auto">
-            {loading ? "Memuat..." : `${venues.length} venue tersimpan`}
+            {loading ? "Memuat..." : `${visibleVenues.length} venue tersimpan`}
           </span>
         </div>
       </section>
@@ -94,9 +107,9 @@ export function FavoritesPage() {
               <div key={idx} className="h-72 rounded-xl bg-slate-100 animate-pulse border border-slate-200" />
             ))}
           </div>
-        ) : venues.length > 0 ? (
+        ) : visibleVenues.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {venues.map((venue) => (
+            {visibleVenues.map((venue) => (
               <VenueCard key={venue.id} venue={venue} />
             ))}
           </div>

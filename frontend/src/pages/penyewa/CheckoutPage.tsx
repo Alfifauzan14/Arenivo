@@ -159,13 +159,13 @@ export function CheckoutPage() {
 
   // 3. Form Data Pemesan
   const [customerName, setCustomerName] = React.useState<string>(
-    user?.fullName || existingBooking.customerName || "Rizky Ramadhan"
+    user?.fullName || existingBooking.customerName || ""
   );
   const [customerPhone, setCustomerPhone] = React.useState<string>(
-    user?.phone || existingBooking.customerPhone || "081234567890"
+    user?.phone || existingBooking.customerPhone || ""
   );
   const [customerEmail, setCustomerEmail] = React.useState<string>(
-    user?.email || "rizky.ramadhan@gmail.com"
+    user?.email || ""
   );
 
   // Sync saat data sesi user selesai dimuat

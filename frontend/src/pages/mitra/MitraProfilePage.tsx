@@ -19,24 +19,25 @@ import {
   Select,
   useToast,
 } from "@/components/ui";
+import { LoadingSkeleton } from "@/components/common/LoadingStates";
 import { apiClient } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
 
 export function MitraProfilePage() {
   const { addToast } = useToast();
 
-  // Profile state
-  const [businessName, setBusinessName] = React.useState("Champion Arena Group");
-  const [picName, setPicName] = React.useState("Mitra Arenivo");
-  const [phone, setPhone] = React.useState("081234567890");
-  const [email, setEmail] = React.useState("mitra@arenivo.id");
+  // Profile state (diisi langsung dari database)
+  const [businessName, setBusinessName] = React.useState("");
+  const [picName, setPicName] = React.useState("");
+  const [phone, setPhone] = React.useState("");
+  const [email, setEmail] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
   const [isFetching, setIsFetching] = React.useState(true);
 
   // Bank account state
-  const [bankName, setBankName] = React.useState("BCA");
-  const [accountNumber, setAccountNumber] = React.useState("8830128491");
-  const [accountHolder, setAccountHolder] = React.useState("Champion Arena Group");
+  const [bankName, setBankName] = React.useState("");
+  const [accountNumber, setAccountNumber] = React.useState("");
+  const [accountHolder, setAccountHolder] = React.useState("");
 
   // Muat data profil mitra langsung dari Database Supabase
   React.useEffect(() => {
@@ -48,18 +49,26 @@ export function MitraProfilePage() {
           const { profile, mitraProfile } = res.data;
           if (profile) {
             if (profile.fullName) setPicName(profile.fullName);
-            if (profile.phone) setPhone(profile.phone);
+            if (profile.phone || mitraProfile?.phone) setPhone(profile.phone || mitraProfile.phone);
             if (profile.email) setEmail(profile.email);
           }
           if (mitraProfile) {
             if (mitraProfile.businessName) setBusinessName(mitraProfile.businessName);
-            if (mitraProfile.bankName) setBankName(mitraProfile.bankName);
+            setBankName(mitraProfile.bankName || "BCA");
             if (mitraProfile.bankAccountNumber) setAccountNumber(mitraProfile.bankAccountNumber);
             if (mitraProfile.bankAccountHolder) setAccountHolder(mitraProfile.bankAccountHolder);
           }
         }
       })
-      .catch(() => {})
+      .catch((err: any) => {
+        if (isMounted) {
+          addToast(
+            "error",
+            err?.error?.message || err?.message || "Gagal memuat data profil & rekening mitra.",
+            "Gagal Memuat"
+          );
+        }
+      })
       .finally(() => {
         if (isMounted) setIsFetching(false);
       });
@@ -67,7 +76,7 @@ export function MitraProfilePage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [addToast]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,6 +115,10 @@ export function MitraProfilePage() {
       setIsLoading(false);
     }
   };
+
+  if (isFetching) {
+    return <LoadingSkeleton />;
+  }
 
   return (
     <div className="space-y-5 sm:space-y-6">

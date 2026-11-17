@@ -24,6 +24,7 @@ import { BrandLogoIcon } from "@/components/common/BrandLogo";
 import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api-client";
+import { supabase } from "@/lib/supabase";
 import { useSession } from "@/features/auth/context/SessionContext";
 
 export function AdminLayout() {
@@ -154,10 +155,11 @@ export function AdminLayout() {
     },
   ];
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem("futsal_admin_authenticated");
     localStorage.removeItem("sb_access_token");
     localStorage.removeItem("futsal_logged_in");
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
     navigate("/admin/login");
   };
 

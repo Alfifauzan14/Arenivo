@@ -24,6 +24,7 @@ import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPatte
 import { useToast } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { apiClient } from "@/lib/api-client";
+import { useSession } from "@/features/auth/context/SessionContext";
 import { cn } from "@/lib/utils";
 
 export function MitraAuthPage() {
@@ -31,6 +32,7 @@ export function MitraAuthPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { refreshProfile } = useSession();
 
   // Detect mode from path (/mitra/register vs /mitra/login) or query param (?mode=register)
   const isRegisterParam =
@@ -180,7 +182,7 @@ export function MitraAuthPage() {
           .single();
 
         if (profile?.role !== "mitra" && profile?.role !== "admin") {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: "local" }).catch(() => {});
           setIsLoading(false);
           addToast("error", "Akun ini bukan akun pengelola arena/mitra yang terdaftar.", "Akses Ditolak");
           return;
@@ -188,6 +190,7 @@ export function MitraAuthPage() {
 
         localStorage.setItem("sb_access_token", data.session.access_token);
         localStorage.setItem("futsal_mitra_authenticated", "true");
+        await refreshProfile();
         setIsLoading(false);
         addToast("success", "Selamat datang kembali di Portal Pengelola!", "Login Mitra Sukses");
         navigate("/mitra");

@@ -39,10 +39,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (profile) {
         setCurrentUser({
           id: profile.id,
-          fullName: savedName || userMeta?.full_name || profile.full_name || "Pengguna Arenivo",
+          fullName: savedName || profile.full_name || userMeta?.full_name || "Pengguna Arenivo",
           email: profile.email || email || "",
-          phone: savedPhone || userMeta?.phone || profile.phone || "",
-          avatarUrl: savedAvatar || userMeta?.avatar_url || userMeta?.picture || profile.avatar_url || "",
+          phone: savedPhone || profile.phone || userMeta?.phone || "",
+          avatarUrl: savedAvatar || profile.avatar_url || userMeta?.avatar_url || userMeta?.picture || "",
           role: profile.role || "penyewa",
           status: profile.status || "aktif",
         });
@@ -160,7 +160,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("futsal_mitra_authenticated");
     localStorage.removeItem("futsal_admin_authenticated");
     localStorage.removeItem("futsal_mitra_verification_status");
-    await supabase.auth.signOut().catch(() => {});
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
     window.location.href = "/";
   }, []);
 

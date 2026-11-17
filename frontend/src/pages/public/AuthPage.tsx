@@ -152,7 +152,7 @@ export function AuthPage() {
             data.session.user.app_metadata?.role === "admin" ||
             data.session.user.user_metadata?.role === "admin"
           ) {
-            await supabase.auth.signOut();
+            await supabase.auth.signOut({ scope: "local" }).catch(() => {});
             localStorage.removeItem("sb_access_token");
             localStorage.removeItem("futsal_logged_in");
             localStorage.removeItem("futsal_admin_authenticated");

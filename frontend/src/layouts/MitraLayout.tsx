@@ -16,20 +16,45 @@ import {
   AlertTriangle,
   FileCheck,
   ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { BrandLogoIcon } from "@/components/common/BrandLogo";
+import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
 import { Select } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
+import { useSession } from "@/features/auth/context/SessionContext";
 import { MitraVerificationStatus } from "@futsal/shared";
 
 export function MitraLayout() {
+  const { user, isLoggedIn, authReady } = useSession();
+  const [authorized, setAuthorized] = React.useState(false);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [venues, setVenues] = React.useState<any[]>([]);
   const [selectedVenueId, setSelectedVenueId] = React.useState("");
+  const location = useLocation();
+  const navigate = useNavigate();
 
   React.useEffect(() => {
+    if (!authReady) return;
+    const token = localStorage.getItem("sb_access_token");
+    if (!isLoggedIn || !user || !token) {
+      localStorage.removeItem("futsal_mitra_authenticated");
+      navigate("/mitra/login", { replace: true });
+      return;
+    }
+    if (user.role !== "mitra" && user.role !== "admin") {
+      localStorage.removeItem("futsal_mitra_authenticated");
+      navigate("/mitra/login", { replace: true });
+      return;
+    }
+    localStorage.setItem("futsal_mitra_authenticated", "true");
+    setAuthorized(true);
+  }, [authReady, isLoggedIn, user, navigate]);
+
+  React.useEffect(() => {
+    if (!authorized) return;
     let isMounted = true;
     apiClient.get<any[]>("/mitra/venues").then((res) => {
       if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
@@ -40,16 +65,14 @@ export function MitraLayout() {
     return () => {
       isMounted = false;
     };
-  }, []);
-  const location = useLocation();
-  const navigate = useNavigate();
+  }, [authorized]);
 
   const handleLogout = async () => {
     localStorage.removeItem("futsal_mitra_authenticated");
     localStorage.removeItem("futsal_logged_in");
     localStorage.removeItem("sb_access_token");
     localStorage.removeItem("futsal_mitra_verification_status");
-    await supabase.auth.signOut().catch(() => {});
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
     window.location.href = "/";
   };
 
@@ -62,6 +85,7 @@ export function MitraLayout() {
   });
 
   React.useEffect(() => {
+    if (!authorized) return;
     let isMounted = true;
     apiClient.get<any>("/mitra/profile").then((res) => {
       if (isMounted && res.data?.mitraProfile?.verificationStatus) {
@@ -73,9 +97,9 @@ export function MitraLayout() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [authorized]);
 
-  const selectedVenue: any = venues.find((v: any) => v.id === selectedVenueId) || venues[0] || { name: "Champion Futsal Arena Cilandak", id: "" };
+  const selectedVenue: any = venues.find((v: any) => v.id === selectedVenueId) || venues[0] || { name: "Memuat Venue...", id: "" };
 
   const menuSections = [
     {
@@ -113,6 +137,20 @@ export function MitraLayout() {
           ? location.pathname === "/mitra"
           : location.pathname.startsWith(m.path)
       )?.label || "Dashboard";
+
+  if (!authorized) {
+    return (
+      <div className="bg-slate-50 min-h-screen py-12 px-4 flex flex-col justify-center items-center text-slate-900 relative">
+        <CleanBackgroundPattern variant="subtle" />
+        <div className="w-full max-w-sm space-y-6 relative z-10 text-center">
+          <div className="flex flex-col items-center gap-3 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
+            <Loader2 className="w-8 h-8 animate-spin text-red-600" />
+            <p className="text-sm font-semibold text-slate-700">Memverifikasi sesi Portal Mitra...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen overflow-hidden flex flex-col md:flex-row bg-slate-50 text-slate-900 relative font-sans">
@@ -189,7 +227,7 @@ export function MitraLayout() {
           <Select
             value={selectedVenueId}
             onChange={(e) => setSelectedVenueId(e.target.value)}
-            options={venues.length > 0 ? venues.map((v: any) => ({ value: v.id, label: v.name })) : [{ value: selectedVenueId || "", label: "Champion Futsal Arena Cilandak" }]}
+            options={venues.length > 0 ? venues.map((v: any) => ({ value: v.id, label: v.name })) : [{ value: selectedVenueId || "", label: "Memuat Venue..." }]}
           />
         </div>
 

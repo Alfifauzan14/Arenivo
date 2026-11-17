@@ -48,38 +48,59 @@ export class GeminiService {
         parts: [{ text: userText }],
       });
 
-      const res = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-goog-api-key": apiKey,
-          },
-          body: JSON.stringify({
-            contents,
-            generationConfig: {
-              temperature: options?.temperature ?? 0.3,
-              maxOutputTokens: options?.maxOutputTokens ?? 450,
-              thinkingConfig: {
-                thinkingBudget: 0,
-              },
-            },
-          }),
-          signal: AbortSignal.timeout(8000),
-        }
-      );
+      const candidateModels = ["gemini-3.5-flash", "gemini-3.8-flash"];
+      let lastError: unknown = null;
 
-      if (!res.ok) {
-        const errBody = await res.text();
-        throw new Error(`Gemini API error [${res.status}]: ${errBody}`);
+      for (const model of candidateModels) {
+        try {
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-goog-api-key": apiKey,
+              },
+              body: JSON.stringify({
+                contents,
+                generationConfig: {
+                  temperature: options?.temperature ?? 0.3,
+                  maxOutputTokens: options?.maxOutputTokens ?? 450,
+                  thinkingConfig: {
+                    thinkingBudget: 0,
+                  },
+                },
+              }),
+              signal: AbortSignal.timeout(14000),
+            }
+          );
+
+          if (!res.ok) {
+            const errBody = await res.text();
+            lastError = new Error(`Gemini API [${model}] error [${res.status}]: ${errBody}`);
+            continue;
+          }
+
+          const data = await res.json();
+          const parts: Array<{ text?: string; thought?: boolean }> =
+            data.candidates?.[0]?.content?.parts || [];
+          const text = parts
+            .filter((p) => !p.thought && typeof p.text === "string")
+            .map((p) => p.text)
+            .join("")
+            .trim();
+
+          if (text) {
+            return text;
+          }
+
+          lastError = new Error(`Gemini API [${model}] returned empty text`);
+        } catch (modelErr) {
+          lastError = modelErr;
+        }
       }
 
-      const data = await res.json();
-      return (
-        data.candidates?.[0]?.content?.parts?.[0]?.text ||
-        "Maaf, saat ini saya tidak dapat menjawab pesan Anda."
-      );
+      throw lastError ?? new Error("All Gemini models failed");
     } catch (err) {
       console.error("[Gemini Error]:", err);
       throw err;

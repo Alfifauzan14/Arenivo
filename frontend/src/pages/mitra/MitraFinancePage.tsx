@@ -62,6 +62,25 @@ export function MitraFinancePage() {
   const [payouts, setPayouts] = React.useState<any[]>([]);
   const [isSubmittingPayout, setIsSubmittingPayout] = React.useState(false);
 
+  const [isBankLoading, setIsBankLoading] = React.useState(true);
+
+  const loadBankProfile = React.useCallback(async () => {
+    setIsBankLoading(true);
+    try {
+      const res = await apiClient.get<any>("/mitra/profile");
+      const mp = res.data?.mitraProfile;
+      if (mp) {
+        if (mp.bankName) setSelectedBank(mp.bankName);
+        if (mp.bankAccountNumber) setBankAccount(mp.bankAccountNumber);
+        if (mp.bankAccountHolder) setAccountHolder(mp.bankAccountHolder);
+      }
+    } catch {
+      // tetap tangani dengan nilai yang sudah ada jika sempat termuat
+    } finally {
+      setIsBankLoading(false);
+    }
+  }, []);
+
   const loadFinanceData = React.useCallback(async () => {
     await Promise.all([
       apiClient
@@ -82,19 +101,9 @@ export function MitraFinancePage() {
           }
         })
         .catch(() => {}),
-      apiClient
-        .get<any>("/mitra/profile")
-        .then((res) => {
-          const mp = res.data?.mitraProfile;
-          if (mp) {
-            if (mp.bankName) setSelectedBank(mp.bankName);
-            if (mp.bankAccountNumber) setBankAccount(mp.bankAccountNumber);
-            if (mp.bankAccountHolder) setAccountHolder(mp.bankAccountHolder);
-          }
-        })
-        .catch(() => {}),
+      loadBankProfile(),
     ]);
-  }, []);
+  }, [loadBankProfile]);
 
   // Live Backend Loading for Balance, Payouts & Mitra Profile
   React.useEffect(() => {
@@ -227,7 +236,12 @@ export function MitraFinancePage() {
           type="button"
           variant="primary"
           size="sm"
-          onClick={() => setIsPayoutModalOpen(true)}
+          onClick={() => {
+            setIsPayoutModalOpen(true);
+            if (!bankAccount || !accountHolder) {
+              void loadBankProfile();
+            }
+          }}
           className="w-full sm:w-auto justify-center gap-1.5 text-xs"
         >
           <ArrowUpRight className="w-4 h-4" />
@@ -749,14 +763,14 @@ export function MitraFinancePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
                 label="Bank Tujuan"
-                value={selectedBank}
+                value={selectedBank || (isBankLoading ? "Memuat..." : "-")}
                 readOnly
                 className="bg-slate-50 text-slate-700"
               />
 
               <Input
                 label="Nomor Rekening"
-                value={bankAccount || "-"}
+                value={bankAccount || (isBankLoading ? "Memuat..." : "Belum diatur")}
                 readOnly
                 className="font-mono bg-slate-50 text-slate-700"
               />
@@ -764,7 +778,7 @@ export function MitraFinancePage() {
 
             <Input
               label="Nama Pemilik Rekening"
-              value={accountHolder || "-"}
+              value={accountHolder || (isBankLoading ? "Memuat..." : "Belum diatur")}
               readOnly
               className="bg-slate-50 text-slate-700"
             />

@@ -45,7 +45,7 @@ export function AdminLoginPage() {
           .single();
 
         if (profile?.role !== "admin") {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: "local" }).catch(() => {});
           setIsLoading(false);
           addToast("error", "Akun ini tidak memiliki hak akses administrator platform.", "Akses Ditolak");
           return;
