@@ -114,3 +114,19 @@
   }
 }
 
+/* Mobile & desktop QR scanner video alignment */
+#qr-reader-target {
+  width: 100% !important;
+  border: none !important;
+}
+
+#qr-reader-target video {
+  width: 100% !important;
+  height: auto !important;
+  display: block !important;
+}
+
+#qr-reader-target.scanner-mirror video {
+  transform: scaleX(-1);
+}
+

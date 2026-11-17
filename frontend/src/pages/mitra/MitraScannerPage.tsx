@@ -64,7 +64,9 @@ export function MitraScannerPage() {
   const [isCameraRunning, setIsCameraRunning] = React.useState(false);
   const [cameraError, setCameraError] = React.useState<string | null>(null);
   const [availableCameras, setAvailableCameras] = React.useState<Array<{ id: string; label: string }>>([]);
+  const [facingMode, setFacingMode] = React.useState<"environment" | "user">("environment");
   const [selectedCameraId, setSelectedCameraId] = React.useState<string>("");
+  const [isSwitchingCamera, setIsSwitchingCamera] = React.useState(false);
   const [soundEnabled, setSoundEnabled] = React.useState(true);
   const [showDemoPresets, setShowDemoPresets] = React.useState(false);
 
@@ -130,13 +132,12 @@ export function MitraScannerPage() {
 
   const selectedVenue = venues.find((v) => v.id === selectedVenueId) || venues[0];
 
-  // Inisialisasi daftar kamera perangkat
+  // Inisialisasi daftar kamera perangkat (tidak memaksa selectedCameraId agar facingMode mobile bekerja)
   React.useEffect(() => {
     Html5Qrcode.getCameras()
       .then((devices) => {
         if (devices && devices.length > 0) {
           setAvailableCameras(devices.map((d) => ({ id: d.id, label: d.label || `Kamera ${d.id}` })));
-          setSelectedCameraId(devices[0].id);
         }
       })
       .catch(() => {});
@@ -149,63 +150,125 @@ export function MitraScannerPage() {
         if (scannerRef.current.isScanning) {
           scannerRef.current.stop().catch(() => {});
         }
-        scannerRef.current.clear();
+        try {
+          scannerRef.current.clear();
+        } catch {
+          // ignore
+        }
       }
     };
   }, []);
 
-  // Fungsi Mulai Kamera Live
-  const startLiveCamera = async (cameraId?: string) => {
+  // Fungsi Mulai Kamera Live (mendukung kamera belakang & depan di HP maupun webcam)
+  const startLiveCamera = async (opts?: { mode?: "environment" | "user"; cameraId?: string }) => {
+    const targetMode = opts?.mode ?? facingMode;
+    const explicitId = opts?.cameraId;
     try {
       setCameraError(null);
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        await scannerRef.current.stop();
+      setIsSwitchingCamera(true);
+      if (scannerRef.current) {
+        if (scannerRef.current.isScanning) {
+          await scannerRef.current.stop().catch(() => {});
+        }
+        try {
+          scannerRef.current.clear();
+        } catch {
+          // ignore
+        }
+        // Beri jeda singkat agar hardware kamera HP melepas stream sebelum switch
+        await new Promise((resolve) => setTimeout(resolve, 150));
       }
 
-      const scanner = scannerRef.current || new Html5Qrcode("qr-reader-target");
+      const scanner = new Html5Qrcode("qr-reader-target");
       scannerRef.current = scanner;
 
-      const targetCamera = cameraId || selectedCameraId;
-      const cameraConfig = targetCamera
-        ? { deviceId: { exact: targetCamera } }
-        : { facingMode: "environment" };
+      const scanConfig = {
+        fps: 12,
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const edge = Math.min(280, Math.max(170, Math.floor(minEdge * 0.68)));
+          return { width: edge, height: edge };
+        },
+        disableFlip: false,
+      };
 
-      await scanner.start(
-        cameraConfig,
-        {
-          fps: 12,
-          qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            const edge = Math.max(160, Math.floor(minEdge * 0.72));
-            return { width: edge, height: edge };
-          },
-          aspectRatio: 1.333333,
-        },
-        (decodedText) => {
-          onQrCodeDetected(decodedText);
-        },
-        () => {
-          // ignore per-frame miss
+      const onDecoded = (decodedText: string) => {
+        onQrCodeDetected(decodedText);
+      };
+      const onMiss = () => {
+        // ignore per-frame miss
+      };
+
+      if (explicitId) {
+        await scanner.start(explicitId, scanConfig, onDecoded, onMiss);
+        setSelectedCameraId(explicitId);
+      } else {
+        try {
+          await scanner.start({ facingMode: { exact: targetMode } }, scanConfig, onDecoded, onMiss);
+        } catch {
+          // Fallback: cari device label yang cocok atau gunakan soft facingMode (misal di desktop / beberapa HP)
+          const refreshed = await Html5Qrcode.getCameras().catch(() => []);
+          const pattern =
+            targetMode === "user"
+              ? /front|user|depan|selfie|facetime/i
+              : /back|rear|belakang|environment|main/i;
+          const matchedCam = refreshed.find((d) => pattern.test(d.label || ""));
+          if (matchedCam) {
+            await scanner.start(matchedCam.id, scanConfig, onDecoded, onMiss);
+            setSelectedCameraId(matchedCam.id);
+          } else {
+            await scanner.start({ facingMode: targetMode }, scanConfig, onDecoded, onMiss);
+            setSelectedCameraId("");
+          }
         }
-      );
+        setFacingMode(targetMode);
+      }
+
+      // Muat ulang daftar kamera setelah izin diberikan agar semua lensa terbaca
+      Html5Qrcode.getCameras()
+        .then((devices) => {
+          if (devices && devices.length > 0) {
+            setAvailableCameras(devices.map((d) => ({ id: d.id, label: d.label || `Kamera ${d.id}` })));
+          }
+        })
+        .catch(() => {});
 
       setIsCameraRunning(true);
-      addToast("info", "Kamera aktif. Arahkan lensa ke kode QR e-tiket penyewa.", "Kamera Siap");
+      addToast(
+        "info",
+        `Kamera ${targetMode === "user" ? "depan" : "belakang"} aktif. Arahkan ke QR e-tiket.`,
+        "Kamera Siap"
+      );
     } catch (err: any) {
       console.warn("Gagal membuka kamera:", err);
       setIsCameraRunning(false);
       setCameraError(
-        err?.message || "Izin kamera ditolak browser atau perangkat kamera tidak terdeteksi. Silakan berikan izin akses kamera."
+        err?.message ||
+          "Izin kamera ditolak browser atau kamera tidak tersedia. Pastikan izin kamera aktif dan coba mode kamera lain."
       );
-      addToast("error", "Izin akses kamera diperlukan untuk memindai tiket secara langsung.", "Kamera Tidak Terbuka");
+      addToast("error", "Gagal mengaktifkan kamera pemindai. Cek izin kamera browser Anda.", "Kamera Tidak Terbuka");
+    } finally {
+      setIsSwitchingCamera(false);
+    }
+  };
+
+  const handleToggleFacingMode = () => {
+    const nextMode = facingMode === "environment" ? "user" : "environment";
+    setFacingMode(nextMode);
+    setSelectedCameraId("");
+    if (isCameraRunning) {
+      void startLiveCamera({ mode: nextMode });
     }
   };
 
   // Fungsi Hentikan Kamera
   const stopLiveCamera = async () => {
-    if (scannerRef.current && scannerRef.current.isScanning) {
+    if (scannerRef.current) {
       try {
-        await scannerRef.current.stop();
+        if (scannerRef.current.isScanning) {
+          await scannerRef.current.stop();
+        }
+        scannerRef.current.clear();
       } catch (err) {
         console.warn("Gagal stop kamera:", err);
       }
@@ -419,37 +482,73 @@ export function MitraScannerPage() {
           </CardHeader>
 
           {/* Area Kamera Viewfinder */}
-          <div className="relative aspect-video sm:aspect-[16/10] max-h-64 sm:max-h-72 w-full bg-slate-950 flex flex-col items-center justify-center overflow-hidden">
+          <div className="relative w-full min-h-[290px] sm:min-h-[320px] bg-slate-950 flex flex-col items-center justify-center overflow-hidden">
             {/* Target element untuk html5-qrcode */}
             <div
               id="qr-reader-target"
               className={cn(
-                "w-full h-full overflow-hidden flex items-center justify-center",
+                "w-full",
+                facingMode === "user" && "scanner-mirror",
                 !isCameraRunning && "hidden"
               )}
             />
 
             {/* Overlay saat kamera mati atau error */}
             {!isCameraRunning && (
-              <div className="flex flex-col items-center justify-center p-6 text-center space-y-3 z-10">
+              <div className="flex flex-col items-center justify-center p-6 text-center space-y-3.5 z-10">
                 <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-white/80 border border-white/10 shadow-inner">
                   <Camera className="w-7 h-7" />
                 </div>
                 <div>
                   <h3 className="text-white font-bold text-sm">Kamera Siap Dijalankan</h3>
                   <p className="text-slate-400 text-xs mt-1 max-w-xs">
-                    Klik tombol di bawah untuk mengaktifkan kamera smartphone atau webcam laptop Anda.
+                    Pilih kamera belakang atau depan lalu mulai memindai QR e-tiket penyewa.
                   </p>
+                </div>
+                <div className="inline-flex rounded-lg bg-white/10 p-1 border border-white/15 text-[11px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFacingMode("environment");
+                      setSelectedCameraId("");
+                    }}
+                    className={cn(
+                      "px-3 py-1.5 rounded-md transition-colors cursor-pointer",
+                      facingMode === "environment"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-white/80 hover:text-white"
+                    )}
+                  >
+                    Kamera Belakang
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFacingMode("user");
+                      setSelectedCameraId("");
+                    }}
+                    className={cn(
+                      "px-3 py-1.5 rounded-md transition-colors cursor-pointer",
+                      facingMode === "user"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-white/80 hover:text-white"
+                    )}
+                  >
+                    Kamera Depan
+                  </button>
                 </div>
                 <Button
                   type="button"
                   variant="primary"
                   size="sm"
-                  onClick={() => startLiveCamera()}
+                  disabled={isSwitchingCamera}
+                  onClick={() => void startLiveCamera({ mode: facingMode })}
                   className="rounded-lg text-xs px-4 h-9 shadow-md"
                 >
                   <Video className="w-3.5 h-3.5 mr-1.5" />
-                  Mulai Kamera Pemindai
+                  {isSwitchingCamera
+                    ? "Membuka Kamera..."
+                    : `Mulai ${facingMode === "user" ? "Kamera Depan" : "Kamera Belakang"}`}
                 </Button>
               </div>
             )}
@@ -465,44 +564,57 @@ export function MitraScannerPage() {
               </div>
             )}
 
-            {/* Visual Frame Overlay saat Kamera Berjalan */}
+            {/* Petunjuk halus saat kamera berjalan tanpa menduplikasi kotak scan html5-qrcode */}
             {isCameraRunning && (
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <div className="w-48 h-48 sm:w-56 sm:h-56 border border-white/30 rounded-2xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
-                  <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-red-500 rounded-tl-lg" />
-                  <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-red-500 rounded-tr-lg" />
-                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-red-500 rounded-bl-lg" />
-                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-red-500 rounded-br-lg" />
-                  <div className="w-full h-0.5 bg-red-500 absolute top-1/2 -translate-y-1/2 animate-pulse shadow-[0_0_8px_#ef4444]" />
-                  <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-white/90 font-mono whitespace-nowrap bg-black/60 px-2 py-0.5 rounded">
-                    Arahkan Barcode / QR ke Kotak
-                  </span>
-                </div>
+              <div className="pointer-events-none absolute bottom-3 inset-x-0 flex justify-center z-10">
+                <span className="text-[11px] text-white/95 font-medium bg-black/65 backdrop-blur-xs px-3 py-1 rounded-full border border-white/15">
+                  Arahkan QR e-tiket ke dalam kotak pemindai
+                </span>
               </div>
             )}
           </div>
 
           {/* Bar Kontrol Kamera Aktif */}
           {isCameraRunning && (
-            <div className="px-3.5 py-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-white text-xs">
-              <div className="flex items-center gap-2">
-                {availableCameras.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const nextCam = availableCameras.find((c) => c.id !== selectedCameraId);
-                      if (nextCam) {
-                        setSelectedCameraId(nextCam.id);
-                        startLiveCamera(nextCam.id);
+            <div className="px-3.5 py-2.5 bg-slate-900 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-white text-xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isSwitchingCamera}
+                  onClick={handleToggleFacingMode}
+                  className="h-8 text-[11px] px-2.5 bg-white/10 text-white border-white/20 hover:bg-white/20"
+                >
+                  <SwitchCamera className="w-3.5 h-3.5 mr-1.5" />
+                  {isSwitchingCamera
+                    ? "Mengganti..."
+                    : facingMode === "environment"
+                    ? "Pakai Kamera Depan"
+                    : "Pakai Kamera Belakang"}
+                </Button>
+                {availableCameras.length > 2 && (
+                  <select
+                    aria-label="Pilih lensa kamera"
+                    value={selectedCameraId}
+                    disabled={isSwitchingCamera}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val) {
+                        void startLiveCamera({ cameraId: val });
                       }
                     }}
-                    className="h-7 text-[11px] px-2.5 bg-white/10 text-white border-white/20 hover:bg-white/20"
+                    className="h-8 text-[11px] px-2 rounded-md bg-white/10 text-white border border-white/20 outline-none max-w-[140px] truncate"
                   >
-                    <SwitchCamera className="w-3 h-3 mr-1" />
-                    Ganti Kamera
-                  </Button>
+                    <option value="" className="text-slate-900">
+                      Auto ({facingMode === "user" ? "Depan" : "Belakang"})
+                    </option>
+                    {availableCameras.map((cam, idx) => (
+                      <option key={cam.id} value={cam.id} className="text-slate-900">
+                        {cam.label || `Lensa ${idx + 1}`}
+                      </option>
+                    ))}
+                  </select>
                 )}
               </div>
               <Button
@@ -510,9 +622,9 @@ export function MitraScannerPage() {
                 variant="outline"
                 size="sm"
                 onClick={stopLiveCamera}
-                className="h-7 text-[11px] px-2.5 bg-red-600/20 text-red-300 border-red-500/40 hover:bg-red-600/30"
+                className="h-8 text-[11px] px-2.5 bg-red-600/20 text-red-300 border-red-500/40 hover:bg-red-600/30"
               >
-                <VideoOff className="w-3 h-3 mr-1" />
+                <VideoOff className="w-3.5 h-3.5 mr-1" />
                 Matikan Kamera
               </Button>
             </div>
