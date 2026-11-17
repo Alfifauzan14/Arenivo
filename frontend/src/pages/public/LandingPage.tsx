@@ -132,12 +132,12 @@ export function LandingPage() {
   const [isBannerPaused, setIsBannerPaused] = React.useState(false);
 
   React.useEffect(() => {
-    if (isBannerPaused) return;
+    if (isBannerPaused || banners.length === 0) return;
     const timer = setInterval(() => {
-      setActiveBannerIdx((prev) => (prev + 1) % banners.length);
+      setActiveBannerIdx((prev) => ((Number.isFinite(prev) ? prev : 0) + 1) % banners.length);
     }, 4500);
     return () => clearInterval(timer);
-  }, [isBannerPaused]);
+  }, [isBannerPaused, banners.length]);
 
   const [openFaqIndex, setOpenFaqIndex] = React.useState<number | null>(null);
 
@@ -162,14 +162,6 @@ export function LandingPage() {
       active = false;
     };
   }, []);
-
-  React.useEffect(() => {
-    if (banners.length === 0) return;
-    const timer = setInterval(() => {
-      setActiveBannerIdx((prev) => (prev + 1) % banners.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [banners]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -385,9 +377,12 @@ export function LandingPage() {
           {/* Carousel Navigation Arrows - Hanya tampil di Desktop/Tablet (Di Android/Mobile otomatis berganti tanpa panah yang menutupi teks) */}
           <button
             type="button"
-            onClick={() =>
-              setActiveBannerIdx((prev) => (prev - 1 + banners.length) % banners.length)
-            }
+            onClick={() => {
+              if (banners.length === 0) return;
+              setActiveBannerIdx(
+                (prev) => ((Number.isFinite(prev) ? prev : 0) - 1 + banners.length) % banners.length
+              );
+            }}
             aria-label="Slide promo sebelumnya"
             className="hidden md:flex absolute left-3.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/95 text-slate-800 hover:bg-white hover:scale-105 transition-all z-20 shadow-xs border border-slate-200 cursor-pointer"
           >
@@ -395,7 +390,10 @@ export function LandingPage() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveBannerIdx((prev) => (prev + 1) % banners.length)}
+            onClick={() => {
+              if (banners.length === 0) return;
+              setActiveBannerIdx((prev) => ((Number.isFinite(prev) ? prev : 0) + 1) % banners.length);
+            }}
             aria-label="Slide promo berikutnya"
             className="hidden md:flex absolute right-3.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/95 text-slate-800 hover:bg-white hover:scale-105 transition-all z-20 shadow-xs border border-slate-200 cursor-pointer"
           >
