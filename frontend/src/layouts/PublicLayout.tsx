@@ -37,14 +37,33 @@ import { Button } from "@/components/ui/button";
 import { BrandLogo, BrandLogoIcon } from "@/components/common/BrandLogo";
 import { CleanBackgroundPattern } from "@/components/common/CleanBackgroundPattern";
 import { useSession } from "@/features/auth/context/SessionContext";
-import { ChatbotWidget } from "@/features/chatbot/components/ChatbotWidget";
 import { apiClient } from "@/lib/api-client";
 import { type InAppNotification } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
+const ChatbotWidget = React.lazy(() =>
+  import("@/features/chatbot/components/ChatbotWidget").then((m) => ({
+    default: m.ChatbotWidget,
+  }))
+);
+
 export function PublicLayout() {
   const { user, isLoggedIn, authReady, logout, favorites } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [mountChatbot, setMountChatbot] = React.useState(false);
+
+  React.useEffect(() => {
+    const win = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (typeof win.requestIdleCallback === "function") {
+      const id = win.requestIdleCallback(() => setMountChatbot(true), { timeout: 2500 });
+      return () => win.cancelIdleCallback?.(id);
+    }
+    const timer = window.setTimeout(() => setMountChatbot(true), 1500);
+    return () => window.clearTimeout(timer);
+  }, []);
   const [notifDropdownOpen, setNotifDropdownOpen] = React.useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = React.useState(false);
   const [helpTopic, setHelpTopic] = React.useState<null | "panduan" | "refund" | "syarat" | "privasi">(null);
@@ -628,7 +647,11 @@ export function PublicLayout() {
       </main>
 
       {/* Floating Chatbot AI Assistant (Disembunyikan di Checkout & E-Tiket agar tidak mendistraksi pembayaran & tiket) */}
-      {!isCheckout && !isTicket && <ChatbotWidget />}
+      {!isCheckout && !isTicket && mountChatbot && (
+        <React.Suspense fallback={null}>
+          <ChatbotWidget />
+        </React.Suspense>
+      )}
 
       {/* FOOTER SECTION (Teks dikurangi, terstruktur rapi, dan tetap hadir di semua halaman) */}
       {isTicket ? (
@@ -647,13 +670,14 @@ export function PublicLayout() {
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
               <span>Checkout Aman & Terenkripsi 256-bit SSL via Midtrans Payment Gateway</span>
             </div>
-            <p className="text-[11px] text-slate-400">© 2026 Arenivo • Seluruh hak cipta dilindungi</p>
+            <p className="text-[11px] text-slate-600">© 2026 Arenivo • Seluruh hak cipta dilindungi</p>
           </div>
         </footer>
       ) : (
         /* Clean & Concise Footer (Responsive: 2-kolom rapi di HP persis referensi Image 1, 4-kolom proporsional di desktop) */
         <footer className="bg-white border-t border-slate-200 mt-12 pb-safe relative z-10 shadow-xs">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-9">
+            <h2 className="sr-only">Navigasi &amp; Informasi Footer</h2>
             
             {/* TAMPILAN KHUSUS HP (Mobile < 768px): Persis Struktur Rapi Gambar 1 */}
             <div className="block md:hidden space-y-6">
@@ -664,7 +688,7 @@ export function PublicLayout() {
                 </Link>
                 <div className="space-y-1">
                   <p className="font-bold text-xs text-slate-900">PT Arenivo Sport Indonesia</p>
-                  <p className="text-slate-500 text-[11px] leading-relaxed">
+                  <p className="text-slate-600 text-[11px] leading-relaxed">
                     Satu Aplikasi, Banyak Arena. Pesan lapangan futsal, mini soccer, dan sepak bola terdekat dengan jadwal real-time dan pembayaran instan langsung dari HP Anda.
                   </p>
                 </div>
@@ -741,27 +765,27 @@ export function PublicLayout() {
                 {/* Kolom Kiri: Perusahaan & Kontak */}
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <h4 className="text-xs font-bold text-slate-900 tracking-tight">
+                    <h3 className="text-xs font-bold text-slate-900 tracking-tight">
                       Perusahaan
-                    </h4>
-                    <ul className="space-y-1.5 text-xs text-slate-600">
+                    </h3>
+                    <ul className="space-y-1 text-xs text-slate-600">
                       <li>
-                        <Link to="/venues" className="hover:text-red-600 transition-colors">
+                        <Link to="/venues" className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors">
                           Cari Lapangan
                         </Link>
                       </li>
                       <li>
-                        <Link to="/pesanan" className="hover:text-red-600 transition-colors">
+                        <Link to="/pesanan" className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors">
                           Riwayat Pesanan
                         </Link>
                       </li>
                       <li>
-                        <Link to="/favorites" className="hover:text-red-600 transition-colors">
+                        <Link to="/favorites" className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors">
                           Venue Favorit
                         </Link>
                       </li>
                       <li>
-                        <Link to="/jadi-mitra" className="hover:text-red-600 transition-colors font-semibold text-red-600">
+                        <Link to="/jadi-mitra" className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors font-semibold text-red-600">
                           Gabung Jadi Mitra
                         </Link>
                       </li>
@@ -769,16 +793,16 @@ export function PublicLayout() {
                   </div>
 
                   <div className="space-y-2">
-                    <h4 className="text-xs font-bold text-slate-900 tracking-tight">
+                    <h3 className="text-xs font-bold text-slate-900 tracking-tight">
                       Hubungi Kami
-                    </h4>
-                    <ul className="space-y-1.5 text-xs text-slate-600">
+                    </h3>
+                    <ul className="space-y-1 text-xs text-slate-600">
                       <li>
                         <a
                           href="https://wa.me/6281234567890?text=Halo%20Admin%20Arenivo,%20saya%20butuh%20bantuan"
                           target="_blank"
                           rel="noreferrer"
-                          className="hover:text-emerald-700 transition-colors flex items-center gap-1.5 font-semibold text-emerald-700 text-[11px]"
+                          className="min-h-[24px] py-0.5 hover:text-emerald-700 transition-colors flex items-center gap-1.5 font-semibold text-emerald-700 text-[11px]"
                         >
                           <MessageCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                           <span>WhatsApp CS</span>
@@ -787,15 +811,15 @@ export function PublicLayout() {
                       <li>
                         <a
                           href="mailto:support@arenivo.id"
-                          className="hover:text-red-600 transition-colors flex items-center gap-1.5 text-[11px] truncate"
+                          className="min-h-[24px] py-0.5 hover:text-red-600 transition-colors flex items-center gap-1.5 text-[11px] truncate"
                         >
-                          <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <Mail className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                           <span>Email Support</span>
                         </a>
                       </li>
                       <li>
-                        <div className="flex items-center gap-1.5 text-slate-600 text-[11px]">
-                          <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <div className="min-h-[24px] flex items-center gap-1.5 text-slate-600 text-[11px]">
+                          <Phone className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                           <span>(021) 5098-7654</span>
                         </div>
                       </li>
@@ -806,27 +830,27 @@ export function PublicLayout() {
                 {/* Kolom Kanan: Pusat Bantuan & Jaminan Sistem */}
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <h4 className="text-xs font-bold text-slate-900 tracking-tight">
+                    <h3 className="text-xs font-bold text-slate-900 tracking-tight">
                       Pusat Bantuan
-                    </h4>
-                    <ul className="space-y-1.5 text-xs text-slate-600">
+                    </h3>
+                    <ul className="space-y-1 text-xs text-slate-600">
                       <li>
-                        <button type="button" onClick={() => setHelpTopic("panduan")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
+                        <button type="button" onClick={() => setHelpTopic("panduan")} className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors cursor-pointer text-left">
                           Panduan Booking
                         </button>
                       </li>
                       <li>
-                        <button type="button" onClick={() => setHelpTopic("refund")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
+                        <button type="button" onClick={() => setHelpTopic("refund")} className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors cursor-pointer text-left">
                           Ketentuan Refund
                         </button>
                       </li>
                       <li>
-                        <button type="button" onClick={() => setHelpTopic("privasi")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
+                        <button type="button" onClick={() => setHelpTopic("privasi")} className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors cursor-pointer text-left">
                           Kebijakan Privasi
                         </button>
                       </li>
                       <li>
-                        <button type="button" onClick={() => setHelpTopic("syarat")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
+                        <button type="button" onClick={() => setHelpTopic("syarat")} className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors cursor-pointer text-left">
                           Syarat &amp; Ketentuan
                         </button>
                       </li>
@@ -834,15 +858,15 @@ export function PublicLayout() {
                   </div>
 
                   <div className="space-y-2">
-                    <h4 className="text-xs font-bold text-slate-900 tracking-tight">
+                    <h3 className="text-xs font-bold text-slate-900 tracking-tight">
                       Jaminan Resmi
-                    </h4>
+                    </h3>
                     <div className="space-y-1.5 text-[11px] text-slate-600">
                       <div className="flex items-center gap-1.5 text-emerald-700 font-semibold">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                         <span>Bebas Double Book</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                      <p className="text-[10px] text-slate-600 leading-relaxed">
                         Midtrans SSL & E-Tiket QR gate terverifikasi resmi.
                       </p>
                     </div>
@@ -860,7 +884,7 @@ export function PublicLayout() {
                 </Link>
                 <div className="space-y-1">
                   <p className="font-bold text-xs text-slate-800">PT Arenivo Sport Indonesia</p>
-                  <p className="text-xs text-slate-500 leading-relaxed max-w-sm">
+                  <p className="text-xs text-slate-600 leading-relaxed max-w-sm">
                     Satu Aplikasi, Banyak Arena. Pesan lapangan futsal, mini soccer, dan sepak bola terdekat dengan jadwal real-time dan pembayaran instan langsung dari HP Anda.
                   </p>
                 </div>
@@ -944,27 +968,27 @@ export function PublicLayout() {
 
               {/* Kolom 2: Menu Utama */}
               <div className="lg:col-span-2 space-y-2.5">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
                   Menu Utama
-                </h4>
-                <ul className="space-y-1.5 text-xs text-slate-600">
+                </h3>
+                <ul className="space-y-1 text-xs text-slate-600">
                   <li>
-                    <Link to="/venues" className="hover:text-red-600 transition-colors">
+                    <Link to="/venues" className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors">
                       Cari Lapangan
                     </Link>
                   </li>
                   <li>
-                    <Link to="/pesanan" className="hover:text-red-600 transition-colors">
+                    <Link to="/pesanan" className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors">
                       Riwayat Pesanan
                     </Link>
                   </li>
                   <li>
-                    <Link to="/favorites" className="hover:text-red-600 transition-colors">
+                    <Link to="/favorites" className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors">
                       Venue Favorit
                     </Link>
                   </li>
                   <li>
-                    <Link to="/jadi-mitra" className="hover:text-red-600 transition-colors font-semibold text-red-600">
+                    <Link to="/jadi-mitra" className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors font-semibold text-red-600">
                       Gabung Jadi Mitra
                     </Link>
                   </li>
@@ -973,27 +997,27 @@ export function PublicLayout() {
 
               {/* Kolom 3: Layanan & Kebijakan */}
               <div className="lg:col-span-3 space-y-2.5">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
                   Pusat Bantuan
-                </h4>
-                <ul className="space-y-1.5 text-xs text-slate-600">
+                </h3>
+                <ul className="space-y-1 text-xs text-slate-600">
                   <li>
-                    <button type="button" onClick={() => setHelpTopic("panduan")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
+                    <button type="button" onClick={() => setHelpTopic("panduan")} className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors cursor-pointer text-left">
                       Panduan Booking
                     </button>
                   </li>
                   <li>
-                    <button type="button" onClick={() => setHelpTopic("refund")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
+                    <button type="button" onClick={() => setHelpTopic("refund")} className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors cursor-pointer text-left">
                       Ketentuan Refund
                     </button>
                   </li>
                   <li>
-                    <button type="button" onClick={() => setHelpTopic("syarat")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
+                    <button type="button" onClick={() => setHelpTopic("syarat")} className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors cursor-pointer text-left">
                       Syarat &amp; Ketentuan
                     </button>
                   </li>
                   <li>
-                    <button type="button" onClick={() => setHelpTopic("privasi")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
+                    <button type="button" onClick={() => setHelpTopic("privasi")} className="inline-flex items-center min-h-[24px] py-0.5 hover:text-red-600 transition-colors cursor-pointer text-left">
                       Kebijakan Privasi
                     </button>
                   </li>
@@ -1002,16 +1026,16 @@ export function PublicLayout() {
 
               {/* Kolom 4: Kontak di Ujung Kanan */}
               <div className="lg:col-span-3 space-y-2.5">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
                   Hubungi Kami
-                </h4>
-                <ul className="space-y-2 text-xs text-slate-600">
+                </h3>
+                <ul className="space-y-1 text-xs text-slate-600">
                   <li>
                     <a
                       href="https://wa.me/6281234567890?text=Halo%20Admin%20Arenivo,%20saya%20butuh%20bantuan"
                       target="_blank"
                       rel="noreferrer"
-                      className="hover:text-emerald-700 transition-colors flex items-center gap-2 font-semibold text-emerald-700"
+                      className="min-h-[24px] py-0.5 hover:text-emerald-700 transition-colors flex items-center gap-2 font-semibold text-emerald-700"
                     >
                       <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span>+62 812-3456-7890 (WA)</span>
@@ -1020,21 +1044,21 @@ export function PublicLayout() {
                   <li>
                     <a
                       href="mailto:support@arenivo.id"
-                      className="hover:text-red-600 transition-colors flex items-center gap-2"
+                      className="min-h-[24px] py-0.5 hover:text-red-600 transition-colors flex items-center gap-2"
                     >
-                      <Mail className="w-4 h-4 text-slate-400 shrink-0" />
+                      <Mail className="w-4 h-4 text-slate-600 shrink-0" />
                       <span>support@arenivo.id</span>
                     </a>
                   </li>
                   <li>
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <Phone className="w-4 h-4 text-slate-400 shrink-0" />
+                    <div className="min-h-[24px] flex items-center gap-2 text-slate-600">
+                      <Phone className="w-4 h-4 text-slate-600 shrink-0" />
                       <span>(021) 5098-7654</span>
                     </div>
                   </li>
                   <li>
-                    <div className="flex items-center gap-2 text-slate-500">
-                      <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                    <div className="min-h-[24px] flex items-center gap-2 text-slate-600">
+                      <Clock className="w-4 h-4 text-slate-600 shrink-0" />
                       <span>Buka 08.00 - 24.00 WIB</span>
                     </div>
                   </li>
@@ -1043,9 +1067,9 @@ export function PublicLayout() {
             </div>
 
             {/* Bottom Bar Ringkas */}
-            <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+            <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
               <p>© 2026 Arenivo. Seluruh hak cipta dilindungi.</p>
-              <p className="text-[11px] font-mono text-slate-400">
+              <p className="text-[11px] font-mono text-slate-600">
                 Aman & Terpercaya • Pembayaran Resmi Midtrans
               </p>
             </div>

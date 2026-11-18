@@ -54,7 +54,10 @@ export function VenueCard({ venue, className }: VenueCardProps) {
           <img
             src={coverPhoto}
             alt={venue.name}
+            width={760}
+            height={475}
             loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         </Link>
@@ -71,8 +74,9 @@ export function VenueCard({ venue, className }: VenueCardProps) {
             "absolute top-3 right-3 w-9 h-9 flex items-center justify-center rounded-full transition-all shadow-sm z-10 border border-slate-200 cursor-pointer",
             favorited
               ? "bg-red-50 text-red-600 hover:bg-red-100 border-red-200"
-              : "bg-white text-slate-400 hover:text-red-500 hover:bg-slate-50"
+              : "bg-white text-slate-600 hover:text-red-500 hover:bg-slate-50"
           )}
+          aria-label={favorited ? "Hapus dari Favorit" : "Simpan ke Favorit"}
           title={favorited ? "Hapus dari Favorit" : "Simpan ke Favorit"}
         >
           <Heart
@@ -88,7 +92,7 @@ export function VenueCard({ venue, className }: VenueCardProps) {
       <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
         <div className="space-y-1.5">
           {/* Label Kategori Kecil */}
-          <span className="text-xs font-semibold text-slate-400 block">
+          <span className="text-xs font-semibold text-slate-600 block">
             Venue
           </span>
 
@@ -106,25 +110,25 @@ export function VenueCard({ venue, className }: VenueCardProps) {
             <span className="font-medium text-slate-700 tabular-nums">
               {venue.ratingAvg.toFixed(2).replace(/\.00$/, ".0")}
             </span>
-            <span className="text-slate-400">•</span>
+            <span className="text-slate-600">•</span>
             <span className="truncate">{cityName}</span>
           </div>
 
           {/* Jenis Olahraga */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 pt-0.5">
-            <Trophy className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          <div className="flex items-center gap-1.5 text-xs text-slate-600 pt-0.5">
+            <Trophy className="w-3.5 h-3.5 text-slate-600 shrink-0" />
             <span>{sportCategory}</span>
           </div>
         </div>
 
         {/* 3. Bagian Bawah: Harga Mulai Rp... /sesi & Tombol Pilih Jam (1 Baris Sejajar) */}
         <div className="pt-3.5 mt-3.5 border-t border-slate-100 flex items-center justify-between gap-2">
-          <div className="text-xs text-slate-500 whitespace-nowrap truncate">
+          <div className="text-xs text-slate-600 whitespace-nowrap truncate">
             <span>Mulai </span>
             <span className="text-sm sm:text-base font-extrabold text-slate-900 tabular-nums">
               {formatRupiah(venue.startingPrice || 150000)}
             </span>
-            <span className="text-[11px] text-slate-400 font-normal"> /sesi</span>
+            <span className="text-[11px] text-slate-600 font-normal"> /sesi</span>
           </div>
 
           <Link to={`/venues/${venue.slug}`} className="shrink-0">

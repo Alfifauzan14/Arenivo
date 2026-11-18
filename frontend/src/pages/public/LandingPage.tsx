@@ -65,31 +65,50 @@ export function LandingPage() {
     }
   }, [searchParams, navigate]);
 
-  // Hero Carousel Auto-play State
+  // Hero Carousel Auto-play State & Deferred Slide Hydration
   const [activeHeroIdx, setActiveHeroIdx] = React.useState(0);
   const [isHeroPaused, setIsHeroPaused] = React.useState(false);
+  const [heroHydrated, setHeroHydrated] = React.useState(false);
+
+  React.useEffect(() => {
+    const win = window as any;
+    if (typeof win.requestIdleCallback === "function") {
+      const id = win.requestIdleCallback(() => setHeroHydrated(true), { timeout: 1500 });
+      return () => win.cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(() => setHeroHydrated(true), 1200);
+    return () => clearTimeout(t);
+  }, []);
 
   React.useEffect(() => {
     if (isHeroPaused) return;
     const timer = setInterval(() => {
+      setHeroHydrated(true);
       setActiveHeroIdx((prev) => (prev + 1) % HERO_SLIDES.length);
     }, 5000);
     return () => clearInterval(timer);
   }, [isHeroPaused]);
 
-  // Search Widget State & Defaults for Reset
-  // Live Backend Data States with graceful Mock fallbacks
+  // Live Backend Data States
   const [venues, setVenues] = React.useState<any[]>([]);
   const [cities, setCities] = React.useState<any[]>([]);
   const [banners, setBanners] = React.useState<any[]>([]);
+  const [loadingVenues, setLoadingVenues] = React.useState(true);
+  const [loadingBanners, setLoadingBanners] = React.useState(true);
 
   React.useEffect(() => {
     let isMounted = true;
-    apiClient.get<any[]>("/venues", { limit: 8 }).then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
-        setVenues(res.data);
-      }
-    }).catch(() => {});
+    apiClient
+      .get<any[]>("/venues", { limit: 8 })
+      .then((res) => {
+        if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+          setVenues(res.data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) setLoadingVenues(false);
+      });
 
     apiClient.get<any[]>("/master/cities").then((res) => {
       if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
@@ -97,11 +116,17 @@ export function LandingPage() {
       }
     }).catch(() => {});
 
-    apiClient.get<any[]>("/banners").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
-        setBanners(res.data);
-      }
-    }).catch(() => {});
+    apiClient
+      .get<any[]>("/banners")
+      .then((res) => {
+        if (isMounted && res.data && Array.isArray(res.data) && res.data.length > 0) {
+          setBanners(res.data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) setLoadingBanners(false);
+      });
 
     return () => {
       isMounted = false;
@@ -143,6 +168,7 @@ export function LandingPage() {
 
   // FAQ fetched from API (admin-editable via system_settings)
   const [faqList, setFaqList] = React.useState<{ question: string; answers: string[] }[]>([]);
+  const [loadingFaq, setLoadingFaq] = React.useState(true);
 
   React.useEffect(() => {
     let active = true;
@@ -157,6 +183,9 @@ export function LandingPage() {
       })
       .catch(() => {
         // If API fails, FAQ stays empty — admin can set it
+      })
+      .finally(() => {
+        if (active) setLoadingFaq(false);
       });
     return () => {
       active = false;
@@ -180,33 +209,39 @@ export function LandingPage() {
 
   return (
     <div className="pb-8 sm:pb-12">
-      {/* 1. HERO BANNER — Real Sports Venue Photography Carousel (Berganti Otomatis Bersih) */}
+      {/* 1. HERO BANNER — Real Sports Venue Photography Carousel */}
       <section
         onMouseEnter={() => setIsHeroPaused(true)}
         onMouseLeave={() => setIsHeroPaused(false)}
-        className="relative min-h-[500px] sm:min-h-[560px] md:min-h-[600px] lg:min-h-[640px] flex items-center overflow-hidden pb-20 sm:pb-24 md:pb-24 text-white select-none"
+        className="relative min-h-[500px] sm:min-h-[560px] md:min-h-[600px] lg:min-h-[640px] flex items-start pt-14 sm:pt-20 md:pt-24 overflow-hidden pb-28 sm:pb-28 md:pb-28 text-white select-none bg-slate-950"
       >
-        {/* Background Slides with Smooth Fade & Ken-Burns Zoom (Berganti Otomatis) */}
-        {HERO_SLIDES.map((slide, idx) => (
-          <div
-            key={slide.id}
-            className={cn(
-              "absolute inset-0 transition-opacity duration-1000 ease-in-out",
-              idx === activeHeroIdx ? "opacity-100 z-0" : "opacity-0 pointer-events-none"
-            )}
-          >
-            <img
-              src={slide.imageUrl}
-              alt={slide.alt}
-              loading={idx === 0 ? "eager" : "lazy"}
-              decoding="async"
+        {/* Background Slides: hanya render Slide 0 saat boot awal agar LCP & TBT mobile optimal */}
+        {HERO_SLIDES.map((slide, idx) => {
+          if (!heroHydrated && idx > 0) return null;
+          return (
+            <div
+              key={slide.id}
               className={cn(
-                "w-full h-full object-cover object-center transition-transform duration-7000 ease-out",
-                idx === activeHeroIdx ? "scale-105" : "scale-100"
+                "absolute inset-0 transition-opacity duration-1000 ease-in-out",
+                idx === activeHeroIdx ? "opacity-100 z-0" : "opacity-0 pointer-events-none"
               )}
-            />
-          </div>
-        ))}
+            >
+              <img
+                src={slide.imageUrl}
+                alt={slide.alt}
+                width={1200}
+                height={675}
+                loading={idx === 0 ? "eager" : "lazy"}
+                fetchPriority={idx === 0 ? "high" : "low"}
+                decoding={idx === 0 ? "sync" : "async"}
+                className={cn(
+                  "w-full h-full object-cover object-center transition-transform duration-7000 ease-out",
+                  heroHydrated && idx === activeHeroIdx ? "scale-105" : "scale-100"
+                )}
+              />
+            </div>
+          );
+        })}
 
         {/* Gradient Overlays: Gelap di kiri untuk keterbacaan teks putih, transparan di kanan sesuai gambar referensi */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-transparent z-10" />
@@ -253,8 +288,10 @@ export function LandingPage() {
           {/* Form Input Pencarian */}
           <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700">Pilih Kota</label>
+              <label htmlFor="landing-city-select" className="text-xs font-bold text-slate-700">Pilih Kota</label>
               <Select
+                id="landing-city-select"
+                aria-label="Pilih Kota"
                 value={selectedCity}
                 onChange={(e) => setSelectedCity(e.target.value)}
                 className="text-xs font-medium"
@@ -269,8 +306,10 @@ export function LandingPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700">Tanggal Main</label>
+              <label htmlFor="landing-play-date" className="text-xs font-bold text-slate-700">Tanggal Main</label>
               <Input
+                id="landing-play-date"
+                aria-label="Tanggal Main"
                 type="date"
                 value={playDate}
                 onChange={(e) => setPlayDate(e.target.value)}
@@ -280,9 +319,11 @@ export function LandingPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700">Nama Lapangan / Venue</label>
+              <label htmlFor="landing-search-query" className="text-xs font-bold text-slate-700">Nama Lapangan / Venue</label>
               <Input
-                placeholder="Contoh: Spartan, Pasteur..."
+                id="landing-search-query"
+                aria-label="Nama Lapangan atau Venue"
+                placeholder="Contoh: Champion, Pasteur..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="text-xs"
@@ -328,50 +369,63 @@ export function LandingPage() {
       <div className="space-y-10 sm:space-y-12 mt-8 sm:mt-10">
         {/* 3. PROMO BANNER CAROUSEL (Otomatis berganti di Android & rapi tanpa panah menutupi teks) */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6">
+        <h2 className="sr-only">Promo Spesial Arenivo</h2>
         <div
           onMouseEnter={() => setIsBannerPaused(true)}
           onMouseLeave={() => setIsBannerPaused(false)}
           className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900 shadow-xs"
         >
           <div className="relative min-h-[195px] sm:min-h-[220px] md:aspect-[24/8] md:max-h-72 w-full overflow-hidden">
-            {banners.map((banner, idx) => (
-              <div
-                key={banner.id}
-                className={cn(
-                  "absolute inset-0 transition-opacity duration-700 ease-in-out flex items-center",
-                  idx === activeBannerIdx ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
-                )}
-              >
-                <img
-                  src={banner.imageUrl}
-                  alt={banner.title}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full h-full object-cover opacity-70"
-                />
-                <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-900/75 sm:via-slate-900/40 to-transparent flex items-center p-4 sm:p-8 md:p-10">
-                  <div className="max-w-xs sm:max-w-md text-white space-y-2 sm:space-y-3 z-10">
-                    <span className="bg-red-600 text-white text-[10px] font-bold px-2.5 py-0.5 sm:py-1 rounded-md uppercase tracking-wider inline-block">
-                      Promo Spesial
-                    </span>
-                    <h3 className="text-base sm:text-xl md:text-2xl font-black leading-snug line-clamp-2">
-                      {banner.title}
-                    </h3>
-                    <div className="pt-0.5">
-                      <Link to="/venues">
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          className="font-bold text-xs py-2 px-3.5 rounded-lg shadow-xs"
-                        >
-                          Klaim Promo Sekarang →
-                        </Button>
-                      </Link>
+            {loadingBanners && banners.length === 0 ? (
+              <div className="absolute inset-0 bg-slate-800/80 animate-pulse flex items-center p-6 sm:p-10">
+                <div className="space-y-3 max-w-md w-full">
+                  <div className="h-5 w-24 rounded bg-slate-700" />
+                  <div className="h-7 w-3/4 rounded bg-slate-700" />
+                  <div className="h-9 w-40 rounded-lg bg-slate-700" />
+                </div>
+              </div>
+            ) : (
+              banners.map((banner, idx) => (
+                <div
+                  key={banner.id}
+                  className={cn(
+                    "absolute inset-0 transition-opacity duration-700 ease-in-out flex items-center",
+                    idx === activeBannerIdx ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
+                  )}
+                >
+                  <img
+                    src={banner.imageUrl}
+                    alt={banner.title}
+                    width={960}
+                    height={320}
+                    loading={idx === 0 ? "eager" : "lazy"}
+                    decoding="async"
+                    className="w-full h-full object-cover opacity-70"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-900/75 sm:via-slate-900/40 to-transparent flex items-center p-4 sm:p-8 md:p-10">
+                    <div className="max-w-xs sm:max-w-md text-white space-y-2 sm:space-y-3 z-10">
+                      <span className="bg-red-600 text-white text-[10px] font-bold px-2.5 py-0.5 sm:py-1 rounded-md uppercase tracking-wider inline-block">
+                        Promo Spesial
+                      </span>
+                      <h3 className="text-base sm:text-xl md:text-2xl font-black leading-snug line-clamp-2">
+                        {banner.title}
+                      </h3>
+                      <div className="pt-0.5">
+                        <Link to="/venues">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            className="font-bold text-xs py-2 px-3.5 rounded-lg shadow-xs"
+                          >
+                            Klaim Promo Sekarang →
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* Carousel Navigation Arrows - Hanya tampil di Desktop/Tablet (Di Android/Mobile otomatis berganti tanpa panah yang menutupi teks) */}
@@ -400,19 +454,23 @@ export function LandingPage() {
             <ChevronRight className="w-4 h-4" />
           </button>
 
-          {/* Dots Indicator - Ditempatkan rapi di kanan bawah berbingkai agar tidak menimpa tombol aksi */}
-          <div className="absolute bottom-3 right-3 sm:bottom-4 sm:right-5 z-20 flex items-center gap-1.5 bg-black/40 backdrop-blur-xs px-2.5 py-1 rounded-full border border-white/10">
+          {/* Dots Indicator - Touch target minimal 24x24px dengan visual dot rapi */}
+          <div className="absolute bottom-2.5 right-3 sm:bottom-3 sm:right-5 z-20 flex items-center bg-black/45 backdrop-blur-xs px-1.5 py-0.5 rounded-full border border-white/10">
             {banners.map((_, i) => (
               <button
                 key={i}
                 type="button"
                 onClick={() => setActiveBannerIdx(i)}
                 aria-label={`Pindah ke banner promo ${i + 1}`}
-                className={cn(
-                  "h-1.5 rounded-full transition-all cursor-pointer",
-                  i === activeBannerIdx ? "w-5 bg-red-600" : "w-1.5 bg-white/70 hover:bg-white"
-                )}
-              />
+                className="w-6 h-6 flex items-center justify-center cursor-pointer"
+              >
+                <span
+                  className={cn(
+                    "h-1.5 rounded-full transition-all block",
+                    i === activeBannerIdx ? "w-4 bg-red-500" : "w-1.5 bg-white/80 hover:bg-white"
+                  )}
+                />
+              </button>
             ))}
           </div>
         </div>
@@ -425,7 +483,7 @@ export function LandingPage() {
             <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               Venue Lapangan Populer
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            <p className="text-xs sm:text-sm text-slate-600 mt-1">
               Pilihan lapangan dengan rating tertinggi, fasilitas lengkap, dan lokasi strategis
             </p>
           </div>
@@ -438,11 +496,25 @@ export function LandingPage() {
           </Link>
         </div>
 
-        {/* Grid Venue Cards */}
+        {/* Grid Venue Cards (Skeleton tinggi tetap agar CLS = 0) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {popularVenues.map((venue, idx) => (
-            <VenueCard key={venue.id} venue={venue} distanceKm={2.3 + idx * 1.4} />
-          ))}
+          {loadingVenues && popularVenues.length === 0
+            ? [1, 2, 3].map((sk) => (
+                <div
+                  key={sk}
+                  className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs animate-pulse h-[380px] flex flex-col"
+                >
+                  <div className="aspect-[16/10] bg-slate-200" />
+                  <div className="p-4 sm:p-5 flex-1 space-y-3">
+                    <div className="h-3 w-12 bg-slate-200 rounded" />
+                    <div className="h-5 w-3/4 bg-slate-200 rounded" />
+                    <div className="h-4 w-1/2 bg-slate-200 rounded" />
+                  </div>
+                </div>
+              ))
+            : popularVenues.map((venue, idx) => (
+                <VenueCard key={venue.id} venue={venue} distanceKm={2.3 + idx * 1.4} />
+              ))}
         </div>
       </section>
 
@@ -454,6 +526,8 @@ export function LandingPage() {
             <img
               src="/images/hero-booking-3d.webp"
               alt="Arenivo - Satu Aplikasi, Banyak Arena"
+              width={380}
+              height={380}
               loading="lazy"
               decoding="async"
               className="w-full max-w-[340px] sm:max-w-[380px] aspect-square object-contain select-none"
@@ -550,6 +624,8 @@ export function LandingPage() {
             <img
               src="/images/hero-promo-3d.webp"
               alt="Promo Sewa Lapangan"
+              width={380}
+              height={380}
               loading="lazy"
               decoding="async"
               className="w-full max-w-[340px] sm:max-w-[380px] aspect-square object-contain select-none"
@@ -559,63 +635,70 @@ export function LandingPage() {
       </section>
 
       {/* 7. SEKSI FAQ ACCORDION (TANPA CARD, LEBAR SEJAJAR KONTEN UTAMA) */}
-      {faqList.length > 0 && (
+      {(loadingFaq || faqList.length > 0) && (
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-6">
         <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 text-center mb-6 sm:mb-8">
           FAQ
         </h2>
 
         <div className="divide-y divide-slate-200 border-b border-slate-200">
-          {faqList.map((item, idx) => {
-            const isOpen = openFaqIndex === idx;
-            return (
-              <div key={idx} className="py-5">
-                <button
-                  type="button"
-                  onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                  className="w-full flex items-center justify-between gap-4 text-left cursor-pointer group"
-                >
-                  <span
-                    className={cn(
-                      "font-bold text-sm sm:text-base transition-colors",
-                      isOpen
-                        ? "text-red-800"
-                        : "text-slate-900 group-hover:text-red-700"
-                    )}
-                  >
-                    {item.question}
-                  </span>
-                  <span className="shrink-0 text-slate-700">
-                    {isOpen ? (
-                      <X className="w-4 h-4 text-red-800" />
-                    ) : (
-                      <Plus className="w-4 h-4 text-slate-900" />
-                    )}
-                  </span>
-                </button>
+          {loadingFaq && faqList.length === 0
+            ? [1, 2, 3, 4, 5].map((sk) => (
+                <div key={sk} className="py-5">
+                  <div className="h-5 w-2/3 bg-slate-200 rounded animate-pulse" />
+                </div>
+              ))
+            : faqList.map((item, idx) => {
+                const isOpen = openFaqIndex === idx;
+                return (
+                  <div key={idx} className="py-5">
+                    <button
+                      type="button"
+                      onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                      className="w-full flex items-center justify-between gap-4 text-left cursor-pointer group"
+                    >
+                      <span
+                        className={cn(
+                          "font-bold text-sm sm:text-base transition-colors",
+                          isOpen
+                            ? "text-red-800"
+                            : "text-slate-900 group-hover:text-red-700"
+                        )}
+                      >
+                        {item.question}
+                      </span>
+                      <span className="shrink-0 text-slate-700">
+                        {isOpen ? (
+                          <X className="w-4 h-4 text-red-800" />
+                        ) : (
+                          <Plus className="w-4 h-4 text-slate-900" />
+                        )}
+                      </span>
+                    </button>
 
-                {isOpen && (
-                  <div className="mt-3 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                    {item.answers.length > 1 ? (
-                      <ol className="list-decimal list-inside space-y-1.5">
-                        {item.answers.map((ans, aIdx) => (
-                          <li key={aIdx}>{ans}</li>
-                        ))}
-                      </ol>
-                    ) : (
-                      <p>{item.answers[0]}</p>
+                    {isOpen && (
+                      <div className="mt-3 text-xs sm:text-sm text-slate-600 leading-relaxed">
+                        {item.answers.length > 1 ? (
+                          <ol className="list-decimal list-inside space-y-1.5">
+                            {item.answers.map((ans, aIdx) => (
+                              <li key={aIdx}>{ans}</li>
+                            ))}
+                          </ol>
+                        ) : (
+                          <p>{item.answers[0]}</p>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
         </div>
       </section>
       )}
 
-      {/* 8. JAMINAN & NILAI LAYANAN / TRUST BADGES (DI BAWAH FAQ SESUAI GAMBAR REFERENSI USER) */}
+      {/* 8. JAMINAN & NILAI LAYANAN / TRUST BADGES */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-2">
+        <h2 className="sr-only">Jaminan Layanan Arenivo</h2>
         <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 shadow-xs">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="flex items-start gap-3.5">
@@ -623,8 +706,8 @@ export function LandingPage() {
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <div className="space-y-1">
-                <h4 className="font-bold text-base text-slate-900">Garansi Bebas Double Booking</h4>
-                <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                <h3 className="font-bold text-base text-slate-900">Garansi Bebas Double Booking</h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                   Slot dikunci secara real-time via Pusher saat checkout. Tidak ada lagi sengketa jadwal di lapangan.
                 </p>
               </div>
@@ -635,8 +718,8 @@ export function LandingPage() {
                 <Zap className="w-5 h-5" />
               </div>
               <div className="space-y-1">
-                <h4 className="font-bold text-base text-slate-900">Konfirmasi & Tiket Otomatis</h4>
-                <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                <h3 className="font-bold text-base text-slate-900">Konfirmasi &amp; Tiket Otomatis</h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                   Pembayaran QRIS dan Virtual Account terverifikasi seketika via Midtrans, langsung menerbitkan E-Tiket QR.
                 </p>
               </div>
@@ -647,8 +730,8 @@ export function LandingPage() {
                 <QrCode className="w-5 h-5" />
               </div>
               <div className="space-y-1">
-                <h4 className="font-bold text-base text-slate-900">Check-in Mudah & Cepat</h4>
-                <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                <h3 className="font-bold text-base text-slate-900">Check-in Mudah &amp; Cepat</h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                   Tunjukkan barcode QR Code dari ponsel Anda ke petugas lapangan tanpa perlu print kertas atau chat bukti bayar.
                 </p>
               </div>
