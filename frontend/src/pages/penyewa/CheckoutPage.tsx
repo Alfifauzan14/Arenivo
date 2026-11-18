@@ -615,7 +615,7 @@ export function CheckoutPage() {
                   <img
                     src={
                       venue.photos?.[0]?.url ||
-                      "/images/hero-futsal-indoor.webp"
+                      "/images/venues/venue-champion-vinyl.webp"
                     }
                     alt={venue.name}
                     className="w-20 h-20 rounded-lg object-cover shrink-0 border border-slate-200"

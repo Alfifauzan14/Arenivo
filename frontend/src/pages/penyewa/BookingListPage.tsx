@@ -212,7 +212,7 @@ export function BookingListPage() {
                       <img
                         src={
                           booking.venue?.photos?.[0]?.url ||
-                          "/images/hero-futsal-indoor.webp"
+                          "/images/venues/venue-champion-vinyl.webp"
                         }
                         alt={booking.venue?.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

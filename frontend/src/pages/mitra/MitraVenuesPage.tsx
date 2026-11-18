@@ -130,7 +130,7 @@ export function MitraVenuesPage() {
         addToast("success", `Venue "${name.trim()}" berhasil diperbarui ke database.`, "Tersimpan");
       } else {
         payload.photos = [
-          { url: "/images/hero-futsal-indoor.webp", isCover: true },
+          { url: "/images/venues/venue-champion-vinyl.webp", isCover: true },
         ];
         await apiClient.post("/mitra/venues", payload);
         addToast("success", `Venue baru "${name.trim()}" berhasil disimpan ke database.`, "Venue Ditambahkan");
@@ -203,7 +203,7 @@ export function MitraVenuesPage() {
                 <div>
                   <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
                     <img
-                      src={v.photos?.[0]?.url || "/images/hero-futsal-indoor.webp"}
+                      src={v.photos?.[0]?.url || "/images/venues/venue-champion-vinyl.webp"}
                       alt={v.name}
                       className="w-full h-full object-cover"
                     />

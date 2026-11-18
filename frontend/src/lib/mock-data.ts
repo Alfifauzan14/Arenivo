@@ -94,14 +94,14 @@ export const MOCK_VENUES: Venue[] = [
       {
         id: "p1",
         venueId: "17ab8073-3d37-4c3d-b635-be37aabd35b2",
-        url: "/images/hero-futsal-indoor.webp",
+        url: "/images/venues/venue-champion-vinyl.webp",
         isCover: true,
         sortOrder: 0,
       },
       {
         id: "p2",
         venueId: "17ab8073-3d37-4c3d-b635-be37aabd35b2",
-        url: "/images/hero-futsal-action.webp",
+        url: "/images/venues/venue-champion-turf.webp",
         isCover: false,
         sortOrder: 1,
       },
@@ -374,7 +374,7 @@ export const MOCK_BANNERS: Banner[] = [
   {
     id: "b1",
     title: "Diskon 25% Main Malam Futsal & Mini Soccer",
-    imageUrl: "/images/hero-futsal-action.webp",
+    imageUrl: "/images/promo/promo-night-discount.webp",
     linkUrl: "/venues",
     sortOrder: 0,
     isActive: true,
@@ -382,7 +382,7 @@ export const MOCK_BANNERS: Banner[] = [
   {
     id: "b2",
     title: "Spesial Hari Olahraga: Cashback Rp50.000 QRIS",
-    imageUrl: "/images/hero-promo-arena.webp",
+    imageUrl: "/images/promo/promo-qris-cashback.webp",
     linkUrl: "/venues",
     sortOrder: 1,
     isActive: true,
@@ -390,7 +390,7 @@ export const MOCK_BANNERS: Banner[] = [
   {
     id: "b3",
     title: "Garansi 100% Bebas Double Booking dengan Sistem Real-Time",
-    imageUrl: "/images/hero-minisoccer-turf.webp",
+    imageUrl: "/images/promo/promo-booking-guarantee.webp",
     linkUrl: "/venues",
     sortOrder: 2,
     isActive: true,

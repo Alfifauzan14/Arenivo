@@ -115,8 +115,8 @@ export function VenueDetailPage() {
       facilities: [],
       fields: [],
       photos: [
-        { id: "p1", url: "/images/hero-futsal-indoor.webp", isCover: true },
-        { id: "p2", url: "/images/hero-futsal-action.webp", isCover: false }
+        { id: "p1", url: "/images/venues/venue-champion-vinyl.webp", isCover: true },
+        { id: "p2", url: "/images/venues/venue-champion-turf.webp", isCover: false }
       ],
     } as any;
   }, [slug]);
@@ -148,10 +148,10 @@ export function VenueDetailPage() {
       return venue.photos.map((p) => p.url);
     }
     return [
-      "/images/hero-futsal-indoor.webp",
-      "/images/hero-futsal-action.webp",
-      "/images/hero-minisoccer-turf.webp",
-      "/images/hero-promo-arena.webp",
+      "/images/venues/venue-champion-vinyl.webp",
+      "/images/venues/venue-champion-turf.webp",
+      "/images/venues/venue-garuda-turf.webp",
+      "/images/venues/venue-bandung-semi.webp",
     ];
   }, [venue.photos]);
 

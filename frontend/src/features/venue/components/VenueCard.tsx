@@ -21,7 +21,7 @@ export function VenueCard({ venue, className }: VenueCardProps) {
   const coverPhoto =
     venue.photos?.find((p) => p.isCover)?.url ||
     venue.photos?.[0]?.url ||
-    "/images/hero-futsal-indoor.webp";
+    "/images/venues/venue-champion-vinyl.webp";
 
   // Tentukan kategori olahraga utama dari nama venue
   const sportCategory = React.useMemo(() => {
