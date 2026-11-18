@@ -71,12 +71,7 @@ export function LandingPage() {
   const [heroHydrated, setHeroHydrated] = React.useState(false);
 
   React.useEffect(() => {
-    const win = window as any;
-    if (typeof win.requestIdleCallback === "function") {
-      const id = win.requestIdleCallback(() => setHeroHydrated(true), { timeout: 1500 });
-      return () => win.cancelIdleCallback?.(id);
-    }
-    const t = setTimeout(() => setHeroHydrated(true), 1200);
+    const t = setTimeout(() => setHeroHydrated(true), 4500);
     return () => clearTimeout(t);
   }, []);
 
@@ -385,7 +380,9 @@ export function LandingPage() {
                 </div>
               </div>
             ) : (
-              banners.map((banner, idx) => (
+              banners.map((banner, idx) => {
+                if (!heroHydrated && idx > 0 && idx !== activeBannerIdx) return null;
+                return (
                 <div
                   key={banner.id}
                   aria-hidden={idx !== activeBannerIdx}
@@ -426,7 +423,8 @@ export function LandingPage() {
                     </div>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
 
