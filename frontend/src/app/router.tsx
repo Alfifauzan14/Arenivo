@@ -1,14 +1,14 @@
 import * as React from "react";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { PublicLayout } from "@/layouts/PublicLayout";
-import { MitraLayout } from "@/layouts/MitraLayout";
-import { AdminLayout } from "@/layouts/AdminLayout";
+import { LandingPage } from "@/pages/public/LandingPage";
 
-// ─── Lazy-loaded Pages ──────────────────────────────────────────────
-// Setiap halaman hanya didownload saat user mengaksesnya (code splitting)
+// ─── Lazy-loaded Layouts & Pages ────────────────────────────────────
+// Setiap halaman & portal non-landing hanya didownload saat user mengaksesnya (code splitting)
+const MitraLayout = React.lazy(() => import("@/layouts/MitraLayout").then(m => ({ default: m.MitraLayout })));
+const AdminLayout = React.lazy(() => import("@/layouts/AdminLayout").then(m => ({ default: m.AdminLayout })));
 
 // 1. Publik & Penyewa
-const LandingPage = React.lazy(() => import("@/pages/public/LandingPage").then(m => ({ default: m.LandingPage })));
 const VenueExplorePage = React.lazy(() => import("@/pages/public/VenueExplorePage").then(m => ({ default: m.VenueExplorePage })));
 const VenueDetailPage = React.lazy(() => import("@/pages/public/VenueDetailPage").then(m => ({ default: m.VenueDetailPage })));
 const MitraLandingPage = React.lazy(() => import("@/pages/public/MitraLandingPage").then(m => ({ default: m.MitraLandingPage })));
@@ -79,7 +79,7 @@ export const router = createBrowserRouter([
     path: "/",
     element: <PublicLayout />,
     children: [
-      { index: true, element: lazy(LandingPage) },
+      { index: true, element: <LandingPage /> },
       { path: "venues", element: lazy(VenueExplorePage) },
       { path: "venues/:slug", element: lazy(VenueDetailPage) },
       { path: "promo", element: lazy(VenueExplorePage) },
@@ -110,7 +110,7 @@ export const router = createBrowserRouter([
   // 3. Mitra Lapangan Portal (/mitra)
   {
     path: "/mitra",
-    element: <MitraLayout />,
+    element: lazy(MitraLayout),
     children: [
       { index: true, element: lazy(MitraDashboardPage) },
       { path: "jadwal", element: lazy(MitraSchedulePage) },
@@ -135,7 +135,7 @@ export const router = createBrowserRouter([
   // 5. Super Admin Platform Portal (/admin)
   {
     path: "/admin",
-    element: <AdminLayout />,
+    element: lazy(AdminLayout),
     children: [
       { index: true, element: lazy(AdminDashboardPage) },
       { path: "mitra", element: lazy(AdminMitraPage) },

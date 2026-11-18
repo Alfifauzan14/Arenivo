@@ -264,7 +264,7 @@ export function LandingPage() {
             <div className="flex flex-wrap items-center gap-3 pt-2 sm:pt-4">
               <Link
                 to="/venues"
-                className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-sm shadow-lg hover:shadow-red-600/30 transition-all hover:-translate-y-0.5 active:translate-y-0"
+                className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold text-xs sm:text-sm shadow-lg hover:shadow-red-700/30 transition-all hover:-translate-y-0.5 active:translate-y-0"
               >
                 <Search className="w-4 h-4" />
                 <span>Cari Lapangan Sekarang</span>
@@ -388,9 +388,10 @@ export function LandingPage() {
               banners.map((banner, idx) => (
                 <div
                   key={banner.id}
+                  aria-hidden={idx !== activeBannerIdx}
                   className={cn(
-                    "absolute inset-0 transition-opacity duration-700 ease-in-out flex items-center",
-                    idx === activeBannerIdx ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
+                    "absolute inset-0 flex items-center",
+                    idx === activeBannerIdx ? "opacity-100 visible z-10" : "opacity-0 invisible z-0 pointer-events-none"
                   )}
                 >
                   <img
@@ -404,18 +405,19 @@ export function LandingPage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-900/75 sm:via-slate-900/40 to-transparent flex items-center p-4 sm:p-8 md:p-10">
                     <div className="max-w-xs sm:max-w-md text-white space-y-2 sm:space-y-3 z-10">
-                      <span className="bg-red-600 text-white text-[10px] font-bold px-2.5 py-0.5 sm:py-1 rounded-md uppercase tracking-wider inline-block">
+                      <span className="bg-red-700 text-white text-[10px] font-bold px-2.5 py-0.5 sm:py-1 rounded-md uppercase tracking-wider inline-block">
                         Promo Spesial
                       </span>
                       <h3 className="text-base sm:text-xl md:text-2xl font-black leading-snug line-clamp-2">
                         {banner.title}
                       </h3>
                       <div className="pt-0.5">
-                        <Link to="/venues">
+                        <Link to="/venues" tabIndex={idx === activeBannerIdx ? 0 : -1}>
                           <Button
                             variant="primary"
                             size="sm"
-                            className="font-bold text-xs py-2 px-3.5 rounded-lg shadow-xs"
+                            tabIndex={idx === activeBannerIdx ? 0 : -1}
+                            className="bg-red-700 hover:bg-red-800 border-red-700 text-white font-bold text-xs py-2 px-3.5 rounded-lg shadow-xs"
                           >
                             Klaim Promo Sekarang →
                           </Button>
