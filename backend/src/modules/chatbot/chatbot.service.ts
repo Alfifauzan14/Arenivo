@@ -90,15 +90,21 @@ export const chatbotService = {
       replyText = "";
     }
 
+    const lowerMsg = input.message.toLowerCase();
+    const cityMatchedVenues = (venues ?? []).filter((v: any) => {
+      const cityName = String(v.cities?.name || "").toLowerCase();
+      return cityName && lowerMsg.includes(cityName);
+    });
+    const rankedVenues = cityMatchedVenues.length > 0 ? cityMatchedVenues : (venues ?? []);
+
     if (!replyText) {
       usedProvider = "local-fallback";
-      const topVenues = (venues ?? []).slice(0, 3);
+      const topVenues = rankedVenues.slice(0, 3);
       if (topVenues.length > 0) {
         const summary = topVenues
           .map((v: any) => {
-            const minPrice = Math.min(
-              ...(v.fields ?? []).map((f: any) => Number(f.base_price) || 150000)
-            );
+            const prices = (v.fields ?? []).map((f: any) => Number(f.base_price) || 150000);
+            const minPrice = prices.length > 0 ? Math.min(...prices) : 150000;
             return `• **${v.name}** (${v.cities?.name ?? "Kota"}) — mulai Rp ${minPrice.toLocaleString("id-ID")}/jam (★${v.rating_avg})`;
           })
           .join("\n");
@@ -109,7 +115,7 @@ export const chatbotService = {
       }
     }
 
-    const recommendations = (venues ?? []).slice(0, 3).map((v: any) => ({
+    const recommendations = rankedVenues.slice(0, 3).map((v: any) => ({
       id: v.id,
       slug: v.slug,
       name: v.name,

@@ -37,6 +37,7 @@ import {
   type Booking,
 } from "@futsal/shared";
 import { TicketCard } from "@/features/ticket/components/TicketCard";
+import { LoadingSkeleton } from "@/components/common/LoadingStates";
 import { cn } from "@/lib/utils";
 
 export function BookingDetailPage() {
@@ -46,74 +47,60 @@ export function BookingDetailPage() {
   const { addToast } = useToast();
   const isPaymentSuccess = searchParams.get("status") === "success";
 
-  // 1. Live Booking State
-  const [booking, setBooking] = React.useState<Booking>({
-    id: id || "arn-live",
-    bookingCode: "ARN-LIVE",
-    userId: "u-1",
-    venueId: "v-1",
-    fieldId: "f-1",
-    customerName: "Penyewa",
-    customerPhone: "081200000000",
-    playStart: new Date().toISOString(),
-    playEnd: new Date(Date.now() + 3600000).toISOString(),
-    totalHours: 1,
-    subtotal: 0,
-    serviceFee: 0,
-    discount: 0,
-    totalPrice: 0,
-    status: BookingStatus.MENUNGGU_BAYAR,
-    createdAt: new Date().toISOString(),
-  } as unknown as Booking);
-
+  // 1. Live Booking State (mulai null agar tidak berkedip placeholder palsu sebelum API merespons)
+  const [booking, setBooking] = React.useState<Booking | null>(null);
   const [liveTicket, setLiveTicket] = React.useState<any>(null);
   const [loadingTicket, setLoadingTicket] = React.useState<boolean>(true);
   const [isSubmittingReview, setIsSubmittingReview] = React.useState<boolean>(false);
+  const [isCancelling, setIsCancelling] = React.useState<boolean>(false);
+  const [isRescheduling, setIsRescheduling] = React.useState<boolean>(false);
+  const [cancelReason, setCancelReason] = React.useState<string>("Jadwal berubah / ada keperluan mendadak");
 
-  React.useEffect(() => {
+  const loadBookingData = React.useCallback(async (isMountedCheck: () => boolean = () => true) => {
     if (!id) {
       setLoadingTicket(false);
       return;
     }
-    let isMounted = true;
     setLoadingTicket(true);
-
-    const loadData = async () => {
-      try {
-        if (isPaymentSuccess) {
-          const payRes = await apiClient.get<any>(`/bookings/${id}/payments`);
-          if (isMounted && payRes.data) {
-            setBooking(payRes.data);
-          }
+    try {
+      let currentBooking: any = null;
+      if (isPaymentSuccess) {
+        const payRes = await apiClient.get<any>(`/bookings/${id}/payments`).catch(() => null);
+        if (isMountedCheck() && payRes?.data) {
+          currentBooking = payRes.data;
+          setBooking(payRes.data);
         }
-        const bRes = await apiClient.get<any>(`/bookings/${id}`);
-        if (isMounted && bRes.data) {
-          setBooking(bRes.data);
-        }
-        const tRes = await apiClient.get<any>(`/bookings/${id}/ticket`);
-        if (isMounted && tRes.data) {
+      }
+      const bRes = await apiClient.get<any>(`/bookings/${id}`);
+      if (isMountedCheck() && bRes.data) {
+        currentBooking = bRes.data;
+        setBooking(bRes.data);
+      }
+      const st = currentBooking?.status;
+      if (
+        st === BookingStatus.DIKONFIRMASI ||
+        st === BookingStatus.DIGUNAKAN ||
+        st === BookingStatus.SELESAI
+      ) {
+        const tRes = await apiClient.get<any>(`/bookings/${id}/ticket`).catch(() => null);
+        if (isMountedCheck() && tRes?.data) {
           setLiveTicket(tRes.data);
         }
-      } catch {
-        // Tiket mungkin belum tersedia — ditangani oleh state UI lain
-      } finally {
-        if (isMounted) setLoadingTicket(false);
       }
-    };
+    } catch {
+      // Ditangani oleh empty/not-found state
+    } finally {
+      if (isMountedCheck()) setLoadingTicket(false);
+    }
+  }, [id, isPaymentSuccess]);
 
-    loadData();
+  React.useEffect(() => {
+    let isMounted = true;
+    void loadBookingData(() => isMounted);
     return () => {
       isMounted = false;
     };
-  }, [id, isPaymentSuccess]);
-
-  const ticket = liveTicket || {
-    id: "tkt-" + booking.id,
-    bookingId: booking.id,
-    ticketCode: loadingTicket ? "Memuat kode tiket..." : (booking.bookingCode || "-"),
-    status: booking.status === BookingStatus.SELESAI || booking.status === BookingStatus.DIGUNAKAN ? "digunakan" : booking.status === BookingStatus.DIBATALKAN ? "dibatalkan" : "aktif",
-    issuedAt: booking.createdAt,
-  };
+  }, [loadBookingData]);
 
   // 2. Modals State
   const [isInvoiceOpen, setIsInvoiceOpen] = React.useState<boolean>(false);
@@ -135,6 +122,40 @@ export function BookingDetailPage() {
   const [comment, setComment] = React.useState<string>("");
   const [hasReviewed, setHasReviewed] = React.useState<boolean>(false);
 
+  if (loadingTicket && !booking) {
+    return (
+      <div className="min-h-screen py-8">
+        <div className="max-w-xl mx-auto px-4">
+          <LoadingSkeleton />
+        </div>
+      </div>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <div className="min-h-screen py-12 px-4 flex items-center justify-center">
+        <Card className="max-w-md w-full p-6 text-center space-y-4">
+          <h2 className="text-base font-bold text-slate-900">Pesanan Tidak Ditemukan</h2>
+          <p className="text-xs text-slate-500">
+            Data pesanan tidak tersedia atau Anda tidak memiliki akses ke pesanan ini.
+          </p>
+          <Link to="/bookings" className="inline-block">
+            <Button variant="primary" size="sm">Kembali ke Pesanan Saya</Button>
+          </Link>
+        </Card>
+      </div>
+    );
+  }
+
+  const ticket = liveTicket || (booking as any).ticket || {
+    id: "tkt-" + booking.id,
+    bookingId: booking.id,
+    ticketCode: booking.bookingCode || "-",
+    status: booking.status === BookingStatus.SELESAI || booking.status === BookingStatus.DIGUNAKAN ? "digunakan" : booking.status === BookingStatus.DIBATALKAN ? "dibatalkan" : "aktif",
+    issuedAt: booking.createdAt,
+  };
+
   // 3. Business Rule Checks
   const now = new Date();
   const playStartTime = new Date(booking.playStart);
@@ -147,7 +168,10 @@ export function BookingDetailPage() {
     hoursUntilPlay > 24;
 
   // Refund eligibility estimate
-  const refundPercent = hoursUntilPlay > 24 ? 100 : hoursUntilPlay >= 6 ? 50 : 0;
+  const isPaidBooking =
+    booking.status === BookingStatus.DIKONFIRMASI ||
+    Boolean((booking as any).payments?.some((p: any) => p.status === "berhasil"));
+  const refundPercent = !isPaidBooking ? 0 : hoursUntilPlay > 24 ? 100 : hoursUntilPlay >= 6 ? 50 : 0;
   const estimatedRefundAmount = Math.round((booking.subtotal * refundPercent) / 100);
 
   // Can cancel: status dikonfirmasi atau menunggu_bayar
@@ -187,41 +211,65 @@ export function BookingDetailPage() {
     }
   };
 
-  const handleConfirmReschedule = () => {
-    const endHour = newStartHour + booking.totalHours;
-    const padStart = String(newStartHour).padStart(2, "0");
-    const padEnd = String(endHour).padStart(2, "0");
+  const handleConfirmReschedule = async () => {
+    const totalHours = Math.max(1, booking.totalHours || 1);
+    const newSlotStarts: string[] = [];
+    for (let i = 0; i < totalHours; i++) {
+      const h = newStartHour + i;
+      newSlotStarts.push(`${newDate}T${String(h).padStart(2, "0")}:00:00+07:00`);
+    }
 
-    setBooking((prev) => ({
-      ...prev,
-      playStart: `${newDate}T${padStart}:00:00+07:00`,
-      playEnd: `${newDate}T${padEnd}:00:00+07:00`,
-      rescheduleCount: (prev.rescheduleCount || 0) + 1,
-    }));
-
-    setIsRescheduleOpen(false);
-    addToast(
-      "success",
-      `Jadwal berhasil diubah ke ${formatDateIndo(newDate)} jam ${padStart}.00 - ${padEnd}.00 WIB.`,
-      "Reschedule Berhasil"
-    );
+    setIsRescheduling(true);
+    try {
+      await apiClient.post(`/bookings/${booking.id}/reschedule`, { newSlotStarts });
+      await loadBookingData();
+      setIsRescheduleOpen(false);
+      const padStart = String(newStartHour).padStart(2, "0");
+      const padEnd = String(newStartHour + totalHours).padStart(2, "0");
+      addToast(
+        "success",
+        `Jadwal berhasil diubah ke ${formatDateIndo(newDate)} jam ${padStart}.00 - ${padEnd}.00 WIB.`,
+        "Reschedule Berhasil"
+      );
+    } catch (err: any) {
+      addToast(
+        "error",
+        err?.error?.message || err?.message || "Gagal melakukan reschedule jadwal. Pastikan slot tersedia dan harga sepadan.",
+        "Reschedule Gagal"
+      );
+    } finally {
+      setIsRescheduling(false);
+    }
   };
 
-  const handleConfirmCancel = () => {
-    setBooking((prev) => ({
-      ...prev,
-      status: BookingStatus.DIBATALKAN,
-      cancelReason: `Dibatalkan oleh penyewa (${refundPercent}% refund diajukan)`,
-    }));
+  const handleConfirmCancel = async () => {
+    const cleanReason = cancelReason.trim();
+    if (cleanReason.length < 5) {
+      addToast("warning", "Mohon tuliskan alasan pembatalan minimal 5 karakter.", "Alasan Pembatalan");
+      return;
+    }
 
-    setIsCancelOpen(false);
-    addToast(
-      "info",
-      `Pesanan dibatalkan. Pengajuan refund sebesar ${formatRupiah(
-        estimatedRefundAmount
-      )} sedang diproses.`,
-      "Pesanan Dibatalkan"
-    );
+    setIsCancelling(true);
+    try {
+      await apiClient.post(`/bookings/${booking.id}/cancel`, { reason: cleanReason });
+      await loadBookingData();
+      setIsCancelOpen(false);
+      addToast(
+        "info",
+        isPaidBooking && estimatedRefundAmount > 0
+          ? `Pesanan dibatalkan. Pengajuan refund sebesar ${formatRupiah(estimatedRefundAmount)} tercatat untuk diproses Admin.`
+          : "Pesanan berhasil dibatalkan dan slot jadwal telah dilepas kembali ke publik.",
+        "Pesanan Dibatalkan"
+      );
+    } catch (err: any) {
+      addToast(
+        "error",
+        err?.error?.message || err?.message || "Gagal membatalkan pesanan.",
+        "Pembatalan Gagal"
+      );
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   const handleSubmitReview = async (e: React.FormEvent) => {
@@ -275,7 +323,7 @@ export function BookingDetailPage() {
         {/* Top Sub-Navigation */}
         <div className="max-w-xl mx-auto flex items-center justify-between no-print text-xs">
           <Link
-            to="/pesanan"
+            to="/bookings"
             className="flex items-center gap-1.5 font-semibold text-slate-600 hover:text-red-600 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -380,6 +428,23 @@ export function BookingDetailPage() {
               <Star className="w-4 h-4 fill-white" />
               <span>Beri Rating & Ulasan Pengalaman</span>
             </Button>
+          )}
+
+          {/* Tombol Lanjutkan Pembayaran jika menunggu bayar */}
+          {booking.status === BookingStatus.MENUNGGU_BAYAR && (
+            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center justify-between gap-3 text-xs">
+              <div>
+                <span className="font-bold text-amber-950 block">Menunggu Pembayaran</span>
+                <span className="text-[11px] text-amber-800">
+                  Selesaikan pembayaran sebelum batas 15 menit agar tiket QR aktif. Reschedule tersedia setelah dikonfirmasi.
+                </span>
+              </div>
+              <Link to={`/checkout/${booking.id}`} className="shrink-0">
+                <Button type="button" variant="primary" size="sm" className="text-xs font-bold">
+                  Lanjutkan Bayar
+                </Button>
+              </Link>
+            </div>
           )}
 
           {/* Tombol Batalkan Pesanan */}
@@ -511,10 +576,11 @@ export function BookingDetailPage() {
               type="button"
               variant="primary"
               size="md"
+              disabled={isRescheduling}
               onClick={handleConfirmReschedule}
               className="flex-1 text-xs font-bold shadow-xs"
             >
-              Simpan Jadwal Baru
+              {isRescheduling ? "Menyimpan..." : "Simpan Jadwal Baru"}
             </Button>
           </div>
         </div>
@@ -579,11 +645,23 @@ export function BookingDetailPage() {
             </div>
           </div>
 
+          <div className="space-y-1">
+            <label className="font-bold text-slate-800 block">Alasan Pembatalan:</label>
+            <input
+              type="text"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Tuliskan alasan pembatalan (min. 5 karakter)"
+              className="w-full p-2.5 rounded-lg border border-slate-200 shadow-xs text-xs focus:outline-none focus:ring-1 focus:ring-red-600 focus:border-red-600"
+            />
+          </div>
+
           <div className="flex gap-2 pt-2">
             <Button
               type="button"
               variant="outline"
               size="md"
+              disabled={isCancelling}
               onClick={() => setIsCancelOpen(false)}
               className="flex-1 text-xs"
             >
@@ -593,10 +671,11 @@ export function BookingDetailPage() {
               type="button"
               variant="danger"
               size="md"
+              disabled={isCancelling}
               onClick={handleConfirmCancel}
               className="flex-1 text-xs font-bold shadow-xs"
             >
-              Konfirmasi Batalkan
+              {isCancelling ? "Membatalkan..." : "Konfirmasi Batalkan"}
             </Button>
           </div>
         </div>

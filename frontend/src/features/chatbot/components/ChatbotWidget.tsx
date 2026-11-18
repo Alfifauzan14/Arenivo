@@ -1,15 +1,37 @@
 import * as React from "react";
-import { useLocation } from "react-router-dom";
-import { Bot, MessageSquare, Send, Sparkles, X, User } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { Bot, MessageSquare, Send, Sparkles, X, User, ExternalLink } from "lucide-react";
 import { MOCK_VENUES } from "@/lib/mock-data";
 import { formatRupiah } from "@futsal/shared";
 import { cn } from "@/lib/utils";
+
+interface ChatRecommendation {
+  id: string;
+  slug: string;
+  name: string;
+  city?: string;
+}
 
 interface ChatMessage {
   id: string;
   sender: "user" | "bot";
   text: string;
   time: string;
+  recommendations?: ChatRecommendation[];
+}
+
+function renderFormattedText(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return (
+        <strong key={idx} className="font-bold text-slate-900">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return <React.Fragment key={idx}>{part}</React.Fragment>;
+  });
 }
 
 export function ChatbotWidget() {
@@ -85,6 +107,7 @@ export function ChatbotWidget() {
         }
 
         if (reply) {
+          const recs = Array.isArray(json.data?.recommendations) ? json.data.recommendations : [];
           setMessages((prev) => [
             ...prev,
             {
@@ -92,6 +115,7 @@ export function ChatbotWidget() {
               sender: "bot",
               text: reply,
               time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+              recommendations: recs,
             },
           ]);
           setIsTyping(false);
@@ -222,7 +246,22 @@ Anda dapat langsung klik nama venue untuk mengecek slot kosong jam 19.00 - 22.00
                       : "bg-white text-slate-800 border border-slate-200 rounded-tl-none"
                   )}
                 >
-                  {m.text}
+                  {m.sender === "bot" ? renderFormattedText(m.text) : m.text}
+                  {m.sender === "bot" && m.recommendations && m.recommendations.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap gap-1.5">
+                      {m.recommendations.map((rec) => (
+                        <Link
+                          key={rec.id || rec.slug}
+                          to={`/venues/${rec.slug}`}
+                          onClick={() => setIsOpen(false)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 hover:bg-red-100 text-red-700 border border-red-200/80 text-[10px] font-semibold transition-colors"
+                        >
+                          <span>{rec.name}</span>
+                          <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                   <span
                     className={cn(
                       "block text-[9px] mt-1 text-right",

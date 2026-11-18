@@ -261,7 +261,7 @@ export function MitraDashboardPage() {
         <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 sm:p-5 border-b border-slate-100">
           <div>
             <CardTitle className="text-sm sm:text-base">
-              Status Jam Operasional (07:00 – 22:00 WIB)
+              Status Jam Operasional (07:00 – 23:00 WIB)
             </CardTitle>
             <CardDescription className="text-xs mt-0.5">
               Pantau ketersediaan jam bermain hari ini (real-time)

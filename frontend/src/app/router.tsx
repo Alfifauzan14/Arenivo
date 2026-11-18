@@ -147,6 +147,7 @@ export const router = createBrowserRouter([
       { path: "refunds", element: lazy(AdminRefundsPage) },
       { path: "payouts", element: lazy(AdminPayoutsPage) },
       { path: "content", element: lazy(AdminContentPage) },
+      { path: "reviews", element: lazy(AdminContentPage) },
       { path: "settings", element: lazy(AdminSettingsPage) },
       { path: "audit-logs", element: lazy(AdminAuditLogsPage) },
     ],

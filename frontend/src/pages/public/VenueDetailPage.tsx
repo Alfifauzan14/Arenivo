@@ -95,10 +95,12 @@ export function VenueDetailPage() {
   const { addToast } = useToast();
   const { isFavorite, toggleFavorite } = useSession();
 
-  // 1. Temukan venue berdasarkan slug
+  // 1. Temukan venue berdasarkan slug (hindari flash rating/ulasan mock sebelum API selesai)
   const initialVenue = React.useMemo(() => {
     const found = MOCK_VENUES.find((v) => v.slug === slug);
-    if (found) return found;
+    if (found) {
+      return { ...found, ratingAvg: 0, reviewCount: 0 };
+    }
     return {
       id: "17ab8073-3d37-4c3d-b635-be37aabd35b2",
       name: "Champion Futsal Arena Cilandak",
@@ -355,13 +357,10 @@ export function VenueDetailPage() {
     });
   }, [expandedFieldIds, selectedDate]);
 
-  // Slots untuk lapangan yang sedang dipilih (utamakan data live backend)
+  // Slots untuk lapangan yang sedang dipilih (hanya gunakan data live backend, tanpa mock harga berbeda)
   const activeFieldSlots = React.useMemo(() => {
     const cacheKey = `${selectedField.id}_${selectedDate}`;
-    if (fieldSlotsCache[cacheKey]) {
-      return fieldSlotsCache[cacheKey];
-    }
-    return generateMockSlots(selectedField.id, selectedDate);
+    return fieldSlotsCache[cacheKey] || [];
   }, [selectedField.id, selectedDate, fieldSlotsCache]);
 
   const selectedSlots = React.useMemo(() => {
@@ -1020,7 +1019,9 @@ export function VenueDetailPage() {
           {/* Daftar Lapangan (Court Cards + Expandable Slot Grid) */}
           <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-xs divide-y divide-slate-200">
             {filteredFields.map((field, fIdx) => {
-              const rawSlots = fieldSlotsCache[`${field.id}_${selectedDate}`] || generateMockSlots(field.id, selectedDate);
+              const cachedSlots = fieldSlotsCache[`${field.id}_${selectedDate}`];
+              const isSlotsLoading = !cachedSlots;
+              const rawSlots = cachedSlots || [];
               const displaySlots = rawSlots.filter((s) => {
                 if (timePeriodFilter === "pagi") return s.hour >= 8 && s.hour < 12;
                 if (timePeriodFilter === "siang") return s.hour >= 12 && s.hour < 17;
@@ -1107,6 +1108,16 @@ export function VenueDetailPage() {
                   {/* Grid Slot Jam */}
                   {isExpanded && (
                     <div className="md:pl-[33.333%] pt-1">
+                      {isSlotsLoading ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                          {Array.from({ length: 8 }).map((_, skIdx) => (
+                            <div
+                              key={skIdx}
+                              className="h-16 rounded-lg bg-slate-100 animate-pulse border border-slate-200"
+                            />
+                          ))}
+                        </div>
+                      ) : (
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
                         {displaySlots.map((slot) => {
                           const isSelected =
@@ -1120,6 +1131,16 @@ export function VenueDetailPage() {
                             <button
                               key={slot.hour}
                               type="button"
+                              disabled={!isAvailable}
+                              aria-disabled={!isAvailable}
+                              title={
+                                isAvailable
+                                  ? `${startHour}:00 - ${nextHour}:00`
+                                  : slot.reason ||
+                                    (isLocked
+                                      ? "Slot sedang dikunci 15 menit oleh penyewa lain"
+                                      : "Slot tidak tersedia")
+                              }
                               onClick={() => handleSlotClick(field, slot)}
                               className={cn(
                                 "p-3 rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-0.5 select-none",
@@ -1191,6 +1212,7 @@ export function VenueDetailPage() {
                           );
                         })}
                       </div>
+                      )}
                     </div>
                   )}
                 </div>

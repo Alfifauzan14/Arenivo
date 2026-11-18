@@ -12,6 +12,7 @@ export const GET = withAuth(
     const { rows, total } = await adminRepository.users({
       q: url.searchParams.get("search") ?? url.searchParams.get("q") ?? undefined,
       status: url.searchParams.get("status") ?? undefined,
+      role: url.searchParams.get("role") ?? undefined,
       from,
       to
     });

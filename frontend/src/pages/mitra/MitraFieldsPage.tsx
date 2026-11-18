@@ -296,7 +296,8 @@ export function MitraFieldsPage() {
                     <span>Jam Buka</span>
                   </span>
                   <span className="font-mono font-semibold text-slate-900 tabular-nums">
-                    08:00 – 23:00 WIB
+                    {field.operatingHours?.[0]?.openTime?.slice(0, 5) || "07:00"} –{" "}
+                    {field.operatingHours?.[0]?.closeTime?.slice(0, 5) || "23:00"} WIB
                   </span>
                 </div>
 

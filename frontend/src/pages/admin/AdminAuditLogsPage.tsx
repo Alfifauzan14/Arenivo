@@ -214,9 +214,18 @@ export function AdminAuditLogsPage() {
                     </TableCell>
 
                     <TableCell>
-                      <div className="flex items-center gap-1.5 font-mono text-xs text-slate-800">
-                        <User className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{log.adminEmail || (log as any).admin?.email || "System"}</span>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-800">
+                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <div>
+                          <span className="font-semibold block">
+                            {(log as any).adminName || log.adminEmail || (log as any).admin?.email || "System"}
+                          </span>
+                          {(log as any).adminName && log.adminEmail && (
+                            <span className="text-[10px] font-mono text-slate-400 block">
+                              {log.adminEmail}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
 

@@ -3,6 +3,7 @@ import { ok, parseBody, publicRoute } from "@/lib/http";
 import { handleOptions } from "@/middleware/cors";
 import { chatbotService } from "@/modules/chatbot/chatbot.service";
 
+export const maxDuration = 30;
 export const OPTIONS = handleOptions;
 
 const schema = z.object({

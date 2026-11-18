@@ -78,26 +78,78 @@ export function CheckoutPage() {
   const hoursParam = searchParams.get("hours");
   const totalParam = searchParams.get("total");
 
-  // Cari booking yang cocok di mock
+  const isExistingUuid = Boolean(
+    bookingId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId)
+  );
+  const [liveExistingBooking, setLiveExistingBooking] = React.useState<any | null>(null);
+  const [loadingExistingBooking, setLoadingExistingBooking] = React.useState<boolean>(isExistingUuid);
+
+  // Cari booking yang cocok di mock (hanya untuk ID mock non-UUID non-bk)
   const existingBooking = React.useMemo(() => {
     return MOCK_BOOKINGS.find((b) => b.id === bookingId) || MOCK_BOOKINGS[1];
   }, [bookingId]);
 
   // Order Code yang ditampilkan di UI
   const displayBookingCode = React.useMemo(() => {
+    if (liveExistingBooking?.bookingCode) {
+      return liveExistingBooking.bookingCode;
+    }
     if (bookingId && bookingId.startsWith("bk-")) {
       return "BK-" + bookingId.replace(/^bk-/, "").slice(0, 8).toUpperCase();
     }
     return existingBooking.bookingCode;
-  }, [bookingId, existingBooking.bookingCode]);
+  }, [bookingId, existingBooking.bookingCode, liveExistingBooking?.bookingCode]);
 
-  // Resolve Venue & Field (prioritaskan data asli dari query param)
+  // Resolve Venue & Field (prioritaskan data asli dari query param atau booking DB)
   const [venue, setVenue] = React.useState<Venue>(
     MOCK_VENUES.find((item) => item.id === venueIdParam) || MOCK_VENUES[0]
   );
   const [field, setField] = React.useState<Field>(
     MOCK_FIELDS.find((item) => item.id === fieldIdParam) || MOCK_FIELDS[0]
   );
+
+  // Muat booking asli jika user membuka /checkout/<uuid> untuk melanjutkan pembayaran menunggu_bayar
+  React.useEffect(() => {
+    if (!isExistingUuid || !bookingId) return;
+    let active = true;
+    setLoadingExistingBooking(true);
+    apiClient
+      .get<any>(`/bookings/${bookingId}`)
+      .then((res) => {
+        if (!active || !res.data) return;
+        const b = res.data;
+        setLiveExistingBooking(b);
+        if (b.venue) setVenue(b.venue);
+        if (b.field) setField(b.field);
+        if (b.customerName) setCustomerName(b.customerName);
+        if (b.customerPhone) setCustomerPhone(b.customerPhone);
+        if (b.notes) setNotes(b.notes);
+        if (Number(b.discount || 0) > 0) {
+          setAppliedPromo({
+            code: b.promoCode || "PROMO",
+            discount: Number(b.discount),
+            description: `Potongan promo ${formatRupiah(Number(b.discount))}`,
+          });
+        }
+        if (b.expiresAt) {
+          const rem = Math.max(0, Math.floor((new Date(b.expiresAt).getTime() - Date.now()) / 1000));
+          setTimeLeft(rem);
+          if (rem <= 0) setIsExpired(true);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          addToast("error", "Data booking tidak ditemukan atau Anda tidak memiliki akses.", "Tidak Ditemukan");
+          navigate("/bookings");
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingExistingBooking(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isExistingUuid, bookingId, addToast, navigate]);
 
   // Ambil venue & field asli dari API supaya fieldId valid saat POST /bookings
   React.useEffect(() => {
@@ -123,9 +175,26 @@ export function CheckoutPage() {
     };
   }, [venueSlugParam, fieldIdParam]);
 
-  const playDateStr = dateParam || existingBooking.playStart.split("T")[0];
-  const startHour = startHourParam ? parseInt(startHourParam, 10) : 19;
-  const hoursCount = hoursParam ? parseInt(hoursParam, 10) : existingBooking.totalHours || 2;
+  const playDateStr = liveExistingBooking?.playStart
+    ? new Date(liveExistingBooking.playStart).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" })
+    : dateParam || existingBooking.playStart.split("T")[0];
+  const startHour = liveExistingBooking?.playStart
+    ? parseInt(
+        new Date(liveExistingBooking.playStart).toLocaleTimeString("en-GB", {
+          timeZone: "Asia/Jakarta",
+          hour: "2-digit",
+          hour12: false,
+        }),
+        10
+      )
+    : startHourParam
+    ? parseInt(startHourParam, 10)
+    : 19;
+  const hoursCount = liveExistingBooking?.totalHours
+    ? Number(liveExistingBooking.totalHours)
+    : hoursParam
+    ? parseInt(hoursParam, 10)
+    : existingBooking.totalHours || 2;
   const endHour = startHour + hoursCount;
 
   // 2. 15-Minute Countdown Timer (desain.md 5.4)
@@ -190,12 +259,16 @@ export function CheckoutPage() {
   } | null>(null);
 
   // Subtotal & Calculations
-  const calculatedSubtotal = totalParam
+  const calculatedSubtotal = liveExistingBooking?.subtotal != null
+    ? Number(liveExistingBooking.subtotal)
+    : totalParam
     ? parseInt(totalParam, 10) - 5000
     : existingBooking.subtotal || field.basePrice * hoursCount;
-  const serviceFee = 5000;
-  const discountAmount = appliedPromo ? appliedPromo.discount : 0;
-  const finalTotalPrice = Math.max(0, calculatedSubtotal + serviceFee - discountAmount);
+  const serviceFee = liveExistingBooking?.serviceFee != null ? Number(liveExistingBooking.serviceFee) : 5000;
+  const discountAmount = appliedPromo ? appliedPromo.discount : Number(liveExistingBooking?.discount || 0);
+  const finalTotalPrice = liveExistingBooking?.totalPrice != null && !appliedPromo
+    ? Number(liveExistingBooking.totalPrice)
+    : Math.max(0, calculatedSubtotal + serviceFee - discountAmount);
 
   const [promoValidating, setPromoValidating] = React.useState(false);
 
@@ -324,30 +397,34 @@ export function CheckoutPage() {
         throw new Error("Nomor WhatsApp minimal 9 digit. Silakan lengkapi form pemesan.");
       }
 
-      // 2. Create Real Booking in PostgreSQL Database
-      const idempotencyKey = "chk-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
-      const bookingPayload = {
-        fieldId: field.id || "f1111111-1111-1111-1111-111111111111",
-        slotStarts,
-        customerName: customerName.trim() || user?.fullName || "Penyewa Lapangan",
-        customerPhone: cleanPhone,
-        promoCode: appliedPromo?.code,
-        notes: notes.trim() || "Booking online via Arenivo Web",
-      };
+      let realBookingId = liveExistingBooking?.id || activeCreatedBookingId;
 
-      const createRes = await apiClient.post<any>("/bookings", bookingPayload, {
-        headers: { "idempotency-key": idempotencyKey },
-      });
-
-      const realBookingId = createRes.data?.id;
       if (!realBookingId) {
-        const serverMsg = createRes.data?.error?.message || createRes.data?.message;
-        throw new Error(
-          serverMsg ||
-          "Server tidak merespons dengan benar. Pastikan backend aktif dan coba lagi."
-        );
+        // 2. Create Real Booking in PostgreSQL Database
+        const idempotencyKey = "chk-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+        const bookingPayload = {
+          fieldId: field.id || "f1111111-1111-1111-1111-111111111111",
+          slotStarts,
+          customerName: customerName.trim() || user?.fullName || "Penyewa Lapangan",
+          customerPhone: cleanPhone,
+          promoCode: appliedPromo?.code,
+          notes: notes.trim() || "Booking online via Arenivo Web",
+        };
+
+        const createRes = await apiClient.post<any>("/bookings", bookingPayload, {
+          headers: { "idempotency-key": idempotencyKey },
+        });
+
+        realBookingId = createRes.data?.id;
+        if (!realBookingId) {
+          const serverMsg = createRes.data?.error?.message || createRes.data?.message;
+          throw new Error(
+            serverMsg ||
+            "Server tidak merespons dengan benar. Pastikan backend aktif dan coba lagi."
+          );
+        }
+        setActiveCreatedBookingId(realBookingId);
       }
-      setActiveCreatedBookingId(realBookingId);
 
       // 3. Request Live Snap Token for the created booking
       const snapReady = await waitForSnapReady();
@@ -436,6 +513,17 @@ export function CheckoutPage() {
     navigate(`/venues/${venue.slug}`);
   };
 
+  if (loadingExistingBooking) {
+    return (
+      <div className="min-h-screen py-12 px-4 flex items-center justify-center">
+        <div className="bg-white rounded-xl border border-slate-200 p-6 text-center space-y-2 shadow-xs">
+          <div className="w-6 h-6 border-2 border-red-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-semibold text-slate-600">Memuat rincian pesanan...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen py-6 sm:py-8 pb-keyboard-safe">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
@@ -452,9 +540,9 @@ export function CheckoutPage() {
           </button>
 
           <div className="text-xs text-slate-400 font-mono flex items-center gap-1.5 overflow-hidden">
-            <span className="shrink-0">Booking ID:</span>
-            <strong className="text-slate-800 font-bold truncate max-w-[240px] sm:max-w-none" title={bookingId || "bk-22222222"}>
-              {bookingId || "bk-22222222"}
+            <span className="shrink-0">Kode Booking:</span>
+            <strong className="text-slate-800 font-bold truncate max-w-[240px] sm:max-w-none" title={displayBookingCode}>
+              {displayBookingCode}
             </strong>
           </div>
         </div>

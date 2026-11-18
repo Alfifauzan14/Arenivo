@@ -13,9 +13,6 @@ import {
   Volume2,
   VolumeX,
   AlertCircle,
-  HelpCircle,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import {
   Card,
@@ -68,7 +65,6 @@ export function MitraScannerPage() {
   const [selectedCameraId, setSelectedCameraId] = React.useState<string>("");
   const [isSwitchingCamera, setIsSwitchingCamera] = React.useState(false);
   const [soundEnabled, setSoundEnabled] = React.useState(true);
-  const [showDemoPresets, setShowDemoPresets] = React.useState(false);
 
   const scannerRef = React.useRef<Html5Qrcode | null>(null);
   const lastScannedRef = React.useRef<{ code: string; time: number }>({ code: "", time: 0 });
@@ -400,11 +396,6 @@ export function MitraScannerPage() {
     return filteredScans.slice(start, start + pageSize);
   }, [filteredScans, currentPage]);
 
-  const demoScenarios = [
-    { code: "FB-E51AB7", label: "Tiket Booking Riil (DB)", desc: "Tiket real dari transaksi selesai di database" },
-    { code: "TKT-FB-8K2M4Q-9A2", label: "Format Standar E-Tiket", desc: "Format barcode QR e-tiket Arenivo" },
-  ];
-
   return (
     <div className="space-y-5 sm:space-y-6">
       {/* 1. Page Header & Active Venue Selector */}
@@ -663,40 +654,6 @@ export function MitraScannerPage() {
               <p className="text-[11px] text-slate-500">
                 Gunakan input manual jika layar ponsel penyewa redup atau kamera tidak dapat fokus.
               </p>
-            </div>
-
-            {/* Opsi Uji Cepat (Untuk Pengujian & Presentasi Guru) */}
-            <div className="pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowDemoPresets((prev) => !prev)}
-                className="flex items-center justify-between w-full text-[11px] font-semibold text-slate-500 hover:text-slate-800 py-1 transition-colors"
-              >
-                <span className="flex items-center gap-1.5">
-                  <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
-                  Kode Contoh Pengujian (Demo Guru)
-                </span>
-                {showDemoPresets ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              </button>
-
-              {showDemoPresets && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-100">
-                  {demoScenarios.map((demo) => (
-                    <button
-                      key={demo.code}
-                      type="button"
-                      onClick={() => {
-                        setManualCode(demo.code);
-                        handleValidateCode(demo.code);
-                      }}
-                      className="text-left p-2 rounded-lg border border-slate-200 hover:border-red-300 hover:bg-red-50/40 transition-colors"
-                    >
-                      <div className="font-mono font-bold text-xs text-slate-900">{demo.code}</div>
-                      <div className="text-[10px] text-slate-500 leading-tight mt-0.5">{demo.label}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </Card>

@@ -31,6 +31,17 @@ export function AdminDashboardPage() {
     totalBookings: 0,
     gmv: 0,
     platformCommission: 0,
+    monthlyStats: [] as Array<{ month: string; gmv: number; bookings: number }>,
+    avgHoursPerBooking: 0,
+    paymentSuccessRate: 0,
+    qrisVaSharePercent: 0,
+    gmvGrowthPercent: 0,
+    serviceHealth: {
+      midtransMode: "Sandbox",
+      slotLockMinutes: 15,
+      aiProvider: "gemini",
+      aiModel: "Gemini Flash",
+    },
   });
   const [commissionPercent, setCommissionPercent] = React.useState<number>(12);
 
@@ -65,29 +76,95 @@ export function AdminDashboardPage() {
     };
   }, []);
 
-  const { totalUsers, totalMitra, pendingMitraCount, totalVenues, totalBookings, gmv, platformCommission } = metrics;
+  const {
+    totalUsers,
+    totalMitra,
+    pendingMitraCount,
+    totalBookings,
+    gmv,
+    platformCommission,
+    monthlyStats,
+    avgHoursPerBooking,
+    paymentSuccessRate,
+    qrisVaSharePercent,
+    gmvGrowthPercent,
+    serviceHealth,
+  } = metrics;
 
   if (loading) {
     return <LoadingSkeleton />;
   }
 
-  // Monthly revenue breakdown simulation
-  const monthlyStats = [
-    { month: "Mei", gmv: 42000000, bookings: 160 },
-    { month: "Jun", gmv: 58000000, bookings: 210 },
-    { month: "Jul", gmv: 71000000, bookings: 265 },
-    { month: "Agt", gmv: 83500000, bookings: 310 },
-    { month: "Sep", gmv: 92400000, bookings: 350 },
-    { month: "Okt (Bulan Ini)", gmv: 114250000, bookings: 428 },
-  ];
+  const maxMonthlyGmv = Math.max(1000000, ...monthlyStats.map((m) => m.gmv || 0));
 
-  const handleExport = (format: "PDF" | "Excel/CSV") => {
+  const handleExport = async (format: "PDF" | "Excel/CSV") => {
     setDownloadingFormat(format);
-    setTimeout(() => {
+    try {
+      const bookingsRes = await apiClient.get<any[]>("/admin/bookings").catch(() => ({ data: [] }));
+      const rows = Array.isArray(bookingsRes.data) ? bookingsRes.data : [];
+      const today = new Date().toISOString().split("T")[0];
+
+      if (format === "Excel/CSV") {
+        const escapeCsv = (val: unknown) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+        const summaryHeader = [
+          ["Laporan Platform Arenivo", today],
+          ["Gross GMV", gmv],
+          [`Komisi Platform (${commissionPercent}%)`, platformCommission],
+          ["Total Booking Terkonfirmasi", totalBookings],
+          ["Total Mitra", totalMitra],
+          ["Total Penyewa", totalUsers],
+          [],
+          ["Kode Booking", "Tanggal", "Penyewa", "Venue", "Lapangan", "Total (Rp)", "Komisi (Rp)", "Status"],
+        ];
+        const dataRows = rows.map((b: any) => [
+          b.bookingCode,
+          b.createdAt ? String(b.createdAt).split("T")[0] : "-",
+          b.customerName,
+          b.venue?.name || "-",
+          b.field?.name || "-",
+          b.totalPrice ?? 0,
+          b.platformCommission ?? 0,
+          b.status,
+        ]);
+        const csvContent =
+          "\uFEFF" +
+          [...summaryHeader, ...dataRows].map((r) => r.map(escapeCsv).join(",")).join("\r\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `laporan-arenivo-${today}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        setExportMessage(`File laporan-arenivo-${today}.csv berhasil diunduh (${rows.length} transaksi).`);
+      } else {
+        const printWin = window.open("", "_blank", "width=900,height=700");
+        if (printWin) {
+          const tableRowsHtml = rows
+            .slice(0, 100)
+            .map(
+              (b: any) =>
+                `<tr><td>${b.bookingCode || "-"}</td><td>${b.customerName || "-"}</td><td>${b.venue?.name || "-"}</td><td>${formatRupiah(Number(b.totalPrice || 0))}</td><td>${b.status || "-"}</td></tr>`
+            )
+            .join("");
+          printWin.document.write(
+            `<!doctype html><html><head><title>Laporan Arenivo ${today}</title><style>body{font-family:system-ui,sans-serif;padding:24px;color:#0f172a}table{width:100%;border-collapse:collapse;margin-top:16px;font-size:12px}th,td{border:1px solid #cbd5e1;padding:6px 8px;text-align:left}th{background:#f1f5f9}</style></head><body><h1>Laporan Platform Arenivo (${today})</h1><p>GMV: ${formatRupiah(gmv)} | Komisi (${commissionPercent}%): ${formatRupiah(platformCommission)} | Booking Aktif/Selesai: ${totalBookings}</p><table><thead><tr><th>Kode</th><th>Penyewa</th><th>Venue</th><th>Total</th><th>Status</th></tr></thead><tbody>${tableRowsHtml || '<tr><td colspan="5">Belum ada transaksi.</td></tr>'}</tbody></table></body></html>`
+          );
+          printWin.document.close();
+          printWin.focus();
+          printWin.print();
+          setExportMessage("Pratinjau cetak / simpan PDF berhasil dibuka.");
+        } else {
+          window.print();
+          setExportMessage("Dialog cetak PDF halaman dibuka.");
+        }
+      }
+      setTimeout(() => setExportMessage(null), 5000);
+    } finally {
       setDownloadingFormat(null);
-      setExportMessage(`Laporan format ${format} berhasil digenerate dan diunduh.`);
-      setTimeout(() => setExportMessage(null), 4000);
-    }, 1200);
+    }
   };
 
   return (
@@ -150,7 +227,9 @@ export function AdminDashboardPage() {
           </p>
           <div className="flex items-center gap-1.5 mt-2 text-[11px] text-emerald-600 font-medium">
             <TrendingUp className="w-3 h-3" />
-            <span>+24.6% dari bulan lalu</span>
+            <span>
+              {gmvGrowthPercent >= 0 ? `+${gmvGrowthPercent}%` : `${gmvGrowthPercent}%`} vs bulan lalu
+            </span>
           </div>
         </Card>
 
@@ -180,7 +259,7 @@ export function AdminDashboardPage() {
             {totalBookings} Pesanan
           </p>
           <div className="flex items-center gap-1.5 mt-2 text-[11px] text-blue-600 font-medium">
-            <span>98.2% pembayaran via QRIS & VA</span>
+            <span>{qrisVaSharePercent}% via QRIS &amp; VA</span>
           </div>
         </Card>
 
@@ -229,8 +308,7 @@ export function AdminDashboardPage() {
 
           <div className="h-48 flex items-end justify-between gap-3 pt-6 border-b border-slate-100">
             {monthlyStats.map((item, idx) => {
-              const maxGmv = 120000000;
-              const heightPercent = Math.round((item.gmv / maxGmv) * 100);
+              const heightPercent = item.gmv > 0 ? Math.max(6, Math.round((item.gmv / maxMonthlyGmv) * 100)) : 2;
               const isCurrent = idx === monthlyStats.length - 1;
 
               return (
@@ -261,8 +339,8 @@ export function AdminDashboardPage() {
           </div>
 
           <div className="flex items-center justify-between text-xs text-slate-500 pt-3">
-            <span>Rata-rata tiket per booking: 2.1 jam main</span>
-            <span className="font-semibold text-slate-700">Tingkat keberhasilan bayar: 94.8%</span>
+            <span>Rata-rata durasi booking: {avgHoursPerBooking} jam main</span>
+            <span className="font-semibold text-slate-700">Tingkat keberhasilan bayar: {paymentSuccessRate}%</span>
           </div>
         </Card>
 
@@ -274,9 +352,11 @@ export function AdminDashboardPage() {
             <div className="p-3 rounded-lg bg-emerald-50/70 border border-emerald-100 flex items-start gap-3">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-bold text-emerald-950">Midtrans Gateway Normal</p>
+                <p className="text-xs font-bold text-emerald-950">
+                  Midtrans Gateway ({serviceHealth.midtransMode})
+                </p>
                 <p className="text-[11px] text-emerald-700">
-                  Webhook notification response time: 240ms
+                  Integrasi Snap &amp; Webhook aktif
                 </p>
               </div>
             </div>
@@ -286,7 +366,7 @@ export function AdminDashboardPage() {
               <div>
                 <p className="text-xs font-bold text-blue-950">Slot Lock Engine Aktif</p>
                 <p className="text-[11px] text-blue-700">
-                  Auto-expire slot 15 menit berjalan konsisten
+                  Auto-expire slot {serviceHealth.slotLockMinutes} menit sesuai pengaturan sistem
                 </p>
               </div>
             </div>
@@ -296,15 +376,15 @@ export function AdminDashboardPage() {
               <div>
                 <p className="text-xs font-bold text-purple-950">AI Chatbot Asisten Aktif</p>
                 <p className="text-[11px] text-purple-700">
-                  Provider: Gemini 1.5 Flash (Latency 850ms)
+                  Provider: {serviceHealth.aiProvider} ({serviceHealth.aiModel})
                 </p>
               </div>
             </div>
           </div>
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-400">Versi Platform</span>
-            <span className="font-mono font-medium text-slate-600">v2.4.0 (Enterprise)</span>
+            <span className="text-slate-400">Komisi Aktif</span>
+            <span className="font-mono font-medium text-slate-600">{commissionPercent}% Platform</span>
           </div>
         </Card>
       </div>

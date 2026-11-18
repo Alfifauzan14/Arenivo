@@ -47,6 +47,7 @@ export function PublicLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = React.useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = React.useState(false);
+  const [helpTopic, setHelpTopic] = React.useState<null | "panduan" | "refund" | "syarat" | "privasi">(null);
   const [notifications, setNotifications] = React.useState<InAppNotification[]>([]);
   const notifReqRef = React.useRef(0);
 
@@ -154,7 +155,7 @@ export function PublicLayout() {
               </button>
 
               <Link
-                to="/pesanan"
+                to="/bookings"
                 className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs hover:shadow-sm transition-all whitespace-nowrap shrink-0"
               >
                 <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
@@ -810,20 +811,24 @@ export function PublicLayout() {
                     </h4>
                     <ul className="space-y-1.5 text-xs text-slate-600">
                       <li>
-                        <Link to="/venues" className="hover:text-red-600 transition-colors">
+                        <button type="button" onClick={() => setHelpTopic("panduan")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
                           Panduan Booking
-                        </Link>
+                        </button>
                       </li>
                       <li>
-                        <Link to="/venues" className="hover:text-red-600 transition-colors">
+                        <button type="button" onClick={() => setHelpTopic("refund")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
                           Ketentuan Refund
-                        </Link>
+                        </button>
                       </li>
                       <li>
-                        <span className="text-slate-500">Kebijakan Privasi</span>
+                        <button type="button" onClick={() => setHelpTopic("privasi")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
+                          Kebijakan Privasi
+                        </button>
                       </li>
                       <li>
-                        <span className="text-slate-500">Syarat Ketentuan</span>
+                        <button type="button" onClick={() => setHelpTopic("syarat")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
+                          Syarat &amp; Ketentuan
+                        </button>
                       </li>
                     </ul>
                   </div>
@@ -973,20 +978,24 @@ export function PublicLayout() {
                 </h4>
                 <ul className="space-y-1.5 text-xs text-slate-600">
                   <li>
-                    <Link to="/venues" className="hover:text-red-600 transition-colors">
+                    <button type="button" onClick={() => setHelpTopic("panduan")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
                       Panduan Booking
-                    </Link>
+                    </button>
                   </li>
                   <li>
-                    <Link to="/venues" className="hover:text-red-600 transition-colors">
+                    <button type="button" onClick={() => setHelpTopic("refund")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
                       Ketentuan Refund
-                    </Link>
+                    </button>
                   </li>
                   <li>
-                    <span className="text-slate-500">Syarat & Ketentuan</span>
+                    <button type="button" onClick={() => setHelpTopic("syarat")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
+                      Syarat &amp; Ketentuan
+                    </button>
                   </li>
                   <li>
-                    <span className="text-slate-500">Kebijakan Privasi</span>
+                    <button type="button" onClick={() => setHelpTopic("privasi")} className="hover:text-red-600 transition-colors cursor-pointer text-left">
+                      Kebijakan Privasi
+                    </button>
                   </li>
                 </ul>
               </div>
@@ -1042,6 +1051,80 @@ export function PublicLayout() {
             </div>
           </div>
         </footer>
+      )}
+
+      {/* Modal Pusat Bantuan & Kebijakan */}
+      {helpTopic && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setHelpTopic(null)}
+        >
+          <div
+            className="bg-white rounded-2xl border border-slate-200 shadow-lg max-w-lg w-full p-5 sm:p-6 space-y-4 text-xs text-slate-700"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                {helpTopic === "panduan"
+                  ? "Panduan Booking Lapangan"
+                  : helpTopic === "refund"
+                  ? "Ketentuan Refund & Reschedule"
+                  : helpTopic === "syarat"
+                  ? "Syarat & Ketentuan Layanan"
+                  : "Kebijakan Privasi Pengguna"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setHelpTopic(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                aria-label="Tutup"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {helpTopic === "panduan" && (
+              <ol className="space-y-2 list-decimal list-inside leading-relaxed">
+                <li>Pilih arena &amp; tanggal bermain di menu <strong>Cari Lapangan</strong>.</li>
+                <li>Klik slot jam berurutan yang berstatus <strong>Tersedia</strong> lalu klik <strong>Lanjut Bayar</strong>.</li>
+                <li>Isi data pemesan (atau gunakan kode promo jika ada), lalu selesaikan pembayaran via Midtrans dalam 15 menit.</li>
+                <li>E-Tiket QR otomatis terbit di menu <strong>Pesanan Saya</strong> untuk dipindai di gate venue.</li>
+              </ol>
+            )}
+
+            {helpTopic === "refund" && (
+              <ul className="space-y-2 list-disc list-inside leading-relaxed">
+                <li><strong>&gt; 24 jam sebelum jadwal main:</strong> Refund 100% dari biaya sewa lapangan.</li>
+                <li><strong>6 – 24 jam sebelum jadwal main:</strong> Refund 50% dari biaya sewa lapangan.</li>
+                <li><strong>&lt; 6 jam sebelum jadwal main:</strong> Tidak dapat dilakukan pengembalian dana (0%).</li>
+                <li><strong>Pembatalan oleh Mitra:</strong> Dana dikembalikan 100% penuh termasuk biaya layanan.</li>
+                <li><strong>Reschedule:</strong> 1x kesempatan ubah jadwal untuk pesanan Dikonfirmasi (&gt; 24 jam sebelum main) dengan tarif sepadan.</li>
+              </ul>
+            )}
+
+            {helpTopic === "syarat" && (
+              <ul className="space-y-2 list-disc list-inside leading-relaxed">
+                <li>Pengguna wajib mengisi identitas &amp; nomor WhatsApp aktif yang valid saat pemesanan.</li>
+                <li>Slot yang masuk ke checkout dikunci selama 15 menit dan dilepas otomatis jika pembayaran melewati batas waktu.</li>
+                <li>Penyewa wajib mematuhi tata tertib masing-masing arena mitra (sepatu non-marking, larangan merokok, dll.).</li>
+              </ul>
+            )}
+
+            {helpTopic === "privasi" && (
+              <ul className="space-y-2 list-disc list-inside leading-relaxed">
+                <li>Data pribadi (nama, email, nomor WhatsApp) hanya digunakan untuk penerbitan E-Tiket, verifikasi gate, dan notifikasi pesanan.</li>
+                <li>Proses pembayaran dienkripsi dan ditangani oleh Midtrans tanpa menyimpan detail kartu/pin pengguna di server Arenivo.</li>
+                <li>Anda dapat memperbarui profil atau menghubungi support@arenivo.id untuk permintaan penghapusan data akun.</li>
+              </ul>
+            )}
+
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
+              <Button type="button" variant="primary" size="sm" onClick={() => setHelpTopic(null)}>
+                Mengerti
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

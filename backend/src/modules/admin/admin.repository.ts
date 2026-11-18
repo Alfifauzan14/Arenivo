@@ -63,9 +63,10 @@ export const adminRepository = {
     return this.setUserStatus(userId, status);
   },
 
-  async users(p: { q?: string; status?: string; from: number; to: number }) {
-    let q = supabaseAdmin.from("profiles").select("*, bookings:bookings!bookings_user_id_fkey(count)", { count: "exact" }).eq("role", "penyewa")
+  async users(p: { q?: string; status?: string; role?: string; from: number; to: number }) {
+    let q = supabaseAdmin.from("profiles").select("*, bookings:bookings!bookings_user_id_fkey(count)", { count: "exact" })
       .order("created_at", { ascending: false }).range(p.from, p.to);
+    if (p.role && p.role !== "all") q = q.eq("role", p.role);
     if (p.status) q = q.eq("status", p.status);
     if (p.q) q = q.or(`full_name.ilike.%${p.q}%,email.ilike.%${p.q}%`);
     const { data, error, count } = await q;
@@ -205,7 +206,18 @@ export const adminRepository = {
       const { count: c } = await q;
       return c || 0;
     };
-    const [users, mitra, pendingMitra, pendingRefunds, pendingPayouts, venues, bookings, { data: paid }] = await Promise.all([
+    const [
+      users,
+      mitra,
+      pendingMitra,
+      pendingRefunds,
+      pendingPayouts,
+      venues,
+      bookings,
+      { data: paid },
+      { data: allPayments },
+      cfg,
+    ] = await Promise.all([
       count("profiles", (q) => q.eq("role", "penyewa")),
       count("mitra_profiles"),
       count("mitra_profiles", (q) => q.eq("verification_status", "menunggu")),
@@ -213,10 +225,76 @@ export const adminRepository = {
       count("payouts", (q) => q.eq("status", "menunggu")),
       count("venues"),
       count("bookings", (q) => q.in("status", ["dikonfirmasi", "digunakan", "selesai"])),
-      supabaseAdmin.from("bookings").select("total_price, platform_commission").in("status", ["dikonfirmasi", "digunakan", "selesai"]).eq("source", "online"),
+      supabaseAdmin
+        .from("bookings")
+        .select("total_price, platform_commission, total_hours, created_at")
+        .in("status", ["dikonfirmasi", "digunakan", "selesai"])
+        .eq("source", "online"),
+      supabaseAdmin.from("payments").select("status, payment_type"),
+      this.settings(),
     ]);
-    const gmv = (paid || []).reduce((s: number, r: any) => s + r.total_price, 0);
-    const commission = (paid || []).reduce((s: number, r: any) => s + r.platform_commission, 0);
+
+    const paidRows = paid || [];
+    const gmv = paidRows.reduce((s: number, r: any) => s + Number(r.total_price || 0), 0);
+    const commission = paidRows.reduce((s: number, r: any) => s + Number(r.platform_commission || 0), 0);
+    const avgHoursPerBooking =
+      paidRows.length > 0
+        ? Number(
+            (
+              paidRows.reduce((s: number, r: any) => s + Number(r.total_hours || 0), 0) /
+              paidRows.length
+            ).toFixed(1)
+          )
+        : 0;
+
+    const paymentRows = allPayments || [];
+    const succeededPayments = paymentRows.filter((p: any) => p.status === "berhasil");
+    const paymentSuccessRate =
+      paymentRows.length > 0
+        ? Number(((succeededPayments.length / paymentRows.length) * 100).toFixed(1))
+        : 0;
+    const qrisVaCount = succeededPayments.filter((p: any) => {
+      const t = String(p.payment_type || "").toLowerCase();
+      return t.includes("qris") || t.includes("va") || t.includes("bank_transfer") || t.includes("gopay");
+    }).length;
+    const qrisVaSharePercent =
+      succeededPayments.length > 0
+        ? Number(((qrisVaCount / succeededPayments.length) * 100).toFixed(1))
+        : 0;
+
+    // Agregasi 6 bulan terakhir secara real-time dari database
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+    const now = new Date();
+    const buckets: Array<{ key: string; month: string; gmv: number; bookings: number }> = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      buckets.push({
+        key,
+        month: i === 0 ? `${monthNames[d.getMonth()]} (Bulan Ini)` : monthNames[d.getMonth()],
+        gmv: 0,
+        bookings: 0,
+      });
+    }
+    const bucketMap = new Map(buckets.map((b) => [b.key, b]));
+    for (const r of paidRows) {
+      if (!r.created_at) continue;
+      const key = String(r.created_at).slice(0, 7);
+      const target = bucketMap.get(key);
+      if (target) {
+        target.gmv += Number(r.total_price || 0);
+        target.bookings += 1;
+      }
+    }
+    const currentMonthGmv = buckets[buckets.length - 1]?.gmv || 0;
+    const prevMonthGmv = buckets[buckets.length - 2]?.gmv || 0;
+    const gmvGrowthPercent =
+      prevMonthGmv > 0
+        ? Number((((currentMonthGmv - prevMonthGmv) / prevMonthGmv) * 100).toFixed(1))
+        : currentMonthGmv > 0
+        ? 100
+        : 0;
+
     return {
       totalUsers: users,
       totalMitra: mitra,
@@ -227,6 +305,17 @@ export const adminRepository = {
       totalBookings: bookings,
       gmv,
       platformCommission: commission,
+      monthlyStats: buckets.map(({ month, gmv: mGmv, bookings: mCount }) => ({ month, gmv: mGmv, bookings: mCount })),
+      avgHoursPerBooking,
+      paymentSuccessRate,
+      qrisVaSharePercent,
+      gmvGrowthPercent,
+      serviceHealth: {
+        midtransMode: process.env.MIDTRANS_IS_PRODUCTION === "true" ? "Production" : "Sandbox",
+        slotLockMinutes: Number(cfg.bookingExpirationMinutes || 15),
+        aiProvider: cfg.primaryAiProvider || "gemini",
+        aiModel: process.env.GEMINI_API_KEY ? "Gemini Flash" : "Local Fallback",
+      },
     };
   },
 

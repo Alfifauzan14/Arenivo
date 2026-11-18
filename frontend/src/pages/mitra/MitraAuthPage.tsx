@@ -153,11 +153,15 @@ export function MitraAuthPage() {
   const [pactScanner, setPactScanner] = React.useState(false);
 
   const [isLoading, setIsLoading] = React.useState(false);
+  const [loginError, setLoginError] = React.useState<string | null>(null);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(null);
     if (!loginEmail.trim() || !loginPassword.trim()) {
-      addToast("warning", "Mohon isi email dan kata sandi pengelola.", "Data Belum Lengkap");
+      const msg = "Mohon isi email dan kata sandi pengelola.";
+      setLoginError(msg);
+      addToast("warning", msg, "Data Belum Lengkap");
       return;
     }
 
@@ -170,7 +174,9 @@ export function MitraAuthPage() {
 
       if (error) {
         setIsLoading(false);
-        addToast("error", error.message || "Email atau kata sandi pengelola tidak sesuai.", "Login Gagal");
+        const msg = error.message || "Email atau kata sandi pengelola tidak sesuai.";
+        setLoginError(msg);
+        addToast("error", msg, "Login Gagal");
         return;
       }
 
@@ -184,7 +190,9 @@ export function MitraAuthPage() {
         if (profile?.role !== "mitra" && profile?.role !== "admin") {
           await supabase.auth.signOut({ scope: "local" }).catch(() => {});
           setIsLoading(false);
-          addToast("error", "Akun ini bukan akun pengelola arena/mitra yang terdaftar.", "Akses Ditolak");
+          const msg = "Akun ini bukan akun pengelola arena/mitra yang terdaftar.";
+          setLoginError(msg);
+          addToast("error", msg, "Akses Ditolak");
           return;
         }
 
@@ -491,6 +499,14 @@ export function MitraAuthPage() {
             {mode === "login" && (
               <div className="space-y-4 min-h-[360px] flex flex-col justify-between">
                 <div className="space-y-4">
+                  {loginError && (
+                    <div
+                      role="alert"
+                      className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium"
+                    >
+                      {loginError}
+                    </div>
+                  )}
                   {/* Google Workspace Bisnis */}
                   <button
                     type="button"

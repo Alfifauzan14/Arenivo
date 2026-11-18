@@ -437,7 +437,7 @@ export function MitraSchedulePage() {
             label="Pilih Jam yang Diblokir"
             value={String(blockHour)}
             onChange={(e) => setBlockHour(parseInt(e.target.value, 10))}
-            options={[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map((h) => ({
+            options={[7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map((h) => ({
               value: String(h),
               label: `${String(h).padStart(2, "0")}:00 – ${String(h + 1).padStart(2, "0")}:00 WIB`,
             }))}
@@ -509,7 +509,7 @@ export function MitraSchedulePage() {
               label="Jam Mulai"
               value={String(walkInStartHour)}
               onChange={(e) => setWalkInStartHour(parseInt(e.target.value, 10))}
-              options={[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map((h) => ({
+              options={[7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map((h) => ({
                 value: String(h),
                 label: `${String(h).padStart(2, "0")}:00 WIB`,
               }))}

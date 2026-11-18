@@ -48,7 +48,7 @@ export class GeminiService {
         parts: [{ text: userText }],
       });
 
-      const candidateModels = ["gemini-3.5-flash", "gemini-3.8-flash"];
+      const candidateModels = ["gemini-3.8-flash", "gemini-3.5-flash"];
       let lastError: unknown = null;
 
       for (const model of candidateModels) {
@@ -65,13 +65,13 @@ export class GeminiService {
                 contents,
                 generationConfig: {
                   temperature: options?.temperature ?? 0.3,
-                  maxOutputTokens: options?.maxOutputTokens ?? 450,
+                  maxOutputTokens: options?.maxOutputTokens ?? 320,
                   thinkingConfig: {
                     thinkingBudget: 0,
                   },
                 },
               }),
-              signal: AbortSignal.timeout(14000),
+              signal: AbortSignal.timeout(9000),
             }
           );
 

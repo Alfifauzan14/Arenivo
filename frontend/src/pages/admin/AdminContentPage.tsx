@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useLocation } from "react-router-dom";
 import {
   Image as ImageIcon,
   Plus,
@@ -46,7 +47,16 @@ interface ReviewRow {
 }
 
 export function AdminContentPage() {
-  const [activeTab, setActiveTab] = React.useState("banners");
+  const location = useLocation();
+  const [activeTab, setActiveTab] = React.useState(() =>
+    location.pathname.endsWith("/reviews") ? "reviews" : "banners"
+  );
+
+  React.useEffect(() => {
+    if (location.pathname.endsWith("/reviews")) {
+      setActiveTab("reviews");
+    }
+  }, [location.pathname]);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [promoPage, setPromoPage] = React.useState(1);
   const [reviewPage, setReviewPage] = React.useState(1);

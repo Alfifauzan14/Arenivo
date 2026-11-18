@@ -291,7 +291,7 @@ export function MitraLayout() {
         {/* Bottom Actions */}
         <div className="p-3 border-t border-slate-200 bg-white space-y-1 shrink-0">
           <Link
-            to={`/venues/${selectedVenueId}`}
+            to={`/venues/${selectedVenue?.slug || selectedVenueId}`}
             target="_blank"
             className="md:hidden w-full text-xs text-slate-600 hover:text-slate-900 px-3 py-2 rounded-lg flex items-center justify-between font-medium transition-colors hover:bg-slate-50"
           >
@@ -338,7 +338,7 @@ export function MitraLayout() {
             </div>
 
             <Link
-              to={`/venues/${selectedVenueId}`}
+              to={`/venues/${selectedVenue?.slug || selectedVenueId}`}
               target="_blank"
               className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors flex items-center gap-1.5"
             >

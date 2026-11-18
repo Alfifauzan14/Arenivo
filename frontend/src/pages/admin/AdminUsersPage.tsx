@@ -39,6 +39,7 @@ interface UserItem {
   fullName: string;
   email: string;
   phone?: string;
+  role?: string;
   avatarUrl?: string;
   bookingsCount: number;
   createdAt?: string;
@@ -50,13 +51,14 @@ export function AdminUsersPage() {
   const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
+  const [filterRole, setFilterRole] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
 
   React.useEffect(() => {
     let isMounted = true;
     setLoading(true);
-    apiClient.get<any[]>("/admin/users").then((res) => {
+    apiClient.get<any[]>("/admin/users", { limit: 100 }).then((res) => {
       if (isMounted && res.data && Array.isArray(res.data)) {
         setUsers(res.data);
       }
@@ -84,8 +86,9 @@ export function AdminUsersPage() {
       (u.phone && u.phone.includes(searchQuery));
 
     const matchesStatus = filterStatus === "all" || u.status === filterStatus;
+    const matchesRole = filterRole === "all" || (u.role || "penyewa") === filterRole;
 
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesRole;
   });
 
   const paginatedUsers = filteredUsers.slice(
@@ -121,10 +124,10 @@ export function AdminUsersPage() {
       {/* Header */}
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
-          Manajemen Pengguna Penyewa
+          Manajemen Pengguna Platform
         </h1>
         <p className="text-xs text-slate-500 mt-0.5">
-          Pantau akun penyewa terdaftar, frekuensi booking, serta penegakan sanksi pemblokiran
+          Pantau seluruh akun terdaftar (Penyewa, Mitra, Admin), frekuensi booking, serta penegakan sanksi pemblokiran
         </p>
       </div>
 
@@ -171,6 +174,23 @@ export function AdminUsersPage() {
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
+            </div>
+
+            {/* Role Dropdown */}
+            <div className="w-full sm:w-44 shrink-0">
+              <Select
+                value={filterRole}
+                onChange={(e) => {
+                  setFilterRole(e.target.value);
+                  setCurrentPage(1);
+                }}
+                options={[
+                  { value: "all", label: `Semua Role (${users.length})` },
+                  { value: "penyewa", label: `Penyewa (${users.filter((u) => (u.role || "penyewa") === "penyewa").length})` },
+                  { value: "mitra", label: `Mitra (${users.filter((u) => u.role === "mitra").length})` },
+                  { value: "admin", label: `Admin (${users.filter((u) => u.role === "admin").length})` },
+                ]}
+              />
             </div>
 
             {/* Status Dropdown */}
@@ -234,9 +254,14 @@ export function AdminUsersPage() {
                           </div>
                         )}
                         <div>
-                          <span className="font-bold text-xs text-slate-900 block">
-                            {user.fullName}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-xs text-slate-900">
+                              {user.fullName}
+                            </span>
+                            <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                              {user.role || "penyewa"}
+                            </span>
+                          </div>
                           <span className="text-[10px] text-slate-400 font-mono">
                             ID: {user.id}
                           </span>
