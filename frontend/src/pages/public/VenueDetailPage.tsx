@@ -27,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import { Modal, Select, useToast } from "@/components/ui";
+import { LoadingSkeleton } from "@/components/common/LoadingStates";
 import { apiClient } from "@/lib/api-client";
 import {
   MOCK_VENUES,
@@ -123,10 +124,16 @@ export function VenueDetailPage() {
 
   const [venue, setVenue] = React.useState<Venue>(initialVenue);
   const [liveFields, setLiveFields] = React.useState<Field[]>([]);
+  const [venueLoading, setVenueLoading] = React.useState<boolean>(true);
 
   React.useEffect(() => {
-    if (!slug) return;
+    if (!slug) {
+      setVenueLoading(false);
+      return;
+    }
     let isMounted = true;
+    setVenueLoading(true);
+    setLiveFields([]);
     apiClient.get<any>(`/venues/${slug}`).then((res) => {
       if (isMounted && res.data) {
         setVenue(res.data);
@@ -134,7 +141,9 @@ export function VenueDetailPage() {
           setLiveFields(res.data.fields);
         }
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      if (isMounted) setVenueLoading(false);
+    });
     return () => {
       isMounted = false;
     };
@@ -329,17 +338,20 @@ export function VenueDetailPage() {
     };
   }, [selectedField?.id, selectedDate]);
 
-  // Muat live slot untuk semua lapangan yang sedang terbuka (expanded)
+  // Muat live slot untuk seluruh lapangan pada tanggal terpilih agar badge "X Jadwal Tersedia" selalu akurat
   React.useEffect(() => {
-    expandedFieldIds.forEach((fId) => {
-      if (!fId || !selectedDate) return;
+    if (!selectedDate || venueFields.length === 0) return;
+    let active = true;
+    venueFields.forEach((f) => {
+      const fId = f?.id;
+      if (!fId) return;
       const key = `${fId}_${selectedDate}`;
       if (fieldSlotsCache[key]) return;
 
       apiClient
         .get<any[]>(`/fields/${fId}/availability?date=${selectedDate}`)
         .then((res) => {
-          if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+          if (active && res.data && Array.isArray(res.data) && res.data.length > 0) {
             const transformed: SlotItem[] = res.data.map((s: any) => ({
               slotStart: s.slotStart || `${selectedDate}T${String(s.hour).padStart(2, "0")}:00:00+07:00`,
               slotEnd: s.slotEnd || `${selectedDate}T${String((s.hour + 1) % 24).padStart(2, "0")}:00:00+07:00`,
@@ -355,7 +367,10 @@ export function VenueDetailPage() {
         })
         .catch(() => {});
     });
-  }, [expandedFieldIds, selectedDate]);
+    return () => {
+      active = false;
+    };
+  }, [venueFields, selectedDate]);
 
   // Slots untuk lapangan yang sedang dipilih (hanya gunakan data live backend, tanpa mock harga berbeda)
   const activeFieldSlots = React.useMemo(() => {
@@ -568,6 +583,16 @@ export function VenueDetailPage() {
       (f.fieldType?.name || f.name).toLowerCase().includes(caborFilter.toLowerCase())
     );
   }, [venueFields, caborFilter]);
+
+  if (venueLoading) {
+    return (
+      <div className="min-h-screen pb-24 md:pb-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6">
+          <LoadingSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-24 md:pb-16">

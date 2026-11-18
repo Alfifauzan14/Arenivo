@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link } from "react-router-dom";
+import { Link, useOutletContext } from "react-router-dom";
 import {
   CheckCircle2,
   DollarSign,
@@ -35,10 +35,14 @@ import { formatRupiah, formatDateIndo, BookingStatus } from "@futsal/shared";
 import { cn } from "@/lib/utils";
 
 export function MitraDashboardPage() {
+  const outletCtx = useOutletContext<{ selectedVenueId?: string; selectedVenue?: any } | null>();
+  const activeVenueId = outletCtx?.selectedVenueId || "";
+  const activeVenue = outletCtx?.selectedVenue;
   const [balance, setBalance] = React.useState<any>(null);
   const [bookings, setBookings] = React.useState<any[]>([]);
   const [venues, setVenues] = React.useState<any[]>([]);
   const [todayOccupancy, setTodayOccupancy] = React.useState<any[]>([]);
+  const [monthlyStats, setMonthlyStats] = React.useState<Array<{ month: string; revenue: number; bookings: number }>>([]);
   const [todayBookingsCount, setTodayBookingsCount] = React.useState<number | null>(null);
   const [loading, setLoading] = React.useState(true);
 
@@ -63,6 +67,9 @@ export function MitraDashboardPage() {
         }
         if (Array.isArray(res.data.todayOccupancy)) {
           setTodayOccupancy(res.data.todayOccupancy);
+        }
+        if (Array.isArray(res.data.monthlyStats)) {
+          setMonthlyStats(res.data.monthlyStats);
         }
       }
     }).catch(() => {});
@@ -90,16 +97,24 @@ export function MitraDashboardPage() {
   // Fallback jika balance belum ter-load
   const currentBalance = balance || { saldoTotal: 0, saldoTertahan: 0, saldoBisaDicairkan: 0 };
 
-  // Compute occupancy stats from real API data
+  // Scope occupancy strictly to active selected venue (fallback to all if none matched)
+  const scopedOccupancy = React.useMemo(() => {
+    if (!activeVenueId) return todayOccupancy;
+    const matched = todayOccupancy.filter((f: any) => f.venueId === activeVenueId);
+    return matched.length > 0 ? matched : todayOccupancy;
+  }, [todayOccupancy, activeVenueId]);
+
   const allSlots = React.useMemo(() => {
-    return todayOccupancy.flatMap((field: any) => 
+    return scopedOccupancy.flatMap((field: any) =>
       (field.slots || []).map((slot: any) => ({
         ...slot,
         fieldName: field.fieldName,
         venueName: field.venueName,
       }))
     );
-  }, [todayOccupancy]);
+  }, [scopedOccupancy]);
+
+  const maxMonthlyRevenue = Math.max(500000, ...monthlyStats.map((m) => m.revenue || 0));
 
   const totalSlotsToday = allSlots.length;
   const occupiedSlotsToday = allSlots.filter((s: any) => s.status === "terisi" || s.status === "dikunci").length;
@@ -142,7 +157,7 @@ export function MitraDashboardPage() {
             Dashboard Operasional
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-            Ringkasan performa harian dan okupansi {venues[0]?.name || "Venue Olahraga"}
+            Ringkasan performa harian dan okupansi {activeVenue?.name || venues[0]?.name || "Venue Olahraga"}
           </p>
         </div>
 
@@ -284,13 +299,13 @@ export function MitraDashboardPage() {
         </CardHeader>
 
         <CardContent className="p-4 sm:p-5 pt-4">
-          {todayOccupancy.length === 0 ? (
+          {scopedOccupancy.length === 0 ? (
             <div className="py-8 text-center text-slate-500 text-xs">
               Tidak ada data okupansi (belum ada lapangan aktif)
             </div>
           ) : (
             <div className="space-y-3">
-              {todayOccupancy.map((field: any) => (
+              {scopedOccupancy.map((field: any) => (
                 <div key={field.fieldId} className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-semibold text-xs text-slate-800">{field.fieldName}</span>
@@ -329,6 +344,57 @@ export function MitraDashboardPage() {
             </div>
           )}
         </CardContent>
+      </Card>
+
+      {/* 2.5 Grafik Pendapatan Mitra (6 Bulan Terakhir - Live DB) */}
+      <Card className="bg-white border-slate-200 p-4 sm:p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">
+              Grafik Pendapatan Bersih Mitra (6 Bulan Terakhir)
+            </h2>
+            <p className="text-xs text-slate-500">
+              Akumulasi pendapatan bersih booking terkonfirmasi &amp; selesai seluruh arena
+            </p>
+          </div>
+          <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600 self-start sm:self-auto">
+            IDR (Rupiah)
+          </span>
+        </div>
+
+        <div className="h-44 flex items-end justify-between gap-3 pt-4 border-b border-slate-100">
+          {monthlyStats.map((item, idx) => {
+            const heightPercent =
+              item.revenue > 0 ? Math.max(8, Math.round((item.revenue / maxMonthlyRevenue) * 100)) : 2;
+            const isCurrent = idx === monthlyStats.length - 1;
+            return (
+              <div key={item.month} className="flex-1 flex flex-col items-center gap-1.5 group">
+                <span className="text-[10px] font-mono text-slate-500 group-hover:text-red-600 transition-colors tabular-nums">
+                  {item.revenue >= 1000000
+                    ? `${(item.revenue / 1000000).toFixed(1)}M`
+                    : `${Math.round(item.revenue / 1000)}K`}
+                </span>
+                <div className="w-full max-w-[44px] bg-slate-100 rounded-t-sm h-32 flex items-end">
+                  <div
+                    style={{ height: `${heightPercent}%` }}
+                    className={cn(
+                      "w-full rounded-t-sm transition-all duration-300",
+                      isCurrent ? "bg-red-600 group-hover:bg-red-700" : "bg-slate-300 group-hover:bg-slate-400"
+                    )}
+                  />
+                </div>
+                <span
+                  className={cn(
+                    "text-[10px] font-medium truncate text-center",
+                    isCurrent ? "font-bold text-red-600" : "text-slate-500"
+                  )}
+                >
+                  {item.month}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </Card>
 
       {/* 3. Pesanan Masuk Terkini (Unified Modern Table + Wide Search & Select) */}

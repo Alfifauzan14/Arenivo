@@ -9,6 +9,7 @@ import {
   Clock,
   MapPin,
   CheckCircle2,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   Card,
@@ -131,16 +132,67 @@ export function MitraBookingsPage() {
     }
   };
 
+  const handleExportCsv = () => {
+    const today = new Date().toISOString().split("T")[0];
+    const escapeCsv = (val: unknown) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+    const headers = [
+      "Kode Booking",
+      "Penyewa",
+      "No. WhatsApp",
+      "Lapangan",
+      "Tanggal Main",
+      "Durasi (Jam)",
+      "Sumber",
+      "Pendapatan Bersih Mitra (Rp)",
+      "Status",
+    ];
+    const csvRows = filteredBookings.map((b: any) => [
+      b.bookingCode || "-",
+      b.customerName || "-",
+      b.customerPhone || "-",
+      b.field?.name || b.fields?.name || "-",
+      b.playStart ? String(b.playStart).split("T")[0] : "-",
+      b.totalHours ?? 1,
+      b.source || "online",
+      b.mitraAmount ?? 0,
+      b.status || "-",
+    ]);
+    const csvContent = "\uFEFF" + [headers, ...csvRows].map((r) => r.map(escapeCsv).join(",")).join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `pesanan-mitra-${today}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    addToast("success", `File pesanan-mitra-${today}.csv berhasil diunduh (${filteredBookings.length} data).`, "Ekspor CSV Berhasil");
+  };
+
   return (
     <div className="space-y-5 sm:space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">
-          Pesanan Masuk
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-          Pantau seluruh reservasi online maupun walk-in, hubungi penyewa, atau kelola pembatalan.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">
+            Pesanan Masuk
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+            Pantau seluruh reservasi online maupun walk-in, hubungi penyewa, atau kelola pembatalan.
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleExportCsv}
+          className="text-xs font-semibold gap-1.5 self-start sm:self-auto"
+        >
+          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Ekspor CSV</span>
+        </Button>
       </div>
 
       {/* Unified Filter & Bookings Card */}

@@ -22,7 +22,8 @@ export const GET = withAuth(
         activeBookings: 0,
         completedBookings: 0,
         recentBookings: [],
-        todayOccupancy: []
+        todayOccupancy: [],
+        monthlyStats: [],
       });
     }
 
@@ -38,7 +39,8 @@ export const GET = withAuth(
       { count: activeBookings },
       { count: completedBookings },
       { count: todayBookings },
-      { data: recentBookings }
+      { data: recentBookings },
+      { data: paidBookings }
     ] = await Promise.all([
       supabaseAdmin
         .from("bookings")
@@ -66,8 +68,35 @@ export const GET = withAuth(
         .select("*, venue:venues(id, name), field:fields(id, name), user:profiles!bookings_user_id_fkey(id, full_name, phone)")
         .in("venue_id", venueIds)
         .order("created_at", { ascending: false })
-        .limit(8)
+        .limit(8),
+      supabaseAdmin
+        .from("bookings")
+        .select("mitra_amount, created_at")
+        .in("venue_id", venueIds)
+        .in("status", ["dikonfirmasi", "digunakan", "selesai"]),
     ]);
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+    const buckets: Array<{ key: string; month: string; revenue: number; bookings: number }> = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(wibNow.getUTCFullYear(), wibNow.getUTCMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      buckets.push({
+        key,
+        month: i === 0 ? `${monthNames[d.getMonth()]} (Bulan Ini)` : monthNames[d.getMonth()],
+        revenue: 0,
+        bookings: 0,
+      });
+    }
+    const bucketMap = new Map(buckets.map((b) => [b.key, b]));
+    for (const row of paidBookings || []) {
+      if (!row.created_at) continue;
+      const target = bucketMap.get(String(row.created_at).slice(0, 7));
+      if (target) {
+        target.revenue += Number(row.mitra_amount || 0);
+        target.bookings += 1;
+      }
+    }
 
     return ok(req, {
       balance,
@@ -77,7 +106,8 @@ export const GET = withAuth(
       completedBookings: completedBookings ?? 0,
       todayBookingsCount: todayBookings ?? 0,
       recentBookings: camelize(recentBookings ?? []),
-      todayOccupancy
+      todayOccupancy,
+      monthlyStats: buckets.map(({ month, revenue, bookings }) => ({ month, revenue, bookings })),
     });
   },
   { allowedRoles: [UserRole.MITRA, UserRole.ADMIN] }

@@ -630,7 +630,7 @@ export function MitraScannerPage() {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Contoh: TKT-FB-8K2M4Q atau FB-E51AB7"
+                  placeholder="Masukkan atau pindai kode E-Tiket (contoh: TKT-...)"
                   value={manualCode}
                   onChange={(e) => setManualCode(e.target.value)}
                   onKeyDown={(e) => {

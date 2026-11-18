@@ -451,7 +451,7 @@ export const MOCK_MITRA_PROFILES: (MitraProfile & { email: string; phone: string
     userId: "f6038a8d-9c02-4bb3-b93a-45e2ac7ac22d",
     businessName: "Champion Arena Group",
     businessAddress: "Jl. TB Simatupang No. 18, Cilandak, Jakarta Selatan",
-    documentUrl: "https://example.com/doc-ktp.pdf",
+    documentUrl: "https://vtfcigukjtmplgcihjgw.supabase.co/storage/v1/object/public/venue-photos/docs/legalitas-champion-arena-group.png",
     verificationStatus: MitraVerificationStatus.DISETUJUI,
     bankName: "BCA",
     bankAccountNumber: "8830192837",

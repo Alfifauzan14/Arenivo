@@ -325,7 +325,13 @@ export function AdminMasterDataPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedCities.length === 0 ? (
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-xs text-slate-500">
+                      Memuat daftar kota...
+                    </TableCell>
+                  </TableRow>
+                ) : paginatedCities.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-8 text-xs text-slate-400">
                       Tidak ada kota yang cocok dengan filter.

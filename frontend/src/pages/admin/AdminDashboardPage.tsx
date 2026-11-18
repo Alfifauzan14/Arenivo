@@ -15,6 +15,7 @@ import {
 import { Card, Button } from "@/components/ui";
 import { LoadingSkeleton } from "@/components/common/LoadingStates";
 import { apiClient } from "@/lib/api-client";
+import { downloadReportPdf } from "@/lib/pdf-export";
 import { formatRupiah } from "@futsal/shared";
 
 export function AdminDashboardPage() {
@@ -37,10 +38,14 @@ export function AdminDashboardPage() {
     qrisVaSharePercent: 0,
     gmvGrowthPercent: 0,
     serviceHealth: {
+      databaseConnected: true,
+      midtransConfigured: true,
       midtransMode: "Sandbox",
+      slotLockActive: true,
       slotLockMinutes: 15,
+      aiActive: true,
       aiProvider: "gemini",
-      aiModel: "Gemini Flash",
+      aiModel: "Gemini 3.1 Flash Lite",
     },
   });
   const [commissionPercent, setCommissionPercent] = React.useState<number>(12);
@@ -140,26 +145,32 @@ export function AdminDashboardPage() {
         URL.revokeObjectURL(url);
         setExportMessage(`File laporan-arenivo-${today}.csv berhasil diunduh (${rows.length} transaksi).`);
       } else {
-        const printWin = window.open("", "_blank", "width=900,height=700");
-        if (printWin) {
-          const tableRowsHtml = rows
-            .slice(0, 100)
-            .map(
-              (b: any) =>
-                `<tr><td>${b.bookingCode || "-"}</td><td>${b.customerName || "-"}</td><td>${b.venue?.name || "-"}</td><td>${formatRupiah(Number(b.totalPrice || 0))}</td><td>${b.status || "-"}</td></tr>`
-            )
-            .join("");
-          printWin.document.write(
-            `<!doctype html><html><head><title>Laporan Arenivo ${today}</title><style>body{font-family:system-ui,sans-serif;padding:24px;color:#0f172a}table{width:100%;border-collapse:collapse;margin-top:16px;font-size:12px}th,td{border:1px solid #cbd5e1;padding:6px 8px;text-align:left}th{background:#f1f5f9}</style></head><body><h1>Laporan Platform Arenivo (${today})</h1><p>GMV: ${formatRupiah(gmv)} | Komisi (${commissionPercent}%): ${formatRupiah(platformCommission)} | Booking Aktif/Selesai: ${totalBookings}</p><table><thead><tr><th>Kode</th><th>Penyewa</th><th>Venue</th><th>Total</th><th>Status</th></tr></thead><tbody>${tableRowsHtml || '<tr><td colspan="5">Belum ada transaksi.</td></tr>'}</tbody></table></body></html>`
-          );
-          printWin.document.close();
-          printWin.focus();
-          printWin.print();
-          setExportMessage("Pratinjau cetak / simpan PDF berhasil dibuka.");
-        } else {
-          window.print();
-          setExportMessage("Dialog cetak PDF halaman dibuka.");
-        }
+        downloadReportPdf({
+          filename: `laporan-arenivo-${today}.pdf`,
+          title: `Laporan Platform Arenivo (${today})`,
+          subtitle: `Diekspor pada ${new Date().toLocaleString("id-ID")} WIB`,
+          summaryLines: [
+            `Gross GMV Transaksi : ${formatRupiah(gmv)}`,
+            `Komisi Platform (${commissionPercent}%) : ${formatRupiah(platformCommission)}`,
+            `Total Booking Aktif/Selesai : ${totalBookings} Pesanan`,
+            `Mitra / Penyewa : ${totalMitra} Mitra / ${totalUsers} Penyewa`,
+          ],
+          columns: [
+            { header: "Kode", width: 11 },
+            { header: "Penyewa", width: 20 },
+            { header: "Venue", width: 26 },
+            { header: "Total", width: 15 },
+            { header: "Status", width: 14 },
+          ],
+          rows: rows.slice(0, 120).map((b: any) => [
+            b.bookingCode || "-",
+            b.customerName || "-",
+            b.venue?.name || "-",
+            formatRupiah(Number(b.totalPrice || 0)),
+            b.status || "-",
+          ]),
+        });
+        setExportMessage(`File laporan-arenivo-${today}.pdf berhasil diunduh (${rows.length} transaksi).`);
       }
       setTimeout(() => setExportMessage(null), 5000);
     } finally {
@@ -346,7 +357,12 @@ export function AdminDashboardPage() {
 
         {/* Quick System Status Card */}
         <Card className="p-5 bg-white border-slate-200 shadow-xs space-y-4">
-          <h2 className="text-sm font-bold text-slate-900">Status Operasional Layanan</h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-bold text-slate-900">Status Operasional Layanan</h2>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+              {serviceHealth.databaseConnected ? "API Live" : "Offline"}
+            </span>
+          </div>
 
           <div className="space-y-3">
             <div className="p-3 rounded-lg bg-emerald-50/70 border border-emerald-100 flex items-start gap-3">
@@ -356,7 +372,9 @@ export function AdminDashboardPage() {
                   Midtrans Gateway ({serviceHealth.midtransMode})
                 </p>
                 <p className="text-[11px] text-emerald-700">
-                  Integrasi Snap &amp; Webhook aktif
+                  {serviceHealth.midtransConfigured
+                    ? `Kunci gateway ${serviceHealth.midtransMode.toLowerCase()} terhubung`
+                    : "Kunci server gateway belum dikonfigurasi"}
                 </p>
               </div>
             </div>
@@ -364,7 +382,9 @@ export function AdminDashboardPage() {
             <div className="p-3 rounded-lg bg-blue-50/70 border border-blue-100 flex items-start gap-3">
               <Clock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-bold text-blue-950">Slot Lock Engine Aktif</p>
+                <p className="text-xs font-bold text-blue-950">
+                  {serviceHealth.slotLockActive ? "Slot Lock Engine Aktif" : "Slot Lock Nonaktif"}
+                </p>
                 <p className="text-[11px] text-blue-700">
                   Auto-expire slot {serviceHealth.slotLockMinutes} menit sesuai pengaturan sistem
                 </p>
@@ -374,7 +394,9 @@ export function AdminDashboardPage() {
             <div className="p-3 rounded-lg bg-purple-50/70 border border-purple-100 flex items-start gap-3">
               <Building2 className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-bold text-purple-950">AI Chatbot Asisten Aktif</p>
+                <p className="text-xs font-bold text-purple-950">
+                  {serviceHealth.aiActive ? "AI Chatbot Asisten Aktif" : "AI Chatbot Mode Fallback"}
+                </p>
                 <p className="text-[11px] text-purple-700">
                   Provider: {serviceHealth.aiProvider} ({serviceHealth.aiModel})
                 </p>

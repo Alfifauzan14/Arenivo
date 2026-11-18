@@ -29,6 +29,12 @@ interface DaySchedule {
   closeHour: number;
 }
 
+interface PriceRuleDraft {
+  startTime: string;
+  endTime: string;
+  price: number;
+}
+
 const DEFAULT_SCHEDULES: DaySchedule[] = [
   { dayName: "Senin", dayOfWeek: 1, isOpen: true, openHour: 8, closeHour: 23 },
   { dayName: "Selasa", dayOfWeek: 2, isOpen: true, openHour: 8, closeHour: 23 },
@@ -60,6 +66,7 @@ export function MitraFieldsPage() {
   const [surface, setSurface] = React.useState("");
   const [basePrice, setBasePrice] = React.useState<number>(150000);
   const [schedules, setSchedules] = React.useState<DaySchedule[]>(DEFAULT_SCHEDULES);
+  const [priceRules, setPriceRules] = React.useState<PriceRuleDraft[]>([]);
 
   const loadData = React.useCallback(async () => {
     try {
@@ -98,6 +105,7 @@ export function MitraFieldsPage() {
     setSurface("");
     setBasePrice(150000);
     setSchedules(DEFAULT_SCHEDULES.map((s) => ({ ...s })));
+    setPriceRules([]);
     setIsModalOpen(true);
   };
 
@@ -108,6 +116,15 @@ export function MitraFieldsPage() {
     setSizeDescription(f.sizeDescription || "");
     setSurface(f.surface || "");
     setBasePrice(Number(f.basePrice || 0));
+
+    const existingRules = Array.isArray(f.fieldPriceRules) ? f.fieldPriceRules : [];
+    setPriceRules(
+      existingRules.map((r: any) => ({
+        startTime: String(r.startTime || "18:00").slice(0, 5),
+        endTime: String(r.endTime || "23:00").slice(0, 5),
+        price: Number(r.price || f.basePrice || 150000),
+      }))
+    );
 
     const existingHours = Array.isArray(f.fieldOperatingHours) ? f.fieldOperatingHours : [];
     if (existingHours.length > 0) {
@@ -156,6 +173,16 @@ export function MitraFieldsPage() {
         isClosed: !s.isOpen,
       }));
 
+      const cleanPriceRules = priceRules
+        .filter((r) => r.startTime && r.endTime && r.price >= 0)
+        .map((r, idx) => ({
+          dayOfWeek: null,
+          startTime: r.startTime,
+          endTime: r.endTime,
+          price: Math.max(0, Math.round(r.price)),
+          priority: idx + 1,
+        }));
+
       if (editingField) {
         await apiClient.patch("/mitra/fields", {
           id: editingField.id,
@@ -165,6 +192,7 @@ export function MitraFieldsPage() {
           surface: surface.trim() || null,
           basePrice: Math.max(0, Math.round(basePrice)),
           operatingHours,
+          priceRules: cleanPriceRules,
         });
         addToast("success", `Lapangan "${name.trim()}" berhasil diperbarui ke database.`, "Tersimpan");
       } else {
@@ -176,6 +204,7 @@ export function MitraFieldsPage() {
           surface: surface.trim() || null,
           basePrice: Math.max(0, Math.round(basePrice)),
           operatingHours,
+          priceRules: cleanPriceRules,
         });
         addToast("success", `Lapangan baru "${name.trim()}" berhasil disimpan ke database.`, "Lapangan Ditambahkan");
       }
@@ -310,6 +339,17 @@ export function MitraFieldsPage() {
                     {formatRupiah(field.basePrice)}/jam
                   </span>
                 </div>
+
+                {Array.isArray(field.fieldPriceRules) && field.fieldPriceRules.length > 0 && (
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                    <span className="text-amber-700 font-medium">Tarif Jam Sibuk</span>
+                    <span className="font-mono font-semibold text-amber-700 tabular-nums">
+                      {String(field.fieldPriceRules[0].startTime).slice(0, 5)}–
+                      {String(field.fieldPriceRules[0].endTime).slice(0, 5)}:{" "}
+                      {formatRupiah(field.fieldPriceRules[0].price)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="pt-1 flex justify-end gap-2">
@@ -390,6 +430,87 @@ export function MitraFieldsPage() {
             onChange={(e) => setBasePrice(parseInt(e.target.value, 10) || 0)}
             required
           />
+
+          {/* Peak-Hour Price Rules */}
+          <div className="space-y-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between gap-2">
+              <label className="font-semibold text-slate-700">
+                Aturan Tarif Jam Sibuk / Malam (Peak-Hour)
+              </label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setPriceRules((prev) => [
+                    ...prev,
+                    { startTime: "18:00", endTime: "23:00", price: Math.max(basePrice + 25000, 175000) },
+                  ])
+                }
+                className="h-7 px-2.5 text-[11px] gap-1"
+              >
+                <Plus className="w-3 h-3" />
+                Tambah Aturan
+              </Button>
+            </div>
+            {priceRules.length === 0 ? (
+              <p className="text-[11px] text-slate-500">
+                Belum ada tarif khusus jam sibuk. Semua jam menggunakan tarif dasar.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {priceRules.map((rule, idx) => (
+                  <div key={idx} className="grid grid-cols-[1fr_1fr_1.3fr_auto] gap-2 items-center">
+                    <input
+                      type="time"
+                      value={rule.startTime}
+                      onChange={(e) =>
+                        setPriceRules((prev) =>
+                          prev.map((r, i) => (i === idx ? { ...r, startTime: e.target.value } : r))
+                        )
+                      }
+                      className="h-8 px-2 text-xs font-mono rounded border border-slate-200 bg-white"
+                      aria-label="Jam mulai peak-hour"
+                    />
+                    <input
+                      type="time"
+                      value={rule.endTime}
+                      onChange={(e) =>
+                        setPriceRules((prev) =>
+                          prev.map((r, i) => (i === idx ? { ...r, endTime: e.target.value } : r))
+                        )
+                      }
+                      className="h-8 px-2 text-xs font-mono rounded border border-slate-200 bg-white"
+                      aria-label="Jam selesai peak-hour"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      value={rule.price}
+                      onChange={(e) =>
+                        setPriceRules((prev) =>
+                          prev.map((r, i) =>
+                            i === idx ? { ...r, price: parseInt(e.target.value, 10) || 0 } : r
+                          )
+                        )
+                      }
+                      placeholder="Tarif (Rp)"
+                      className="h-8 px-2 text-xs font-mono rounded border border-slate-200 bg-white"
+                      aria-label="Harga peak-hour"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPriceRules((prev) => prev.filter((_, i) => i !== idx))}
+                      className="p-1.5 rounded text-rose-600 hover:bg-rose-50 cursor-pointer"
+                      aria-label="Hapus aturan harga"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Daily Schedule */}
           <div className="space-y-2 pt-2 border-t border-slate-100">

@@ -8,7 +8,7 @@ interface SessionContextType {
   isLoggedIn: boolean;
   authReady: boolean;
   login: (userData?: Partial<Profile>) => void;
-  logout: () => Promise<void>;
+  logout: (options?: { redirect?: boolean } | unknown) => Promise<void>;
   favorites: string[];
   toggleFavorite: (venueId: string) => void;
   isFavorite: (venueId: string) => boolean;
@@ -48,24 +48,28 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         });
         setIsLoggedIn(true);
 
-        // Load favorites dari API dengan fallback Supabase langsung
-        try {
-          const favRes = await apiClient.get<any[]>("/me/favorites");
-          if (favRes.data && Array.isArray(favRes.data)) {
-            setFavorites(favRes.data.filter(Boolean).map((v: any) => v.id));
-          }
-        } catch {
+        // Hanya muat daftar favorit untuk akun penyewa agar role mitra/admin tidak memicu fetch tak perlu
+        if ((profile.role || "penyewa") === "penyewa") {
           try {
-            const { data: favRows } = await supabase
-              .from("favorites")
-              .select("venue_id")
-              .eq("user_id", userId);
-            if (favRows) {
-              setFavorites(favRows.map((r: any) => r.venue_id));
+            const favRes = await apiClient.get<any[]>("/me/favorites");
+            if (favRes.data && Array.isArray(favRes.data)) {
+              setFavorites(favRes.data.filter(Boolean).map((v: any) => v.id));
             }
           } catch {
-            // abaikan
+            try {
+              const { data: favRows } = await supabase
+                .from("favorites")
+                .select("venue_id")
+                .eq("user_id", userId);
+              if (favRows) {
+                setFavorites(favRows.map((r: any) => r.venue_id));
+              }
+            } catch {
+              // abaikan
+            }
           }
+        } else {
+          setFavorites([]);
         }
         return;
       }
@@ -151,9 +155,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const logout = React.useCallback(async () => {
+  const logout = React.useCallback(async (options?: { redirect?: boolean } | unknown) => {
     setIsLoggedIn(false);
     setCurrentUser(null);
+    setFavorites([]);
     localStorage.removeItem("futsal_logged_in");
     localStorage.removeItem("futsal_auth_token");
     localStorage.removeItem("sb_access_token");
@@ -161,7 +166,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("futsal_admin_authenticated");
     localStorage.removeItem("futsal_mitra_verification_status");
     await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-    window.location.href = "/";
+    const shouldRedirect = !(
+      typeof options === "object" &&
+      options !== null &&
+      "redirect" in options &&
+      (options as { redirect?: boolean }).redirect === false
+    );
+    if (shouldRedirect) {
+      window.location.href = "/";
+    }
   }, []);
 
   const toggleFavorite = React.useCallback(async (venueId: string) => {

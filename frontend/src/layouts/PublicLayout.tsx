@@ -73,7 +73,7 @@ export function PublicLayout() {
   React.useEffect(() => {
     if (!authReady) return;
     const reqId = ++notifReqRef.current;
-    if (!isLoggedIn) {
+    if (!isLoggedIn || user?.role !== "penyewa") {
       setNotifications([]);
       return;
     }
@@ -91,7 +91,7 @@ export function PublicLayout() {
     return () => {
       isMounted = false;
     };
-  }, [authReady, isLoggedIn]);
+  }, [authReady, isLoggedIn, user?.role]);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -240,7 +240,7 @@ export function PublicLayout() {
               </Link>
 
               <Link
-                to="/venues?filter=promo"
+                to="/promo"
                 className={cn(
                   "px-3 py-2 transition-all whitespace-nowrap relative font-medium",
                   location.pathname === "/promo" || location.search.includes("promo")
@@ -522,7 +522,7 @@ export function PublicLayout() {
                   </Link>
 
                   <Link
-                    to="/venues?filter=promo"
+                    to="/promo"
                     onClick={() => setMobileMenuOpen(false)}
                     className={cn(
                       "py-2.5 text-[15px] font-medium transition-colors",
@@ -1080,6 +1080,9 @@ export function PublicLayout() {
       {/* Modal Pusat Bantuan & Kebijakan */}
       {helpTopic && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Pusat Bantuan & Kebijakan Arenivo"
           className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={() => setHelpTopic(null)}
         >

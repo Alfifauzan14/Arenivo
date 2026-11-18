@@ -48,7 +48,7 @@ export class GeminiService {
         parts: [{ text: userText }],
       });
 
-      const candidateModels = ["gemini-3.8-flash", "gemini-3.5-flash"];
+      const candidateModels = ["gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-3.8-flash"];
       let lastError: unknown = null;
 
       for (const model of candidateModels) {
@@ -71,7 +71,7 @@ export class GeminiService {
                   },
                 },
               }),
-              signal: AbortSignal.timeout(9000),
+              signal: AbortSignal.timeout(5500),
             }
           );
 

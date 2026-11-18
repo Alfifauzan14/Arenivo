@@ -496,6 +496,8 @@ export function AdminContentPage() {
                     ? "Cari judul banner atau tautan..."
                     : activeTab === "promos"
                     ? "Cari kode promo..."
+                    : activeTab === "faqs"
+                    ? "Cari pertanyaan atau jawaban FAQ..."
                     : "Cari nama penyewa, ulasan, atau venue..."
                 }
                 value={searchQuery}

@@ -311,10 +311,14 @@ export const adminRepository = {
       qrisVaSharePercent,
       gmvGrowthPercent,
       serviceHealth: {
+        databaseConnected: true,
+        midtransConfigured: Boolean(process.env.MIDTRANS_SERVER_KEY),
         midtransMode: process.env.MIDTRANS_IS_PRODUCTION === "true" ? "Production" : "Sandbox",
+        slotLockActive: Number(cfg.bookingExpirationMinutes || 15) > 0,
         slotLockMinutes: Number(cfg.bookingExpirationMinutes || 15),
+        aiActive: Boolean(process.env.GEMINI_API_KEY) && cfg.primaryAiProvider !== "local-fallback",
         aiProvider: cfg.primaryAiProvider || "gemini",
-        aiModel: process.env.GEMINI_API_KEY ? "Gemini Flash" : "Local Fallback",
+        aiModel: process.env.GEMINI_API_KEY ? "Gemini 3.1 Flash Lite" : "Local Fallback",
       },
     };
   },

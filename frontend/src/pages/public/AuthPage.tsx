@@ -28,18 +28,20 @@ export function AuthPage() {
   // Mode: "login" | "register"
   const isRegisterParam = location.pathname === "/register" || searchParams.get("mode") === "register";
   const [mode, setMode] = React.useState<"login" | "register">(isRegisterParam ? "register" : "login");
+  const [loginError, setLoginError] = React.useState<string | null>(null);
+  const isValidatingLoginRef = React.useRef(false);
 
-  // Jika akun admin sedang login dan membuka halaman login penyewa, putuskan sesi
+  // Jika akun admin sudah login sebelum membuka /login, putuskan sesi tanpa menimpa proses validasi submit
   React.useEffect(() => {
+    if (isValidatingLoginRef.current) return;
     if (isLoggedIn && user?.role === "admin") {
-      logout();
-      addToast(
-        "error",
-        "Akun Administrator tidak diizinkan berada di sesi penyewa. Silakan masuk melalui Portal Admin (/admin/login).",
-        "Akses Ditolak"
-      );
+      const msg =
+        "Akun Administrator tidak diizinkan berada di sesi penyewa. Silakan masuk melalui Portal Admin (/admin/login).";
+      setLoginError(msg);
+      void logout({ redirect: false });
+      addToast("error", msg, "Akses Ditolak");
     }
-  }, [isLoggedIn, user]);
+  }, [isLoggedIn, user, logout, addToast]);
 
   // Keep mode in sync if user directly visits /register or /login
   React.useEffect(() => {
@@ -112,6 +114,8 @@ export function AuthPage() {
     setIsLoading(true);
 
     if (mode === "login") {
+      isValidatingLoginRef.current = true;
+      setLoginError(null);
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
@@ -119,8 +123,11 @@ export function AuthPage() {
         });
 
         if (error) {
+          isValidatingLoginRef.current = false;
           setIsLoading(false);
-          addToast("error", error.message || "Email atau kata sandi tidak sesuai.", "Gagal Masuk");
+          const errMsg = error.message || "Email atau kata sandi tidak sesuai.";
+          setLoginError(errMsg);
+          addToast("error", errMsg, "Gagal Masuk");
           return;
         }
 
@@ -152,29 +159,30 @@ export function AuthPage() {
             data.session.user.app_metadata?.role === "admin" ||
             data.session.user.user_metadata?.role === "admin"
           ) {
-            await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-            localStorage.removeItem("sb_access_token");
-            localStorage.removeItem("futsal_logged_in");
-            localStorage.removeItem("futsal_admin_authenticated");
+            await logout({ redirect: false });
+            isValidatingLoginRef.current = false;
             setIsLoading(false);
-            addToast(
-              "error",
-              "Akses Ditolak: Akun Administrator tidak diizinkan masuk melalui login penyewa. Silakan masuk melalui Portal Admin (/admin/login).",
-              "Akses Ditolak"
-            );
+            const denyMsg =
+              "Akses Ditolak: Akun Administrator tidak diizinkan masuk melalui login penyewa. Silakan masuk melalui Portal Admin (/admin/login).";
+            setLoginError(denyMsg);
+            addToast("error", denyMsg, "Akses Ditolak");
             return;
           }
 
           localStorage.setItem("sb_access_token", data.session.access_token);
           localStorage.setItem("futsal_logged_in", "true");
           await refreshProfile();
+          isValidatingLoginRef.current = false;
           setIsLoading(false);
           addToast("success", "Selamat datang kembali!", "Autentikasi Berhasil");
-          navigate("/bookings");
+          navigate(userRole === "mitra" ? "/mitra" : "/bookings");
         }
       } catch (err: any) {
+        isValidatingLoginRef.current = false;
         setIsLoading(false);
-        addToast("error", err.message || "Terjadi kesalahan saat masuk.", "Error");
+        const msg = err.message || "Terjadi kesalahan saat masuk.";
+        setLoginError(msg);
+        addToast("error", msg, "Error");
       }
     } else {
       try {
@@ -425,6 +433,15 @@ export function AuthPage() {
                   </div>
 
                   {/* Email */}
+                  {loginError && (
+                    <div
+                      role="alert"
+                      className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium leading-relaxed"
+                    >
+                      {loginError}
+                    </div>
+                  )}
+
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-slate-700 ml-0.5">Alamat Email / Username</label>
                     <div className="rounded-lg bg-white border border-slate-200 focus-within:ring-2 focus-within:ring-red-500/20 focus-within:border-red-600 px-3.5 py-2.5 flex items-center gap-3 transition-all shadow-xs">

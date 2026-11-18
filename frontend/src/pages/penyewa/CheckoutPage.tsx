@@ -400,6 +400,28 @@ export function CheckoutPage() {
       let realBookingId = liveExistingBooking?.id || activeCreatedBookingId;
 
       if (!realBookingId) {
+        // Pastikan kode promo yang sedang diketik ikut tervalidasi sebelum POST /bookings
+        let activePromoCode = appliedPromo?.code;
+        const typedPromo = promoInput.trim().toUpperCase();
+        if (!activePromoCode && typedPromo) {
+          const promoRes = await apiClient.post<any>("/promos/validate", {
+            code: typedPromo,
+            venueId: venue.id,
+            subtotal: calculatedSubtotal,
+          });
+          if (promoRes.data?.code) {
+            activePromoCode = promoRes.data.code;
+            setAppliedPromo({
+              code: promoRes.data.code,
+              discount: promoRes.data.discount,
+              description:
+                promoRes.data.discountType === "fixed"
+                  ? `Diskon ${formatRupiah(promoRes.data.discountValue)}`
+                  : `Diskon ${promoRes.data.discountValue}% (maks ${formatRupiah(promoRes.data.discount)})`,
+            });
+          }
+        }
+
         // 2. Create Real Booking in PostgreSQL Database
         const idempotencyKey = "chk-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
         const bookingPayload = {
@@ -407,7 +429,7 @@ export function CheckoutPage() {
           slotStarts,
           customerName: customerName.trim() || user?.fullName || "Penyewa Lapangan",
           customerPhone: cleanPhone,
-          promoCode: appliedPromo?.code,
+          promoCode: activePromoCode,
           notes: notes.trim() || "Booking online via Arenivo Web",
         };
 
@@ -825,12 +847,18 @@ export function CheckoutPage() {
                 type="button"
                 variant="primary"
                 size="lg"
-                disabled={isExpired || isSnapLoading}
+                disabled={isExpired || isSnapLoading || promoValidating}
                 onClick={handleOpenPayment}
                 className="w-full font-bold shadow-xs flex items-center justify-center gap-2"
               >
                 <Lock className="w-4 h-4" />
-                <span>{isSnapLoading ? "Menyiapkan Midtrans Snap..." : "Bayar Sekarang"}</span>
+                <span>
+                  {promoValidating
+                    ? "Memeriksa Promo..."
+                    : isSnapLoading
+                    ? "Menyiapkan Midtrans Snap..."
+                    : "Bayar Sekarang"}
+                </span>
                 <ArrowRight className="w-4 h-4" />
               </Button>
 

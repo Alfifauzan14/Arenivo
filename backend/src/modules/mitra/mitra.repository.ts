@@ -76,8 +76,14 @@ export const mitraRepository = {
           bookingId: res?.bookingId || null,
         });
       }
-      const venueName = Array.isArray(field.venue) ? field.venue[0]?.name : field.venue?.name;
-      result.push({ fieldId: field.id, fieldName: field.name, venueName, slots });
+      const venueObj = Array.isArray(field.venue) ? field.venue[0] : field.venue;
+      result.push({
+        fieldId: field.id,
+        fieldName: field.name,
+        venueId: venueObj?.id || null,
+        venueName: venueObj?.name || "",
+        slots,
+      });
     }
     return result;
   },

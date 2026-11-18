@@ -376,7 +376,7 @@ export function MitraLayout() {
         )}
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-20 md:pb-8">
-          <Outlet />
+          <Outlet context={{ selectedVenueId, selectedVenue, venues }} />
         </main>
 
         {/* 4. Mobile Bottom Navigation Bar (4 Menu Operasional Kunci Mitra di Lapangan) */}

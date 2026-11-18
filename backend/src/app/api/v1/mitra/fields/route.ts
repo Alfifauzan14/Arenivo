@@ -55,6 +55,17 @@ const patchFieldSchema = z.object({
         isClosed: z.boolean().optional()
       })
     )
+    .optional(),
+  priceRules: z
+    .array(
+      z.object({
+        dayOfWeek: z.number().int().min(0).max(6).optional().nullable(),
+        startTime: z.string(),
+        endTime: z.string(),
+        price: z.number().int().min(0),
+        priority: z.number().int().optional()
+      })
+    )
     .optional()
 });
 
@@ -176,7 +187,30 @@ export const PATCH = withAuth(
       );
     }
 
-    return ok(req, camelize(data));
+    if (body.priceRules !== undefined) {
+      await supabaseAdmin.from("field_price_rules").delete().eq("field_id", body.id);
+      if (body.priceRules.length > 0) {
+        await supabaseAdmin.from("field_price_rules").insert(
+          body.priceRules.map((r) => ({
+            field_id: body.id,
+            day_of_week: r.dayOfWeek ?? null,
+            start_time: r.startTime,
+            end_time: r.endTime,
+            price: r.price,
+            priority: r.priority ?? 0
+          }))
+        );
+      }
+    }
+
+    const { data: refreshed, error: refErr } = await supabaseAdmin
+      .from("fields")
+      .select("*, field_type:field_types(*), field_operating_hours(*), field_price_rules(*)")
+      .eq("id", body.id)
+      .single();
+    dbError(refErr);
+
+    return ok(req, camelize(refreshed || data));
   },
   { allowedRoles: [UserRole.MITRA, UserRole.ADMIN], requireApprovedMitra: true }
 );
