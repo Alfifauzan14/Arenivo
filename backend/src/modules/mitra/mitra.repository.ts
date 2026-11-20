@@ -163,6 +163,14 @@ export const mitraRepository = {
   },
 
   async balance(mitraId: string) {
+    // Pastikan booking yang jam mainnya sudah lewat langsung selesai & masuk saldo mitra
+    try {
+      await supabaseAdmin.rpc("complete_booking");
+    } catch {
+      // abaikan jika gagal sementara
+    }
+
+    const venueIds = await this.venueIds(mitraId);
     const { data: bal } = await supabaseAdmin.from("mitra_balances").select("*").eq("mitra_id", mitraId).maybeSingle();
     const { data: entries } = await supabaseAdmin
       .from("mitra_balance_entries")
@@ -170,10 +178,43 @@ export const mitraRepository = {
       .eq("mitra_id", mitraId)
       .order("created_at", { ascending: false })
       .limit(100);
-    const formattedEntries = (entries || []).map((e: any) => ({
-      ...e,
-      booking_code: e.booking?.booking_code || null,
-    }));
+
+    const creditedBookingIds = new Set((entries || []).map((e: any) => e.booking_id).filter(Boolean));
+    let escrowEntries: any[] = [];
+    if (venueIds.length > 0) {
+      const { data: escrowBookings } = await supabaseAdmin
+        .from("bookings")
+        .select("id, booking_code, mitra_amount, created_at, updated_at")
+        .in("venue_id", venueIds)
+        .eq("source", "online")
+        .eq("status", "dikonfirmasi")
+        .gt("mitra_amount", 0)
+        .order("updated_at", { ascending: false })
+        .limit(50);
+
+      escrowEntries = (escrowBookings || [])
+        .filter((b: any) => !creditedBookingIds.has(b.id))
+        .map((b: any) => ({
+          id: `escrow-${b.id}`,
+          mitra_id: mitraId,
+          booking_id: b.id,
+          payout_id: null,
+          amount: b.mitra_amount,
+          entry_type: "hold",
+          description: `Dana Escrow (Menunggu Check-in / Selesai) ${b.booking_code}`,
+          booking_code: b.booking_code,
+          created_at: b.updated_at || b.created_at,
+        }));
+    }
+
+    const formattedEntries = [
+      ...escrowEntries,
+      ...(entries || []).map((e: any) => ({
+        ...e,
+        entry_type: e.amount < 0 ? "out" : "in",
+        booking_code: e.booking?.booking_code || null,
+      })),
+    ];
     return camelize<any>({
       ...(bal || { saldo_total: 0, saldo_tertahan: 0, saldo_bisa_dicairkan: 0 }),
       entries: formattedEntries,

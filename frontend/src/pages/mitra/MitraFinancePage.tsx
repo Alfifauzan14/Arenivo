@@ -128,12 +128,12 @@ export function MitraFinancePage() {
   const [bankAccount, setBankAccount] = React.useState("");
   const [accountHolder, setAccountHolder] = React.useState("");
 
-  // Ledger Mutasi Saldo (Realtime dari Database Supabase)
+  // Ledger Mutasi Saldo (Realtime dari Database Supabase + Escrow booking aktif)
   const ledgerEntries: BalanceEntry[] = React.useMemo(() => {
     if (!balance.entries || !Array.isArray(balance.entries)) return [];
     return balance.entries.map((e: any) => ({
       id: e.id,
-      type: (e.amount < 0 ? "out" : "in") as "in" | "out",
+      type: (e.entryType === "hold" ? "hold" : e.amount < 0 ? "out" : "in") as "in" | "out" | "hold",
       description: e.description || "Pendapatan Booking Online",
       orderCode: e.bookingCode || e.booking?.bookingCode || undefined,
       amount: Math.abs(e.amount),
@@ -350,6 +350,7 @@ export function MitraFinancePage() {
                 options={[
                   { value: "semua", label: `Semua Mutasi (${ledgerEntries.length})` },
                   { value: "in", label: "Dana Masuk (+)" },
+                  { value: "hold", label: "Tertahan (Escrow)" },
                   { value: "out", label: "Dana Keluar (-)" },
                 ]}
               />
@@ -377,16 +378,21 @@ export function MitraFinancePage() {
                           {rowNo}
                         </span>
                         <span className="font-mono font-bold text-slate-900 tabular-nums truncate">
-                          {ent.orderCode || (ent.type === "in" ? "UANG MASUK" : "PENCAIRAN")}
+                          {ent.orderCode || (ent.type === "in" ? "UANG MASUK" : ent.type === "hold" ? "ESCROW" : "PENCAIRAN")}
                         </span>
                       </div>
                       <span
                         className={`font-mono font-bold tabular-nums shrink-0 ${
-                          ent.type === "in" ? "text-emerald-700" : "text-slate-900"
+                          ent.type === "in"
+                            ? "text-emerald-700"
+                            : ent.type === "hold"
+                            ? "text-amber-700"
+                            : "text-slate-900"
                         }`}
                       >
-                        {ent.type === "in" ? "+" : "-"}
+                        {ent.type === "out" ? "-" : "+"}
                         {formatRupiah(ent.amount)}
+                        {ent.type === "hold" ? " (Escrow)" : ""}
                       </span>
                     </div>
 
@@ -447,11 +453,16 @@ export function MitraFinancePage() {
                         </TableCell>
                         <TableCell
                           className={`text-right font-mono font-bold tabular-nums whitespace-nowrap ${
-                            ent.type === "in" ? "text-emerald-700" : "text-slate-900"
+                            ent.type === "in"
+                              ? "text-emerald-700"
+                              : ent.type === "hold"
+                              ? "text-amber-700"
+                              : "text-slate-900"
                           }`}
                         >
-                          {ent.type === "in" ? "+" : "-"}
+                          {ent.type === "out" ? "-" : "+"}
                           {formatRupiah(ent.amount)}
+                          {ent.type === "hold" ? " (Escrow)" : ""}
                         </TableCell>
                       </TableRow>
                     );
