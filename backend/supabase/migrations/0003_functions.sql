@@ -269,7 +269,7 @@ begin
     end if;
     if v_amount > 0 or v_pct = 0 then
       insert into refunds(booking_id,payment_id,amount,refund_percent,status,reason,requested_by)
-      values (v_b.id,v_pay.id,v_amount,v_pct, case when v_amount > 0 then 'diajukan' else 'ditolak' end, p_reason, p_actor_id);
+      values (v_b.id,v_pay.id,v_amount,v_pct, (case when v_amount > 0 then 'diajukan' else 'ditolak' end)::refund_status, p_reason, p_actor_id);
     end if;
   end if;
   return v_b;

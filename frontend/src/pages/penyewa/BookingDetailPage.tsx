@@ -172,7 +172,11 @@ export function BookingDetailPage() {
     booking.status === BookingStatus.DIKONFIRMASI ||
     Boolean((booking as any).payments?.some((p: any) => p.status === "berhasil"));
   const refundPercent = !isPaidBooking ? 0 : hoursUntilPlay > 24 ? 100 : hoursUntilPlay >= 6 ? 50 : 0;
-  const estimatedRefundAmount = Math.round((booking.subtotal * refundPercent) / 100);
+  const refundableBase = Math.max(
+    0,
+    Number(booking.totalPrice ?? booking.subtotal) - Number(booking.serviceFee || 0)
+  );
+  const estimatedRefundAmount = Math.round((refundableBase * refundPercent) / 100);
 
   // Can cancel: status dikonfirmasi atau menunggu_bayar
   const canCancel =
