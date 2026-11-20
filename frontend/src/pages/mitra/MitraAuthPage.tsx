@@ -187,10 +187,13 @@ export function MitraAuthPage() {
           .eq("id", data.session.user.id)
           .single();
 
-        if (profile?.role !== "mitra" && profile?.role !== "admin") {
+        if (profile?.role !== "mitra") {
           await supabase.auth.signOut({ scope: "local" }).catch(() => {});
           setIsLoading(false);
-          const msg = "Akun ini bukan akun pengelola arena/mitra yang terdaftar.";
+          const msg =
+            profile?.role === "admin"
+              ? "Akses Ditolak: Akun Administrator silakan masuk melalui Portal Admin (/admin/login)."
+              : "Akun ini bukan akun pengelola arena/mitra yang terdaftar.";
           setLoginError(msg);
           addToast("error", msg, "Akses Ditolak");
           return;

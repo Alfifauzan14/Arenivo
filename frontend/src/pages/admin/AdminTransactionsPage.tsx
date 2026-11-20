@@ -378,7 +378,7 @@ export function AdminTransactionsPage() {
                     )}
                     <p className="text-slate-600">
                       Metode:{" "}
-                      <strong className="font-mono uppercase">{payment.paymentType}</strong>
+                      <strong className="font-mono uppercase">{payment.paymentType || "-"}</strong>
                     </p>
                     <p className="text-slate-600">
                       Status Pembayaran:{" "}

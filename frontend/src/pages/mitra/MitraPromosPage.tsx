@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useOutletContext } from "react-router-dom";
 import { Plus, Search, X, Trash2, Loader2 } from "lucide-react";
 import {
   Card,
@@ -21,6 +22,8 @@ import { apiClient } from "@/lib/api-client";
 import { formatRupiah, type Promo } from "@futsal/shared";
 
 export function MitraPromosPage() {
+  const outletCtx = useOutletContext<{ selectedVenueId?: string } | null>();
+  const activeVenueId = outletCtx?.selectedVenueId || "";
   const { addToast } = useToast();
   const [promos, setPromos] = React.useState<Promo[]>([]);
   const [venues, setVenues] = React.useState<any[]>([]);
@@ -34,12 +37,21 @@ export function MitraPromosPage() {
   const pageSize = 5;
 
   // Form Promo State
-  const [selectedVenueId, setSelectedVenueId] = React.useState("");
+  const [selectedVenueId, setSelectedVenueId] = React.useState(activeVenueId);
   const [code, setCode] = React.useState("");
   const [discountType, setDiscountType] = React.useState<"fixed" | "percent">("fixed");
   const [discountValue, setDiscountValue] = React.useState<number>(20000);
   const [minSpend, setMinSpend] = React.useState<number>(100000);
   const [quota, setQuota] = React.useState<number>(50);
+  const [endDateStr, setEndDateStr] = React.useState<string>(() =>
+    new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0]
+  );
+
+  React.useEffect(() => {
+    if (activeVenueId) {
+      setSelectedVenueId(activeVenueId);
+    }
+  }, [activeVenueId]);
 
   const loadData = React.useCallback(async () => {
     try {
@@ -50,14 +62,14 @@ export function MitraPromosPage() {
       if (Array.isArray(pRes.data)) setPromos(pRes.data);
       if (Array.isArray(vRes.data)) {
         setVenues(vRes.data);
-        setSelectedVenueId((prev) => prev || vRes.data[0]?.id || "");
+        setSelectedVenueId((prev) => prev || activeVenueId || vRes.data[0]?.id || "");
       }
     } catch {
       // biarkan state kosong
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeVenueId]);
 
   React.useEffect(() => {
     loadData();
@@ -96,6 +108,9 @@ export function MitraPromosPage() {
 
     setSaving(true);
     try {
+      const parsedEnd = endDateStr
+        ? new Date(`${endDateStr}T23:59:59+07:00`).toISOString()
+        : new Date(Date.now() + 30 * 86400000).toISOString();
       await apiClient.post("/mitra/promos", {
         venueId: vId,
         code: code.trim().toUpperCase(),
@@ -103,7 +118,7 @@ export function MitraPromosPage() {
         discountValue: Math.max(1, Math.round(discountValue)),
         minSpend: Math.max(0, Math.round(minSpend)),
         quota: Math.max(0, Math.round(quota)),
-        endDate: new Date(Date.now() + 30 * 86400000).toISOString(),
+        endDate: parsedEnd,
       });
 
       setIsModalOpen(false);
@@ -363,6 +378,15 @@ export function MitraPromosPage() {
               onChange={(e) => setQuota(parseInt(e.target.value, 10) || 0)}
             />
           </div>
+
+          <Input
+            label="Berlaku Sampai Tanggal"
+            type="date"
+            min={new Date().toISOString().split("T")[0]}
+            value={endDateStr}
+            onChange={(e) => setEndDateStr(e.target.value)}
+            required
+          />
 
           <div className="flex gap-2.5 pt-3 border-t border-slate-100">
             <Button

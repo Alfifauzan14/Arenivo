@@ -123,16 +123,16 @@ export function VenueCard({ venue, className }: VenueCardProps) {
 
         {/* 3. Bagian Bawah: Harga Mulai Rp... /sesi & Tombol Pilih Jam (1 Baris Sejajar) */}
         <div className="pt-3.5 mt-3.5 border-t border-slate-100 flex items-center justify-between gap-2">
-          <div className="text-xs text-slate-600 whitespace-nowrap truncate">
+          <div className="text-xs text-slate-600 whitespace-nowrap">
             <span>Mulai </span>
-            <span className="text-sm sm:text-base font-extrabold text-slate-900 tabular-nums">
+            <span className="text-sm font-extrabold text-slate-900 tabular-nums">
               {formatRupiah(venue.startingPrice || 150000)}
             </span>
-            <span className="text-[11px] text-slate-600 font-normal"> /sesi</span>
+            <span className="text-[11px] text-slate-600 font-normal">/sesi</span>
           </div>
 
           <Link to={`/venues/${venue.slug}`} className="shrink-0">
-            <Button variant="primary" size="sm" className="rounded-lg font-bold shadow-xs px-3.5 py-1.5 text-xs">
+            <Button variant="primary" size="sm" className="rounded-lg font-bold shadow-xs px-3 py-1.5 text-xs">
               Pilih Jam
             </Button>
           </Link>

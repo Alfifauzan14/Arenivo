@@ -30,6 +30,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { apiClient } from "@/lib/api-client";
+import { downloadReportPdf } from "@/lib/pdf-export";
 import {
   formatRupiah,
   formatDateIndo,
@@ -188,7 +189,36 @@ export function BookingDetailPage() {
 
   // 4. Action Handlers
   const handlePrintPdf = () => {
-    window.print();
+    const playDate = booking.playStart ? booking.playStart.split("T")[0] : "-";
+    const startTime = booking.playStart
+      ? new Date(booking.playStart).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+      : "-";
+    const endTime = booking.playEnd
+      ? new Date(booking.playEnd).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+      : "-";
+    downloadReportPdf({
+      filename: `etiket-arenivo-${booking.bookingCode}.pdf`,
+      title: `E-Tiket & Ringkasan Booking ${booking.bookingCode}`,
+      subtitle: `Diterbitkan oleh Arenivo pada ${new Date().toLocaleString("id-ID")} WIB`,
+      summaryLines: [
+        `Kode Booking : ${booking.bookingCode}   |   No. E-Tiket : ${ticket.ticketCode}`,
+        `Status Pesanan : ${String(booking.status || "").toUpperCase()}`,
+        `Venue : ${booking.venue?.name || "-"}   |   Lapangan : ${booking.field?.name || "-"}`,
+        `Jadwal Main : ${formatDateIndo(playDate, false)} (${startTime} - ${endTime} WIB, ${booking.totalHours} Jam)`,
+        `Penyewa : ${booking.customerName || "-"} (${booking.customerPhone || "-"})`,
+      ],
+      columns: [
+        { header: "Komponen Biaya", width: 42 },
+        { header: "Nominal", width: 22 },
+      ],
+      rows: [
+        [`Sewa Lapangan (${booking.totalHours} Jam)`, formatRupiah(booking.subtotal)],
+        ["Biaya Layanan Platform", formatRupiah(booking.serviceFee)],
+        ...(booking.discount > 0 ? [["Diskon Promo", `-${formatRupiah(booking.discount)}`]] : []),
+        ["Total Tagihan", formatRupiah(booking.totalPrice)],
+      ],
+    });
+    addToast("success", `E-Tiket PDF etiket-arenivo-${booking.bookingCode}.pdf berhasil diunduh.`, "Unduhan Selesai");
   };
 
   const handleSaveToGoogleCalendar = () => {
@@ -472,58 +502,104 @@ export function BookingDetailPage() {
         onClose={() => setIsInvoiceOpen(false)}
         title="Bukti Pembayaran / Invoice Resmi"
       >
-        <div className="space-y-4 text-xs">
-          <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Nomor Invoice:</span>
-              <span className="font-mono font-bold text-slate-900">
-                INV-{booking.bookingCode}-2026
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Waktu Pembayaran:</span>
-              <span className="font-mono text-slate-800">
-                {formatDateIndo(booking.createdAt?.split("T")[0] || "2026-10-15")} 08:35 WIB
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Metode Bayar:</span>
-              <span className="font-semibold text-slate-800">Midtrans QRIS (GoPay/BCA)</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Status Pembayaran:</span>
-              <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-bold">
-                LUNAS (Settlement)
-              </span>
-            </div>
-          </div>
+        {(() => {
+          const paymentsList: any[] = Array.isArray((booking as any).payments)
+            ? (booking as any).payments
+            : [];
+          const settledPayment = paymentsList.find((p) => p.status === "berhasil");
+          const latestPayment = settledPayment || paymentsList[0];
+          const isBookingSettled =
+            Boolean(settledPayment) ||
+            booking.status === BookingStatus.DIKONFIRMASI ||
+            booking.status === BookingStatus.DIGUNAKAN ||
+            booking.status === BookingStatus.SELESAI;
+          const paidTimestamp =
+            settledPayment?.paidAt ||
+            settledPayment?.updatedAt ||
+            (isBookingSettled ? booking.updatedAt || booking.createdAt : null);
+          const paidTimeText = paidTimestamp
+            ? `${formatDateIndo(paidTimestamp.split("T")[0])} ${new Date(
+                paidTimestamp
+              ).toLocaleTimeString("id-ID", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })} WIB`
+            : "-";
+          const paymentMethodLabel = latestPayment?.paymentType
+            ? String(latestPayment.paymentType).toUpperCase().replace(/_/g, " ")
+            : booking.source === "manual"
+            ? "Tunai (Walk-In Mitra)"
+            : "Belum Dipilih / Belum Bayar";
+          const statusLabel = isBookingSettled
+            ? "LUNAS (Settlement)"
+            : booking.status === BookingStatus.MENUNGGU_BAYAR
+            ? "MENUNGGU PEMBAYARAN"
+            : booking.status === BookingStatus.KEDALUWARSA
+            ? "KEDALUWARSA"
+            : "DIBATALKAN";
+          const statusClass = isBookingSettled
+            ? "bg-emerald-50 text-emerald-700"
+            : booking.status === BookingStatus.MENUNGGU_BAYAR
+            ? "bg-amber-50 text-amber-700"
+            : "bg-rose-50 text-rose-700";
 
-          <div className="space-y-2 pt-2 border-t border-slate-100">
-            <div className="flex justify-between">
-              <span className="text-slate-600">Sewa Lapangan ({booking.totalHours} Jam):</span>
-              <span className="font-mono">{formatRupiah(booking.subtotal)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-600">Biaya Layanan Platform:</span>
-              <span className="font-mono">{formatRupiah(booking.serviceFee)}</span>
-            </div>
-            {booking.discount > 0 && (
-              <div className="flex justify-between text-emerald-600 font-medium">
-                <span>Diskon Promo:</span>
-                <span className="font-mono">-{formatRupiah(booking.discount)}</span>
+          return (
+            <div className="space-y-4 text-xs">
+              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2">
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">Nomor Invoice:</span>
+                  <span className="font-mono font-bold text-slate-900">
+                    INV-{booking.bookingCode}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">Waktu Pembayaran:</span>
+                  <span className="font-mono text-slate-800 text-right">{paidTimeText}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">Metode Bayar:</span>
+                  <span className="font-semibold text-slate-800 text-right">{paymentMethodLabel}</span>
+                </div>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-slate-500">Status Pembayaran:</span>
+                  <span className={cn("px-2 py-0.5 rounded-md font-bold", statusClass)}>
+                    {statusLabel}
+                  </span>
+                </div>
               </div>
-            )}
-            <div className="flex justify-between text-sm font-extrabold text-slate-900 pt-2 border-t border-slate-200">
-              <span>Total Dibayar:</span>
-              <span className="font-mono text-red-600">{formatRupiah(booking.totalPrice)}</span>
-            </div>
-          </div>
 
-          <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-xs text-[11px] text-slate-600 flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Dokumen invoice ini sah diterbitkan otomatis oleh sistem Arenivo.</span>
-          </div>
-        </div>
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Sewa Lapangan ({booking.totalHours} Jam):</span>
+                  <span className="font-mono">{formatRupiah(booking.subtotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Biaya Layanan Platform:</span>
+                  <span className="font-mono">{formatRupiah(booking.serviceFee)}</span>
+                </div>
+                {booking.discount > 0 && (
+                  <div className="flex justify-between text-emerald-600 font-medium">
+                    <span>Diskon Promo:</span>
+                    <span className="font-mono">-{formatRupiah(booking.discount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm font-extrabold text-slate-900 pt-2 border-t border-slate-200">
+                  <span>{isBookingSettled ? "Total Dibayar:" : "Total Tagihan:"}</span>
+                  <span className="font-mono text-red-600">{formatRupiah(booking.totalPrice)}</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-xs text-[11px] text-slate-600 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  {isBookingSettled
+                    ? "Bukti pembayaran ini sah diterbitkan otomatis oleh sistem Arenivo."
+                    : "Tagihan ini belum berstatus lunas. Selesaikan pembayaran untuk menerbitkan bukti lunas."}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* 5. MODAL: Reschedule Jadwal */}

@@ -1119,7 +1119,7 @@ export function VenueDetailPage() {
                           onClick={() => toggleExpandField(field.id)}
                           className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
                         >
-                          <span>{availableCount} Jadwal Tersedia</span>
+                          <span>{isSlotsLoading ? "Memuat jadwal..." : `${availableCount} Jadwal Tersedia`}</span>
                           {isExpanded ? (
                             <ChevronUp className="w-4 h-4" />
                           ) : (

@@ -533,7 +533,9 @@ export function AdminMitraPage() {
                 Dokumen Legalitas Usaha (NIB / SIUP / KTP)
               </span>
               <p className="text-slate-500 text-[11px]">
-                Dokumen tersimpan aman pada Cloud Storage dengan Signed URL kedaluwarsa 15 menit.
+                {selectedMitra.documentUrl?.includes("/storage/v1/object/public/")
+                  ? "Dokumen legalitas usaha tersimpan pada Cloud Storage Arenivo."
+                  : "Dokumen tersimpan aman pada Cloud Storage dengan Signed URL kedaluwarsa 15 menit."}
               </p>
               <div className="flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-md">
                 <span className="font-mono text-[11px] text-slate-600 truncate max-w-[280px]">

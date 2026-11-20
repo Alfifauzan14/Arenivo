@@ -31,12 +31,14 @@ export function AuthPage() {
   const [loginError, setLoginError] = React.useState<string | null>(null);
   const isValidatingLoginRef = React.useRef(false);
 
-  // Jika akun admin sudah login sebelum membuka /login, putuskan sesi tanpa menimpa proses validasi submit
+  // Jika akun admin/mitra sudah login sebelum membuka /login, putuskan sesi tanpa menimpa proses validasi submit
   React.useEffect(() => {
     if (isValidatingLoginRef.current) return;
-    if (isLoggedIn && user?.role === "admin") {
+    if (isLoggedIn && (user?.role === "admin" || user?.role === "mitra")) {
       const msg =
-        "Akun Administrator tidak diizinkan berada di sesi penyewa. Silakan masuk melalui Portal Admin (/admin/login).";
+        user.role === "admin"
+          ? "Akun Administrator tidak diizinkan berada di sesi penyewa. Silakan masuk melalui Portal Admin (/admin/login)."
+          : "Akun Mitra Arena tidak diizinkan berada di sesi penyewa. Silakan masuk melalui Portal Mitra (/mitra/login).";
       setLoginError(msg);
       void logout({ redirect: false });
       addToast("error", msg, "Akses Ditolak");
@@ -154,16 +156,19 @@ export function AuthPage() {
             }
           }
 
-          if (
-            userRole === "admin" ||
-            data.session.user.app_metadata?.role === "admin" ||
-            data.session.user.user_metadata?.role === "admin"
-          ) {
+          const resolvedRole =
+            userRole ||
+            data.session.user.app_metadata?.role ||
+            data.session.user.user_metadata?.role;
+
+          if (resolvedRole === "admin" || resolvedRole === "mitra") {
             await logout({ redirect: false });
             isValidatingLoginRef.current = false;
             setIsLoading(false);
             const denyMsg =
-              "Akses Ditolak: Akun Administrator tidak diizinkan masuk melalui login penyewa. Silakan masuk melalui Portal Admin (/admin/login).";
+              resolvedRole === "admin"
+                ? "Akses Ditolak: Akun Administrator tidak diizinkan masuk melalui login penyewa. Silakan masuk melalui Portal Admin (/admin/login)."
+                : "Akses Ditolak: Akun Mitra Arena tidak diizinkan masuk melalui login penyewa. Silakan masuk melalui Portal Mitra (/mitra/login).";
             setLoginError(denyMsg);
             addToast("error", denyMsg, "Akses Ditolak");
             return;
@@ -175,7 +180,7 @@ export function AuthPage() {
           isValidatingLoginRef.current = false;
           setIsLoading(false);
           addToast("success", "Selamat datang kembali!", "Autentikasi Berhasil");
-          navigate(userRole === "mitra" ? "/mitra" : "/bookings");
+          navigate("/bookings");
         }
       } catch (err: any) {
         isValidatingLoginRef.current = false;
@@ -425,11 +430,12 @@ export function AuthPage() {
                     </button>
                   </div>
 
-                  <div className="relative flex items-center justify-center pt-0.5">
-                    <div className="border-t border-slate-200 w-full" />
-                    <span className="bg-white px-3 text-[10px] text-slate-400 uppercase font-mono tracking-wider">
+                  <div className="relative flex items-center justify-center pt-0.5 gap-3">
+                    <div className="border-t border-slate-200 flex-1" />
+                    <span className="bg-white px-2 text-[10px] text-slate-400 uppercase font-mono tracking-wider whitespace-nowrap shrink-0">
                       atau via email
                     </span>
+                    <div className="border-t border-slate-200 flex-1" />
                   </div>
 
                   {/* Email */}
@@ -495,7 +501,7 @@ export function AuthPage() {
                       to="/forgot-password"
                       className="text-xs font-semibold text-red-600 hover:text-red-700 hover:underline"
                     >
-                      Forgot Password?
+                      Lupa Kata Sandi?
                     </Link>
                   </div>
                 </div>
@@ -744,7 +750,7 @@ export function AuthPage() {
                   onClick={() => handleModeChange("register")}
                   className="font-bold text-red-600 hover:text-red-700 hover:underline cursor-pointer"
                 >
-                  Create Your Account →
+                  Buat Akun Baru →
                 </button>
               </p>
             ) : (

@@ -8,6 +8,7 @@ import {
   Plus,
   Star,
   Trophy,
+  Upload,
   Video,
   Loader2,
 } from "lucide-react";
@@ -42,6 +43,8 @@ export function MitraVenuesPage() {
   const [latitude, setLatitude] = React.useState<number>(-6.2915);
   const [longitude, setLongitude] = React.useState<number>(106.7984);
   const [youtubeUrl, setYoutubeUrl] = React.useState("");
+  const [coverPhotoUrl, setCoverPhotoUrl] = React.useState("");
+  const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
   const [rules, setRules] = React.useState("");
   const [selectedFacilityIds, setSelectedFacilityIds] = React.useState<string[]>([]);
 
@@ -77,6 +80,7 @@ export function MitraVenuesPage() {
     setLatitude(-6.2915);
     setLongitude(106.7984);
     setYoutubeUrl("");
+    setCoverPhotoUrl("/images/venues/venue-champion-vinyl.webp");
     setRules("1. Wajib mengenakan sepatu sol karet.\n2. Dilarang merokok di area lapangan.");
     setSelectedFacilityIds([]);
     setIsModalOpen(true);
@@ -89,10 +93,50 @@ export function MitraVenuesPage() {
     setAddress(v.address);
     setLatitude(v.latitude || -6.2915);
     setLongitude(v.longitude || 106.7984);
-    setYoutubeUrl(v.youtubeUrl || "");
+    setYoutubeUrl(v.youtubeUrl && !v.youtubeUrl.includes("dQw4w9WgXcQ") ? v.youtubeUrl : "");
+    const existingCover =
+      v.photos?.find((p: any) => p.isCover)?.url ||
+      v.photos?.[0]?.url ||
+      "/images/venues/venue-champion-vinyl.webp";
+    setCoverPhotoUrl(existingCover);
     setRules(v.rules || "");
     setSelectedFacilityIds((v.facilities || []).map((f: any) => f.id).filter(Boolean));
     setIsModalOpen(true);
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      addToast("warning", "Mohon pilih berkas gambar (JPG, PNG, atau WebP).", "Format Tidak Valid");
+      return;
+    }
+    setUploadingPhoto(true);
+    try {
+      const signRes = await apiClient.post<{ signedUrl: string; publicUrl: string }>("/uploads/sign", {
+        bucket: "venue-photos",
+        fileName: file.name,
+        contentType: file.type,
+      });
+      const signedUrl = signRes.data?.signedUrl;
+      const publicUrl = signRes.data?.publicUrl;
+      if (!signedUrl || !publicUrl) throw new Error("Signed URL tidak tersedia.");
+
+      const putRes = await fetch(signedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "image/jpeg" },
+        body: file,
+      });
+      if (!putRes.ok) throw new Error("Gagal mengunggah gambar ke Storage.");
+
+      setCoverPhotoUrl(publicUrl);
+      addToast("success", "Foto sampul venue siap disimpan.", "Foto Terunggah");
+    } catch (err: any) {
+      addToast("error", err?.message || "Gagal mengunggah foto venue.", "Upload Gagal");
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = "";
+    }
   };
 
   const toggleFacility = (id: string) => {
@@ -125,13 +169,16 @@ export function MitraVenuesPage() {
         facilityIds: selectedFacilityIds,
       };
 
+      const existingOtherPhotos = (editingVenue?.photos || [])
+        .filter((p: any) => p.url && p.url !== coverPhotoUrl && !p.isCover)
+        .map((p: any) => ({ url: p.url, isCover: false }));
+      const finalCover = coverPhotoUrl.trim() || "/images/venues/venue-champion-vinyl.webp";
+      payload.photos = [{ url: finalCover, isCover: true }, ...existingOtherPhotos];
+
       if (editingVenue) {
         await apiClient.patch("/mitra/venues", { id: editingVenue.id, ...payload });
         addToast("success", `Venue "${name.trim()}" berhasil diperbarui ke database.`, "Tersimpan");
       } else {
-        payload.photos = [
-          { url: "/images/venues/venue-champion-vinyl.webp", isCover: true },
-        ];
         await apiClient.post("/mitra/venues", payload);
         addToast("success", `Venue baru "${name.trim()}" berhasil disimpan ke database.`, "Venue Ditambahkan");
       }
@@ -345,6 +392,31 @@ export function MitraVenuesPage() {
                 style={{ border: 0 }}
                 loading="lazy"
               />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="font-semibold text-slate-700 block">Foto Sampul Venue</label>
+            <div className="flex items-center gap-3 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+              <img
+                src={coverPhotoUrl || "/images/venues/venue-champion-vinyl.webp"}
+                alt="Preview Sampul Venue"
+                className="w-20 h-14 object-cover rounded-md border border-slate-200 shrink-0 bg-white"
+              />
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs cursor-pointer shadow-xs">
+                  <Upload className="w-3.5 h-3.5 text-red-600" />
+                  <span>{uploadingPhoto ? "Mengunggah..." : "Unggah Foto Baru"}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={uploadingPhoto}
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
+                </label>
+                <p className="text-[11px] text-slate-500 truncate">{coverPhotoUrl}</p>
+              </div>
             </div>
           </div>
 

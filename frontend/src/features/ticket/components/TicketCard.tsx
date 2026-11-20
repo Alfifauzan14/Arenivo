@@ -1,7 +1,8 @@
 import * as React from "react";
-import { Copy, Check, ShieldCheck } from "lucide-react";
+import { Copy, Check, ShieldCheck, QrCode, Clock } from "lucide-react";
 import { BookingStatusBadge, useToast } from "@/components/ui";
 import {
+  BookingStatus,
   formatDateIndo,
   formatRupiah,
   type Booking,
@@ -24,6 +25,10 @@ export function TicketCard({ booking, ticket, className }: TicketCardProps) {
   const [copiedCode, setCopiedCode] = React.useState<string | null>(null);
 
   const ticketCode = ticket?.ticketCode || `TKT-${booking.bookingCode}-9A2`;
+  const isTicketActive =
+    booking.status === BookingStatus.DIKONFIRMASI ||
+    booking.status === BookingStatus.DIGUNAKAN ||
+    booking.status === BookingStatus.SELESAI;
   const qrDataUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=${encodeURIComponent(
     ticketCode
   )}`;
@@ -151,15 +156,38 @@ export function TicketCard({ booking, ticket, className }: TicketCardProps) {
 
         {/* Kolom Kanan: QR Code Simple */}
         <div className="sm:col-span-5 flex flex-col items-center justify-center sm:border-l border-t sm:border-t-0 border-slate-100 pt-4 sm:pt-0 sm:pl-4 text-center space-y-1.5">
-          <img
-            src={qrDataUrl}
-            alt={`QR Code ${ticketCode}`}
-            className="w-32 h-32 object-contain rounded-lg border border-slate-200 p-1.5 bg-white"
-            loading="lazy"
-          />
-          <span className="text-[11px] font-bold text-slate-900 block">
-            Scan QR di Gate Masuk
-          </span>
+          {isTicketActive ? (
+            <>
+              <img
+                src={qrDataUrl}
+                alt={`QR Code ${ticketCode}`}
+                width={128}
+                height={128}
+                className="w-32 h-32 object-contain rounded-lg border border-slate-200 p-1.5 bg-white"
+              />
+              <span className="text-[11px] font-bold text-slate-900 block">
+                Scan QR di Gate Masuk
+              </span>
+            </>
+          ) : (
+            <div className="w-32 h-32 rounded-lg border border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center p-3 gap-1.5 text-slate-500">
+              {booking.status === BookingStatus.MENUNGGU_BAYAR ? (
+                <>
+                  <Clock className="w-7 h-7 text-amber-500" />
+                  <span className="text-[10px] font-semibold leading-tight text-slate-600">
+                    QR aktif setelah lunas
+                  </span>
+                </>
+              ) : (
+                <>
+                  <QrCode className="w-7 h-7 text-slate-400" />
+                  <span className="text-[10px] font-semibold leading-tight text-slate-500">
+                    Tiket tidak aktif
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

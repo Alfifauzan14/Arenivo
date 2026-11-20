@@ -2,7 +2,7 @@ import { z } from "zod";
 import { AppError, ErrorCode, UserRole } from "@futsal/shared";
 import { withAuth } from "@/middleware/auth";
 import { handleOptions } from "@/middleware/cors";
-import { idParam, ok, parseBody } from "@/lib/http";
+import { idParam, ok, parseBody, reqIp } from "@/lib/http";
 import { adminRepository } from "@/modules/admin/admin.repository";
 
 export const OPTIONS = handleOptions;
@@ -22,22 +22,19 @@ export const POST = withAuth(
       proofUrl: undefined,
       reason: undefined
     }));
+    const ip = reqIp(req);
 
     if (action === "approve" || action === "complete") {
-      const updated = await adminRepository.finishRefund(
-        id,
-        user.id,
-        body.reference ?? body.proofUrl ?? `REF-${Date.now()}`
-      );
+      const ref = body.reference ?? body.proofUrl ?? `REF-${Date.now()}`;
+      const updated = await adminRepository.finishRefund(id, user.id, ref);
+      await adminRepository.audit(user.id, "refund.complete", "refunds", id, `Refund selesai (${ref})`, ip);
       return ok(req, updated);
     }
 
     if (action === "reject") {
-      const updated = await adminRepository.rejectRefund(
-        id,
-        user.id,
-        body.reason ?? "Ditolak oleh Admin"
-      );
+      const reason = body.reason ?? "Ditolak oleh Admin";
+      const updated = await adminRepository.rejectRefund(id, user.id, reason);
+      await adminRepository.audit(user.id, "refund.reject", "refunds", id, reason, ip);
       return ok(req, updated);
     }
 

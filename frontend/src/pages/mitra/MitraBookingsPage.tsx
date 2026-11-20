@@ -387,7 +387,7 @@ export function MitraBookingsPage() {
           </div>
 
           {/* 2. Tampilan Web / Desktop: Tabel Modern Header Merah Soft */}
-          <div className="hidden md:block">
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -436,7 +436,7 @@ export function MitraBookingsPage() {
                             </a>
                           </div>
                         </TableCell>
-                        <TableCell className="text-slate-700 font-medium whitespace-nowrap">
+                        <TableCell className="text-slate-700 font-medium max-w-[160px] truncate" title={b.field?.name}>
                           {b.field?.name}
                         </TableCell>
                         <TableCell className="font-mono text-slate-600 tabular-nums whitespace-nowrap">
@@ -633,35 +633,50 @@ export function MitraBookingsPage() {
             {/* Rincian Finansial */}
             {(() => {
               const subtotal = Number(selectedBookingDetail.subtotal || selectedBookingDetail.totalPrice || 0);
+              const discount = Number(selectedBookingDetail.discount || 0);
               const commission = Number(selectedBookingDetail.platformCommission || 0);
               const serviceFee = Number(selectedBookingDetail.serviceFee || 0);
               const commissionPct = subtotal > 0 ? Math.round((commission / subtotal) * 100) : 0;
               const rawNet = Number(selectedBookingDetail.mitraAmount ?? Math.max(0, subtotal - commission));
-              const safeNet = Math.min(rawNet, Number(selectedBookingDetail.totalPrice || rawNet));
+              const safeNet = Math.min(rawNet, Number(subtotal || rawNet));
               return (
                 <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">Total Transaksi Penyewa</span>
+                  <div className="flex justify-between items-center text-slate-600">
+                    <span>Subtotal Sewa Lapangan</span>
+                    <span className="font-mono font-semibold text-slate-900">
+                      {formatRupiah(subtotal)}
+                    </span>
+                  </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between items-center text-emerald-700">
+                      <span>Diskon Promo</span>
+                      <span className="font-mono font-semibold">
+                        -{formatRupiah(discount)}
+                      </span>
+                    </div>
+                  )}
+                  {serviceFee > 0 && (
+                    <div className="flex justify-between items-center text-slate-500">
+                      <span>Biaya Layanan Aplikasi (Ditanggung Penyewa)</span>
+                      <span className="font-mono text-slate-700">
+                        +{formatRupiah(serviceFee)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-1.5 border-t border-slate-100">
+                    <span className="text-slate-600 font-medium">Total Dibayar Penyewa</span>
                     <span className="font-mono font-bold text-slate-900">
                       {formatRupiah(selectedBookingDetail.totalPrice)}
                     </span>
                   </div>
-                  {serviceFee > 0 && (
-                    <div className="flex justify-between items-center text-slate-500">
-                      <span>Biaya Layanan Aplikasi (Platform)</span>
-                      <span className="font-mono text-slate-600">
-                        -{formatRupiah(serviceFee)}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center text-slate-500">
-                    <span>Komisi Platform{commissionPct > 0 ? ` (${commissionPct}%)` : ""}</span>
+                  <div className="flex justify-between items-center text-slate-500 pt-1.5 border-t border-dashed border-slate-200">
+                    <span>Komisi Platform dari Sewa{commissionPct > 0 ? ` (${commissionPct}%)` : ""}</span>
                     <span className="font-mono text-red-600">
                       -{formatRupiah(commission)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                    <span className="font-semibold text-slate-800">Pendapatan Bersih Mitra</span>
+                    <span className="font-semibold text-slate-800">Pendapatan Bersih Mitra (Sewa - Komisi)</span>
                     <span className="font-mono font-bold text-emerald-700 text-sm">
                       {formatRupiah(safeNet)}
                     </span>

@@ -150,6 +150,7 @@ export const router = createBrowserRouter([
       { path: "reviews", element: lazy(AdminContentPage) },
       { path: "settings", element: lazy(AdminSettingsPage) },
       { path: "audit-logs", element: lazy(AdminAuditLogsPage) },
+      { path: "logs", element: <Navigate to="/admin/audit-logs" replace /> },
     ],
   },
 

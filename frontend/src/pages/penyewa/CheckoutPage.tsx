@@ -803,40 +803,40 @@ export function CheckoutPage() {
 
               {/* Rincian item */}
               <div className="space-y-2.5 text-xs">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center gap-3">
                   <span className="text-slate-600">
                     Sewa Lapangan ({hoursCount} Jam x {formatRupiah(field.basePrice)}):
                   </span>
-                  <span className="font-mono text-slate-800 tabular-nums">
+                  <span className="font-mono text-slate-800 tabular-nums whitespace-nowrap shrink-0">
                     {formatRupiah(calculatedSubtotal)}
                   </span>
                 </div>
 
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center gap-3">
                   <span className="text-slate-600 flex items-center gap-1">
                     Biaya Layanan Platform
-                    <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                    <HelpCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   </span>
-                  <span className="font-mono text-slate-800 tabular-nums">
+                  <span className="font-mono text-slate-800 tabular-nums whitespace-nowrap shrink-0">
                     {formatRupiah(serviceFee)}
                   </span>
                 </div>
 
                 {appliedPromo && (
-                  <div className="flex justify-between items-center text-emerald-600 font-medium">
+                  <div className="flex justify-between items-center gap-3 text-emerald-600 font-medium">
                     <span>Diskon Promo ({appliedPromo.code}):</span>
-                    <span className="font-mono tabular-nums">
+                    <span className="font-mono tabular-nums whitespace-nowrap shrink-0">
                       -{formatRupiah(appliedPromo.discount)}
                     </span>
                   </div>
                 )}
 
-                <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline">
+                <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline gap-3">
                   <div>
                     <span className="text-xs font-bold text-slate-900 block">Total Tagihan</span>
                     <span className="text-[10px] text-slate-400 font-mono">Sudah termasuk PPN</span>
                   </div>
-                  <span className="text-xl font-black font-mono text-red-600 tabular-nums">
+                  <span className="text-xl font-black font-mono text-red-600 tabular-nums whitespace-nowrap shrink-0">
                     {formatRupiah(finalTotalPrice)}
                   </span>
                 </div>

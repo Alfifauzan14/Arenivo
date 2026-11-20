@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useOutletContext } from "react-router-dom";
 import {
   Ban,
   Calendar as CalendarIcon,
@@ -37,8 +38,10 @@ interface ExtendedSlotItem extends SlotItem {
 }
 
 export function MitraSchedulePage() {
+  const outletCtx = useOutletContext<{ selectedVenueId?: string } | null>();
+  const activeVenueId = outletCtx?.selectedVenueId || "";
   const { addToast } = useToast();
-  const [fields, setFields] = React.useState<any[]>([]);
+  const [allFields, setAllFields] = React.useState<any[]>([]);
   const [selectedFieldId, setSelectedFieldId] = React.useState("");
   const [selectedDate, setSelectedDate] = React.useState(() => {
     const now = new Date(Date.now() + 7 * 60 * 60000);
@@ -71,8 +74,7 @@ export function MitraSchedulePage() {
         if (active && Array.isArray(res.data)) {
           const activeFields = res.data.filter((f) => f.status === "aktif");
           const list = activeFields.length > 0 ? activeFields : res.data;
-          setFields(list);
-          if (list.length > 0) setSelectedFieldId(list[0].id);
+          setAllFields(list);
         }
       })
       .catch(() => {})
@@ -83,6 +85,22 @@ export function MitraSchedulePage() {
       active = false;
     };
   }, []);
+
+  const fields = React.useMemo(() => {
+    if (!activeVenueId) return allFields;
+    const filtered = allFields.filter((f) => f.venueId === activeVenueId);
+    return filtered.length > 0 ? filtered : allFields;
+  }, [allFields, activeVenueId]);
+
+  React.useEffect(() => {
+    if (fields.length === 0) {
+      setSelectedFieldId("");
+      return;
+    }
+    if (!fields.some((f) => f.id === selectedFieldId)) {
+      setSelectedFieldId(fields[0].id);
+    }
+  }, [fields, selectedFieldId]);
 
   const currentField = fields.find((f) => f.id === selectedFieldId) || fields[0] || { name: "-", basePrice: 0 };
 

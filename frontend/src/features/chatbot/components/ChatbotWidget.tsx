@@ -21,16 +21,17 @@ interface ChatMessage {
 }
 
 function renderFormattedText(text: string) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  const cleaned = text.replace(/^\s*\*\s+/gm, "• ");
+  const parts = cleaned.split(/(\*\*[\s\S]+?\*\*)/g);
   return parts.map((part, idx) => {
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
       return (
         <strong key={idx} className="font-bold text-slate-900">
-          {part.slice(2, -2)}
+          {part.slice(2, -2).replace(/\*\*/g, "")}
         </strong>
       );
     }
-    return <React.Fragment key={idx}>{part}</React.Fragment>;
+    return <React.Fragment key={idx}>{part.replace(/\*\*/g, "")}</React.Fragment>;
   });
 }
 
@@ -291,14 +292,14 @@ Anda dapat langsung klik nama venue untuk mengecek slot kosong jam 19.00 - 22.00
           </div>
 
           {/* Quick Replies Chips */}
-          <div className="p-2 bg-white border-t border-slate-100 flex items-center gap-1.5 overflow-x-auto text-[11px] scrollbar-none">
+          <div className="p-2 bg-white border-t border-slate-100 flex flex-wrap items-center gap-1.5 text-[11px]">
             {quickReplies.map((qr, i) => (
               <button
                 key={i}
                 type="button"
                 disabled={isTyping}
                 onClick={() => void handleSendMessage(qr)}
-                className="px-2.5 py-1 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50 font-medium rounded-lg whitespace-nowrap transition-colors shrink-0 border border-red-200/70 cursor-pointer"
+                className="px-2.5 py-1 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50 font-medium rounded-lg transition-colors border border-red-200/70 cursor-pointer text-left"
               >
                 {qr}
               </button>

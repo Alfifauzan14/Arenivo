@@ -44,7 +44,7 @@ export function MitraLayout() {
       navigate("/mitra/login", { replace: true });
       return;
     }
-    if (user.role !== "mitra" && user.role !== "admin") {
+    if (user.role !== "mitra") {
       localStorage.removeItem("futsal_mitra_authenticated");
       navigate("/mitra/login", { replace: true });
       return;

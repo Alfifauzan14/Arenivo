@@ -2,7 +2,7 @@ import { supabaseAdmin } from "../../lib/supabase";
 import { rpc, camelize, dbError, orNotFound } from "../../lib/http";
 import type { CreateBookingInput } from "@futsal/shared";
 
-const BOOKING_SELECT = `*, venue:venues(id, name, slug, address), field:fields(id, name, base_price)`;
+const BOOKING_SELECT = `*, venue:venues(id, name, slug, address, photos:venue_photos(*)), field:fields(id, name, base_price)`;
 
 export const bookingsRepository = {
   create(userId: string, input: CreateBookingInput, idempotencyKey: string) {

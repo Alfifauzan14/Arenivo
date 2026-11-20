@@ -200,17 +200,12 @@ export function BookingListPage() {
                   {/* 1. Foto Cover Bersih + Status & Kode Booking */}
                   <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
                     <Link
-                      to={
-                        isWaitingPayment
-                          ? `/checkout/${booking.id}`
-                          : isConfirmed || isCompleted
-                          ? `/bookings/${booking.id}`
-                          : `/venues/${booking.venue?.slug || ""}`
-                      }
+                      to={`/bookings/${booking.id}`}
                       className="block w-full h-full"
                     >
                       <img
                         src={
+                          booking.venue?.photos?.find((p: any) => p.isCover)?.url ||
                           booking.venue?.photos?.[0]?.url ||
                           "/images/venues/venue-champion-vinyl.webp"
                         }
@@ -238,13 +233,7 @@ export function BookingListPage() {
 
                       {/* Nama Venue */}
                       <Link
-                        to={
-                          isWaitingPayment
-                            ? `/checkout/${booking.id}`
-                            : isConfirmed || isCompleted
-                            ? `/bookings/${booking.id}`
-                            : `/venues/${booking.venue?.slug || ""}`
-                        }
+                        to={`/bookings/${booking.id}`}
                         className="font-bold text-base sm:text-lg text-slate-900 line-clamp-1 hover:text-red-600 transition-colors block leading-snug"
                       >
                         {booking.venue?.name}
