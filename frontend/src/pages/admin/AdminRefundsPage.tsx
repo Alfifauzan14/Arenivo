@@ -50,24 +50,50 @@ interface RefundItem {
   processedAt?: string;
 }
 
+function normalizeRefund(r: any): RefundItem {
+  return {
+    ...r,
+    id: String(r?.id ?? ""),
+    bookingCode: String(r?.bookingCode ?? r?.booking?.bookingCode ?? r?.booking?.booking_code ?? "-"),
+    customerName: String(r?.customerName ?? r?.booking?.customerName ?? r?.booking?.customer_name ?? "-"),
+    venueName: String(r?.venueName ?? r?.booking?.venue?.name ?? "-"),
+    reason: String(r?.reason ?? "-"),
+    amount: Number(r?.amount ?? 0),
+    refundPercent: Number(r?.refundPercent ?? 0),
+    status: String(r?.status ?? RefundStatus.DIAJUKAN),
+  };
+}
+
 export function AdminRefundsPage() {
   const [refunds, setRefunds] = React.useState<RefundItem[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [submitting, setSubmitting] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterStatus, setFilterStatus] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
 
+  const reloadRefunds = React.useCallback(async () => {
+    const res = await apiClient.get<any[]>("/admin/refunds");
+    if (res.data && Array.isArray(res.data)) {
+      setRefunds(res.data.map(normalizeRefund));
+    }
+  }, []);
+
   React.useEffect(() => {
     let isMounted = true;
     setLoading(true);
-    apiClient.get<any[]>("/admin/refunds").then((res) => {
-      if (isMounted && res.data && Array.isArray(res.data)) {
-        setRefunds(res.data);
-      }
-    }).catch(() => {}).finally(() => {
-      if (isMounted) setLoading(false);
-    });
+    apiClient
+      .get<any[]>("/admin/refunds")
+      .then((res) => {
+        if (isMounted && res.data && Array.isArray(res.data)) {
+          setRefunds(res.data.map(normalizeRefund));
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
     return () => {
       isMounted = false;
     };
@@ -86,18 +112,19 @@ export function AdminRefundsPage() {
   const [rejectError, setRejectError] = React.useState<string | null>(null);
 
   // Toast
-  const [toastMessage, setToastMessage] = React.useState<string | null>(null);
+  const [toast, setToast] = React.useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+  const showToast = (text: string, type: "success" | "error" = "success") => {
+    setToast({ type, text });
+    setTimeout(() => setToast(null), 4500);
   };
 
+  const q = searchQuery.toLowerCase();
   const filteredRefunds = refunds.filter((r) => {
     const matchesSearch =
-      r.bookingCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.venueName.toLowerCase().includes(searchQuery.toLowerCase());
+      (r.bookingCode || "").toLowerCase().includes(q) ||
+      (r.customerName || "").toLowerCase().includes(q) ||
+      (r.venueName || "").toLowerCase().includes(q);
 
     const matchesStatus = filterStatus === "all" || r.status === filterStatus;
 
@@ -109,38 +136,38 @@ export function AdminRefundsPage() {
     currentPage * pageSize
   );
 
-  const handleProcessMidtrans = (refundItem: RefundItem) => {
+  const handleProcessMidtrans = async (refundItem: RefundItem) => {
     const refundKey = `REF-MID-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    setSubmitting(true);
+    try {
+      await apiClient.post(`/admin/refunds/${refundItem.id}/approve`, {
+        reference: refundKey,
+      });
+      await reloadRefunds().catch(() => {});
 
-    setRefunds((prev) =>
-      prev.map((r) =>
-        r.id === refundItem.id
-          ? {
-              ...r,
-              status: RefundStatus.SELESAI,
-              midtransRefundKey: refundKey,
-              processedBy: "adm-1",
-              processedAt: new Date().toISOString(),
-            }
-          : r
-      )
-    );
+      if (selectedRefund?.id === refundItem.id) {
+        setSelectedRefund((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: RefundStatus.SELESAI,
+                midtransRefundKey: refundKey,
+              }
+            : null
+        );
+      }
 
-    if (selectedRefund?.id === refundItem.id) {
-      setSelectedRefund((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: RefundStatus.SELESAI,
-              midtransRefundKey: refundKey,
-            }
-          : null
+      showToast(
+        `Pengembalian dana ${formatRupiah(refundItem.amount)} ditandai selesai. Referensi: ${refundKey}.`
       );
+    } catch (err: any) {
+      showToast(
+        err?.data?.error?.message || err?.message || "Gagal memproses pengembalian dana.",
+        "error"
+      );
+    } finally {
+      setSubmitting(false);
     }
-
-    showToast(
-      `Pengembalian dana ${formatRupiah(refundItem.amount)} via Midtrans API berhasil diproses. Kunci refund: ${refundKey}.`
-    );
   };
 
   const handleOpenManual = (refundItem: RefundItem) => {
@@ -149,7 +176,7 @@ export function AdminRefundsPage() {
     setTransferError(null);
   };
 
-  const handleConfirmManual = () => {
+  const handleConfirmManual = async () => {
     if (!transferRef.trim() || transferRef.trim().length < 6) {
       setTransferError("Nomor referensi transfer bank wajib diisi minimal 6 karakter.");
       return;
@@ -157,36 +184,37 @@ export function AdminRefundsPage() {
 
     if (!manualRefund) return;
 
-    setRefunds((prev) =>
-      prev.map((r) =>
-        r.id === manualRefund.id
-          ? {
-              ...r,
-              status: RefundStatus.SELESAI,
-              midtransRefundKey: transferRef.trim(),
-              processedBy: "adm-1",
-              processedAt: new Date().toISOString(),
-            }
-          : r
-      )
-    );
+    const refCode = transferRef.trim();
+    setSubmitting(true);
+    try {
+      await apiClient.post(`/admin/refunds/${manualRefund.id}/complete`, {
+        reference: refCode,
+      });
+      await reloadRefunds().catch(() => {});
 
-    if (selectedRefund?.id === manualRefund.id) {
-      setSelectedRefund((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: RefundStatus.SELESAI,
-              midtransRefundKey: transferRef.trim(),
-            }
-          : null
+      if (selectedRefund?.id === manualRefund.id) {
+        setSelectedRefund((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: RefundStatus.SELESAI,
+                midtransRefundKey: refCode,
+              }
+            : null
+        );
+      }
+
+      showToast(
+        `Refund ${formatRupiah(manualRefund.amount)} ditandai selesai secara manual dengan No. Ref: ${refCode}.`
       );
+      setManualRefund(null);
+    } catch (err: any) {
+      setTransferError(
+        err?.data?.error?.message || err?.message || "Gagal menyelesaikan refund manual."
+      );
+    } finally {
+      setSubmitting(false);
     }
-
-    showToast(
-      `Refund ${formatRupiah(manualRefund.amount)} ditandai selesai secara manual dengan No. Ref: ${transferRef.trim()}.`
-    );
-    setManualRefund(null);
   };
 
   const handleOpenReject = (refundItem: RefundItem) => {
@@ -195,7 +223,7 @@ export function AdminRefundsPage() {
     setRejectError(null);
   };
 
-  const handleConfirmReject = () => {
+  const handleConfirmReject = async () => {
     if (!rejectReason.trim() || rejectReason.trim().length < 8) {
       setRejectError("Alasan penolakan wajib diisi minimal 8 karakter.");
       return;
@@ -203,34 +231,35 @@ export function AdminRefundsPage() {
 
     if (!rejectingRefund) return;
 
-    setRefunds((prev) =>
-      prev.map((r) =>
-        r.id === rejectingRefund.id
-          ? {
-              ...r,
-              status: RefundStatus.DITOLAK,
-              rejectionReason: rejectReason.trim(),
-              processedBy: "adm-1",
-              processedAt: new Date().toISOString(),
-            }
-          : r
-      )
-    );
+    const reasonText = rejectReason.trim();
+    setSubmitting(true);
+    try {
+      await apiClient.post(`/admin/refunds/${rejectingRefund.id}/reject`, {
+        reason: reasonText,
+      });
+      await reloadRefunds().catch(() => {});
 
-    if (selectedRefund?.id === rejectingRefund.id) {
-      setSelectedRefund((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: RefundStatus.DITOLAK,
-              rejectionReason: rejectReason.trim(),
-            }
-          : null
+      if (selectedRefund?.id === rejectingRefund.id) {
+        setSelectedRefund((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: RefundStatus.DITOLAK,
+                rejectionReason: reasonText,
+              }
+            : null
+        );
+      }
+
+      showToast(`Klaim refund ${rejectingRefund.bookingCode} berhasil ditolak.`);
+      setRejectingRefund(null);
+    } catch (err: any) {
+      setRejectError(
+        err?.data?.error?.message || err?.message || "Gagal menolak klaim refund."
       );
+    } finally {
+      setSubmitting(false);
     }
-
-    showToast(`Klaim refund ${rejectingRefund.bookingCode} berhasil ditolak.`);
-    setRejectingRefund(null);
   };
 
   if (loading) {
@@ -250,13 +279,26 @@ export function AdminRefundsPage() {
       </div>
 
       {/* Toast Feedback */}
-      {toastMessage && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-medium flex items-center justify-between animate-in fade-in">
+      {toast && (
+        <div
+          className={`p-3 rounded-lg text-xs font-medium flex items-center justify-between animate-in fade-in border ${
+            toast.type === "error"
+              ? "bg-red-50 border-red-200 text-red-800"
+              : "bg-emerald-50 border-emerald-200 text-emerald-800"
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>{toastMessage}</span>
+            {toast.type === "error" ? (
+              <XCircle className="w-4 h-4 text-red-600" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            )}
+            <span>{toast.text}</span>
           </div>
-          <button onClick={() => setToastMessage(null)} className="text-emerald-700 font-bold">
+          <button
+            onClick={() => setToast(null)}
+            className={toast.type === "error" ? "text-red-700 font-bold" : "text-emerald-700 font-bold"}
+          >
             ×
           </button>
         </div>
@@ -393,7 +435,7 @@ export function AdminRefundsPage() {
                             : "danger"
                         }
                       >
-                        {r.status.toUpperCase()}
+                        {(r.status || "").toUpperCase()}
                       </Badge>
                     </TableCell>
 
@@ -412,6 +454,7 @@ export function AdminRefundsPage() {
                         <>
                           <Button
                             size="sm"
+                            disabled={submitting}
                             onClick={() => handleProcessMidtrans(r)}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 text-xs"
                           >
@@ -421,6 +464,7 @@ export function AdminRefundsPage() {
                           <Button
                             variant="danger"
                             size="sm"
+                            disabled={submitting}
                             onClick={() => handleOpenReject(r)}
                             className="h-7 px-2 text-xs"
                           >
@@ -537,6 +581,7 @@ export function AdminRefundsPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    disabled={submitting}
                     onClick={() => handleOpenManual(selectedRefund)}
                     className="text-xs"
                   >
@@ -544,6 +589,7 @@ export function AdminRefundsPage() {
                   </Button>
                   <Button
                     size="sm"
+                    disabled={submitting}
                     onClick={() => handleProcessMidtrans(selectedRefund)}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
                   >
@@ -553,6 +599,7 @@ export function AdminRefundsPage() {
                   <Button
                     variant="danger"
                     size="sm"
+                    disabled={submitting}
                     onClick={() => handleOpenReject(selectedRefund)}
                     className="text-xs"
                   >
@@ -606,6 +653,7 @@ export function AdminRefundsPage() {
               </Button>
               <Button
                 size="sm"
+                disabled={submitting}
                 onClick={handleConfirmManual}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
               >
@@ -658,6 +706,7 @@ export function AdminRefundsPage() {
               <Button
                 variant="danger"
                 size="sm"
+                disabled={submitting}
                 onClick={handleConfirmReject}
                 className="text-xs"
               >

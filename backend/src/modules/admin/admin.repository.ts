@@ -101,12 +101,22 @@ export const adminRepository = {
   },
 
   async refunds(status: string | undefined, from: number, to: number) {
-    let q = supabaseAdmin.from("refunds").select("*, booking:bookings(booking_code, customer_name)", { count: "exact" })
-      .order("created_at", { ascending: false }).range(from, to);
+    let q = supabaseAdmin
+      .from("refunds")
+      .select("*, booking:bookings(booking_code, customer_name, venue:venues(name))", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
     if (status) q = q.eq("status", status);
     const { data, error, count } = await q;
     dbError(error);
-    return { rows: camelize<any[]>(data || []), total: count || 0 };
+    const rows = camelize<any[]>(data || []).map((r: any) => ({
+      ...r,
+      bookingCode: r.bookingCode ?? r.booking?.bookingCode ?? "-",
+      customerName: r.customerName ?? r.booking?.customerName ?? "-",
+      venueName: r.venueName ?? r.booking?.venue?.name ?? "-",
+      reason: r.reason ?? "-",
+    }));
+    return { rows, total: count || 0 };
   },
 
   async finishRefund(id: string, adminId: string, reference: string) {
